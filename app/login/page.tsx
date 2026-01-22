@@ -1,21 +1,30 @@
 'use client'
 
-import { useState } from 'react' //useState: 사용자가 입력창에 글자를 칠 때마다 그 글자를 컴퓨터가 기억하게 하는 상자입니다.
-import { createClient } from '@/utils/supabase'  // 우리가 만든 연결 단말기
-import { useRouter } from 'next/navigation' // 페이지 이동 도구
+import { useState, useEffect } from 'react'
+import { createClient } from '@/utils/supabase'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+
   const router = useRouter()
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const error = searchParams.get('error')
 
-  // [로그인 버튼을 눌렀을 때 실행되는 마법]
+  // 경고창 띄우기 로직
+  useEffect(() => {
+    if (error === 'unauthorized') {
+      alert('⚠️ 로그인 없이 접속할 수 없습니다. 먼저 로그인해 주세요!')
+    }
+  }, [error])
+  
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault() // 페이지가 새로고침되는 것을 막아줘요
+    e.preventDefault()
 
-    // 수파베이스에게 "로그인시켜줘!"라고 말합니다.
-    const { error } = await supabase.auth.signInWithPassword({ //signInWithPassword: 수파베이스가 미리 만들어둔 **'로그인 전용 도구'**입니다. 이메일과 비번만 던져주면 알아서 검사해 줍니다.
+    const { error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
     })
@@ -24,7 +33,8 @@ export default function LoginPage() {
       alert('로그인 실패: ' + error.message)
     } else {
       alert('로그인 성공!')
-      router.push('/') // 성공하면 첫 페이지로 이동!
+      router.push('/')
+      router.refresh() // 메인 화면 정보를 새로고침하기 위해 추가
     }
   }
 
@@ -46,7 +56,7 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
           required 
         />
-        <button type="submit" style={{ backgroundColor: 'blue', color: 'white', cursor: 'pointer' }}>
+        <button type="submit" style={{ backgroundColor: 'blue', color: 'white', cursor: 'pointer', padding: '10px' }}>
           로그인하기
         </button>
       </form>
