@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Sidebar from '@/components/Sidebar'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,16 +20,27 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+    <html lang="ko">
+      <body>
+        <div style={{ display: 'flex' }}>
+          {/* 사이드바 배치 */}
+          <Sidebar />
+
+          {/* 메인 콘텐츠: 사이드바 너비(240px)만큼 왼쪽 여백을 줍니다. */}
+          <main style={{ 
+            flex: 1, 
+            marginLeft: '240px', 
+            minHeight: '100vh',
+            backgroundColor: '#fff' 
+          }}>
+            {children}
+          </main>
+        </div>
       </body>
     </html>
-  );
+  )
 }

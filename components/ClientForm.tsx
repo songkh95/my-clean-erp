@@ -1,3 +1,12 @@
+/** 
+my-clean-erp/
+├── app/
+├── utils/
+├── components/       <-- ✨ 새로 만들기
+│   └── ClientForm.tsx <-- ✨ 새로 만들기
+└── middleware.ts
+ */
+
 'use client'
 
 import { useState, useEffect } from 'react'
