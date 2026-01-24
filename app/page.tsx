@@ -43,29 +43,6 @@ export default function HomePage() {
 
   return (
     <div style={{ padding: '0' }}>
-      {/* 상단 헤더 영역 - 이전 스타일 유지 */}
-      <header style={{
-        display: 'flex',
-        justifyContent: 'space-between', // between으로 오타 수정
-        alignItems: 'center',
-        padding: '10px 20px',
-        backgroundColor: '#333',
-        color: 'white'
-      }}>
-        <div style={{ flex: 1 }}>
-          <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>🧼 My Clean ERP</span>
-        </div>
-
-        <div style={{ textAlign: 'right' }}>
-          <span style={{ marginRight: '15px' }}>
-            <strong>{orgName}</strong> | {userName} 님 환영합니다
-          </span>
-          <button onClick={handleLogout} style={{ padding: '5px 10px', cursor: 'pointer', borderRadius: '4px' }}>
-            로그아웃
-          </button>
-        </div>
-      </header>
-
       {/* 메인 내용 (대시보드 청소 버전) */}
       <main style={{ padding: '40px' }}>
         <h1 style={{ fontSize: '2rem' }}>🏠 홈 대시보드</h1>

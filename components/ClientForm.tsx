@@ -1,105 +1,115 @@
-/** 
-my-clean-erp/
-├── app/
-├── utils/
-├── components/       <-- ✨ 새로 만들기
-│   └── ClientForm.tsx <-- ✨ 새로 만들기
-└── middleware.ts
- */
-
 'use client'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
-import { useRouter } from 'next/navigation'
 
-export default function NewClientPage() {
-  const router = useRouter()
+export default function ClientForm({ onSuccess }: { onSuccess: () => void }) {
+  const [isOpen, setIsOpen] = useState(true)
   const supabase = createClient()
-  
-  // 1. 현재 로그인한 사람의 회사 ID를 저장할 상자
-  const [myOrgId, setMyOrgId] = useState<string | null>(null)
 
-  // 2. 11개 항목을 담은 '종합 선물 세트' 상자
+  // [누락방지 11종 필드]
   const [formData, setFormData] = useState({
-    name: '',
-    business_number: '',
-    representative_name: '',
-    contact_person: '',
-    phone: '',
-    office_phone: '',
-    email: '',
-    address: '',
-    status: 'active',
-    popup_memo: ''
+    name: '', business_number: '', representative_name: '', contact_person: '',
+    phone: '', office_phone: '', email: '', address: '',
+    parent_id: '', status: '정상', popup_memo: ''
   })
 
-  // 3. 페이지가 열리자마자 내 회사 ID를 알아내기
-useEffect(() => {
-  const checkUser = async () => {
+  const [parentSearch, setParentSearch] = useState('현재 거래처가 본사')
+  const [allClients, setAllClients] = useState<any[]>([])
+  const [filteredResults, setFilteredResults] = useState<any[]>([])
+  const [showDropdown, setShowDropdown] = useState(false)
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('clients').select('id, name')
+      if (data) setAllClients(data)
+    }
+    load()
+  }, [])
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setParentSearch(val)
+    if (!val) { setFormData(p => ({...p, parent_id: ''})); setFilteredResults([]); return; }
+    const res = allClients.filter(c => c.name.includes(val))
+    setFilteredResults(res); setShowDropdown(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     const { data: { user } } = await supabase.auth.getUser()
-    
-    // [보안 추가] 로그인한 유저 정보가 없으면?
-    if (!user) {
-      alert('로그인이 필요한 페이지입니다.')
-      router.push('/login') // 로그인 페이지로 강제 이동!
-      return
-    }
+    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
 
-    // 로그인 확인 후 조직 정보 가져오기
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single()
-    
-    if (profile) setMyOrgId(profile.organization_id)
-  }
-  checkUser()
-}, [])
+    const { error } = await supabase.from('clients').insert({
+      ...formData,
+      parent_id: formData.parent_id || null,
+      organization_id: profile?.organization_id
+    })
 
-  // 4. 입력창에 글자를 칠 때 실행되는 통합 함수
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,     // 기존 내용물은 그대로 두고
-      [name]: value // 바뀐 칸(name)만 새 값(value)으로 갈아 끼우기!
-    }))
-  }
-
-  const handleSave = async () => {
-    if (!myOrgId) return alert('조직 정보를 불러오는 중입니다.')
-
-    // 5. 드디어 DB에 저장!
-    const { error } = await supabase
-      .from('clients')
-      .insert([{ ...formData, organization_id: myOrgId }])
-
-    if (error) {
-      alert('에러 발생: ' + error.message)
-    } else {
-      alert('새 거래처가 등록되었습니다!')
-      router.push('/')
+    if (!error) {
+      alert('🎉 등록 성공!')
+      setFormData({ name: '', business_number: '', representative_name: '', contact_person: '', phone: '', office_phone: '', email: '', address: '', parent_id: '', status: '정상', popup_memo: '' })
+      setParentSearch('현재 거래처가 본사')
+      onSuccess()
     }
   }
+
+  const inputStyle = { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd', boxSizing: 'border-box' as const, fontSize: '0.9rem', backgroundColor: '#fff' }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px' }}>
-      <h1>🏰 새 거래처 등록</h1>
-      
-      {/* 입력 칸들 (예시로 3개만 먼저 적었습니다. 나머지도 같은 방식!) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <input name="name" placeholder="업체명 (필수)" onChange={handleChange} />
-        <input name="business_number" placeholder="사업자번호" onChange={handleChange} />
-        <input name="representative_name" placeholder="대표자명" onChange={handleChange} />
-        <input name="contact_person" placeholder="담당자명" onChange={handleChange} />
-        <input name="phone" placeholder="핸드폰 번호" onChange={handleChange} />
-        <textarea name="popup_memo" placeholder="알림 메모" onChange={handleChange} />
-        
-        <button onClick={handleSave} style={{ padding: '15px', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '5px' }}>
-          거래처 저장하기
-        </button>
+    <div style={{ border: '1px solid #e0e0e0', borderRadius: '12px', backgroundColor: '#fff', overflow: 'hidden' }}>
+      <div onClick={() => setIsOpen(!isOpen)} style={{ padding: '15px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', backgroundColor: '#fcfcfc', borderBottom: isOpen ? '1px solid #eee' : 'none' }}>
+        <span style={{ fontWeight: 'bold' }}>➕ 신규 거래처 등록</span>
+        <span>{isOpen ? '▲' : '▼'}</span>
       </div>
+
+      {isOpen && (
+        <form onSubmit={handleSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <input placeholder="업체명 (필수)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required style={inputStyle} />
+          
+          <div style={{ position: 'relative' }}>
+            <label style={{ fontSize: '0.75rem', color: '#888' }}>본사 지정 (미입력 시 본사)</label>
+            <input 
+              value={parentSearch} onChange={handleSearch}
+              onFocus={() => { if(parentSearch === '현재 거래처가 본사') setParentSearch('') }}
+              onBlur={() => setTimeout(() => { if(!formData.parent_id) setParentSearch('현재 거래처가 본사'); setShowDropdown(false) }, 200)}
+              style={{ ...inputStyle, backgroundColor: formData.parent_id ? '#f0f7ff' : '#fff' }}
+            />
+            {showDropdown && filteredResults.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: '4px', maxHeight: '150px', overflowY: 'auto', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
+                {filteredResults.map(c => (
+                  <div key={c.id} onClick={() => { setFormData({...formData, parent_id: c.id}); setParentSearch(c.name); setShowDropdown(false); }} style={{ padding: '10px', cursor: 'pointer', borderBottom: '1px solid #eee' }}>{c.name}</div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input placeholder="사업자번호" value={formData.business_number} onChange={e => setFormData({...formData, business_number: e.target.value})} style={inputStyle} />
+            <input placeholder="대표자명" value={formData.representative_name} onChange={e => setFormData({...formData, representative_name: e.target.value})} style={inputStyle} />
+          </div>
+          
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input placeholder="담당자명" value={formData.contact_person} onChange={e => setFormData({...formData, contact_person: e.target.value})} style={inputStyle} />
+            <input placeholder="휴대폰 번호" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} style={inputStyle} />
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input placeholder="사무실 번호" value={formData.office_phone} onChange={e => setFormData({...formData, office_phone: e.target.value})} style={inputStyle} />
+            <input type="email" placeholder="이메일 주소" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={inputStyle} />
+          </div>
+
+          <input placeholder="주소" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} style={inputStyle} />
+          
+          <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} style={inputStyle}>
+            <option value="정상">정상</option><option value="중지">중지</option><option value="해지">해지</option>
+          </select>
+
+          <textarea placeholder="알림메모" value={formData.popup_memo} onChange={e => setFormData({...formData, popup_memo: e.target.value})} style={{ ...inputStyle, height: '60px', resize: 'none' }} />
+          
+          <button type="submit" style={{ padding: '12px', borderRadius: '6px', border: 'none', backgroundColor: '#0070f3', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>등록하기</button>
+        </form>
+      )}
     </div>
   )
 }
