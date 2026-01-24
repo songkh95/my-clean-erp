@@ -6,8 +6,7 @@ import "./globals.css";
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { usePathname } from 'next/navigation'
-
-
+import MainLayout from "@/components/MainLayout";
 
 
 export default function RootLayout({
@@ -31,18 +30,23 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <div style={{ display: 'flex' }}>
-          <Sidebar />
-
-          <div style={{ flex: 1, marginLeft: '240px', display: 'flex', flexDirection: 'column' }}>
-            <Header />
-            
-            <main style={{ flex: 1, backgroundColor: '#fff' }}>
-              {children}
-            </main>
-          </div>
-        </div>
+        {/* 🔴 이제 모든 페이지는 MainLayout의 보호를 받습니다 */}
+        <MainLayout>
+          {children}
+        </MainLayout>
       </body>
     </html>
-  )
+  );
 }
+
+/** [ RootLayout (app/layout.tsx) ]
+      ⬇️
+[ MainLayout (사이드바 + 여백 조절 기능) ]
+      ⬇️
+-----------------------------------
+|  여기에 들어가는 페이지들 (children) |
+-----------------------------------
+   1. 🏠 홈 (app/page.tsx)
+   2. 👥 거래처 관리 (app/clients/page.tsx)
+   3. 📦 자산 및 재고 (app/inventory/page.tsx)
+   4. 🔧 (미래에 만들) 설정, A/S 관리 등... */

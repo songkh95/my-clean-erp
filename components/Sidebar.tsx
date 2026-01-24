@@ -3,41 +3,111 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-export default function Sidebar() {
+// 🔴 [중요] 대장(MainLayout)이 내려주는 명령을 정의합니다.
+type SidebarProps = {
+  isCollapsed: boolean;
+  toggleSidebar: () => void;
+}
+
+// 🔴 함수가 실행될 때 이 명령들(props)을 받도록 수정했습니다.
+export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
   const pathname = usePathname()
 
-  // 메뉴 스타일 (현재 페이지일 때 색상을 다르게 표시)
-  const linkStyle = (path: string) => ({
-    display: 'block',
-    padding: '12px 20px',
-    textDecoration: 'none',
-    color: pathname === path ? '#0070f3' : '#333',
-    backgroundColor: pathname === path ? '#e6f0ff' : 'transparent',
-    fontWeight: pathname === path ? 'bold' : 'normal',
+  const getNavStyle = (path: string) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: isCollapsed ? 'center' : 'flex-start',
+    padding: isCollapsed ? '12px 0' : '12px 20px',
     borderRadius: '8px',
-    marginBottom: '5px'
+    marginBottom: '8px',
+    textDecoration: 'none',
+    fontSize: '0.95rem',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+    backgroundColor: pathname === path ? '#0070f3' : 'transparent',
+    color: pathname === path ? '#fff' : '#475569',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    height: '45px',
+    boxSizing: 'border-box' as const
   })
+
+  const navItems = [
+    { name: '홈 (대시보드)', path: '/', icon: '🏠' },
+    { name: '거래처 관리', path: '/clients', icon: '👥' },
+    { name: '자산 및 재고', path: '/inventory', icon: '📦' },
+  ]
 
   return (
     <aside style={{
-      width: '240px',
+      width: isCollapsed ? '70px' : '240px',
       height: '100vh',
       borderRight: '1px solid #ddd',
-      padding: '20px',
+      padding: '20px 12px',
       backgroundColor: '#fcfcfc',
-      position: 'fixed', // 화면에 고정
+      position: 'fixed',
       left: 0,
-      top: 0
+      top: 0,
+      transition: 'width 0.3s ease',
+      zIndex: 100,
+      overflow: 'hidden'
     }}>
-      <h2 style={{ fontSize: '1.2rem', marginBottom: '30px' }}>🧼 My Clean ERP</h2>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: isCollapsed ? 'center' : 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '30px',
+        padding: '0 5px',
+        height: '40px'
+      }}>
+        {!isCollapsed && (
+          <h2 style={{ fontSize: '1.2rem', margin: 0, whiteSpace: 'nowrap' }}>
+            🧼 ERP
+          </h2>
+        )}
+        
+        {/* 🔴 버튼을 누르면 대장에게 보고(toggleSidebar) */}
+        <button 
+          onClick={toggleSidebar}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1.2rem',
+            color: '#333',
+            padding: '5px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          ☰
+        </button>
+      </div>
       
       <nav>
-        <Link href="/" style={linkStyle('/')}>
-          🏠 홈 (대시보드)
-        </Link>
-        <Link href="/clients" style={linkStyle('/clients')}>
-          👥 거래처 관리
-        </Link>
+        {navItems.map((item) => (
+          <Link 
+            key={item.path} 
+            href={item.path} 
+            style={getNavStyle(item.path)}
+            title={isCollapsed ? item.name : ''}
+          >
+            <span style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {item.icon}
+            </span>
+            
+            <span style={{ 
+              marginLeft: isCollapsed ? 0 : '12px', 
+              opacity: isCollapsed ? 0 : 1, 
+              width: isCollapsed ? 0 : 'auto',
+              transition: 'all 0.2s',
+              visibility: isCollapsed ? 'hidden' : 'visible'
+            }}>
+              {item.name}
+            </span>
+          </Link>
+        ))}
       </nav>
     </aside>
   )

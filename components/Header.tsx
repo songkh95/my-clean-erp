@@ -2,58 +2,74 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 
 export default function Header() {
-  const [userName, setUserName] = useState('')
-  const [orgName, setOrgName] = useState('')
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const supabase = createClient()
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
-    const fetchUserData = async () => {
+    const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select(`name, organizations ( name )`)
-          .eq('id', user.id)
-          .single()
-
-        if (profile) {
-          setUserName(profile.name)
-          // @ts-ignore
-          setOrgName(profile.organizations?.name || '소속 없음')
-        }
+        // 🔴 [수정] 이메일이 없으면 null을 넣도록 '?? null' 추가
+        setUserEmail(user.email ?? null)
       }
     }
-    fetchUserData()
+    getUser()
   }, [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    alert('로그아웃 되었습니다.')
     router.push('/login')
+  }
+
+  const getPageTitle = (path: string) => {
+    if (path === '/') return '🏠 홈 (대시보드)'
+    if (path.startsWith('/clients')) return '👥 거래처 관리'
+    if (path.startsWith('/inventory')) return '📦 자산 및 재고 관리'
+    return '🧼 My Clean ERP'
   }
 
   return (
     <header style={{
-      //display: 'flex',
-      //justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '10px 20px',
+      height: '60px',
       backgroundColor: '#333',
-      color: 'white',
-      height: '60px' // 높이 고정
+      color: '#fff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '0 30px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
     }}>
-   
-      <div style={{ textAlign: 'right' }}>
-        <span style={{ marginRight: '15px' }}>
-          <strong>{orgName}</strong> | {userName} 님
-        </span>
-        <button onClick={handleLogout} style={{ padding: '5px 10px', cursor: 'pointer', borderRadius: '4px' }}>
-          로그아웃
-        </button>
+      <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>
+        {getPageTitle(pathname)}
+      </h2>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.9rem' }}>
+        {userEmail ? (
+          <>
+            <span>👤 {userEmail} 님</span>
+            <button 
+              onClick={handleLogout}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#555',
+                border: '1px solid #777',
+                color: '#fff',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.8rem'
+              }}
+            >
+              로그아웃
+            </button>
+          </>
+        ) : (
+          <span>로그인 정보 확인 중...</span>
+        )}
       </div>
     </header>
   )
