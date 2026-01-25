@@ -1,0 +1,231 @@
+/* components/InventoryList.module.css */
+
+/* 전체 컨테이너 */
+.container {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  background-color: #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* 아코디언 헤더 */
+.header {
+  padding: 15px 20px;
+  background-color: #fcfcfc;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+
+/* 헤더가 접혔을 때 (밑줄 없애기) */
+.headerClosed {
+  border-bottom: none;
+}
+
+/* 검색창 영역 */
+.searchContainer {
+  padding: 10px 20px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #eee;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #dddddd; /* 요청하신 색상 */
+  font-size: 0.9rem;
+  outline: none;
+}
+
+/* 테이블 영역 */
+.tableContainer {
+  overflow-x: auto;
+  min-height: 300px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.theadTr {
+  background-color: #f9f9f9;
+  border-bottom: 2px solid #eee;
+}
+
+.th {
+  padding: 12px 10px;
+  text-align: left;
+  color: #666;
+  font-weight: bold;
+}
+
+.td {
+  padding: 12px 10px;
+  color: #333;
+}
+
+.noDataRow {
+  padding: 40px;
+  text-align: center;
+  color: #999;
+}
+
+/* 데이터 행 (기본) */
+.dataRow {
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  background-color: transparent;
+  transition: background-color 0.2s;
+}
+
+/* 데이터 행 (펼쳐졌을 때 강조) */
+.dataRowExpanded {
+  background-color: #f0f7ff;
+}
+
+.modelName {
+  font-weight: bold;
+}
+
+/* 상태 뱃지 */
+.statusBadge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.statusWarehouse {
+  background-color: #eee;
+  color: #666;
+}
+
+.statusInstalled {
+  background-color: #e3f2fd;
+  color: #0070f3;
+}
+
+/* 상세 정보 영역 (펼쳐진 곳) */
+.expandedRow {
+  background-color: #fcfcfc;
+  border-bottom: 1px solid #ddd;
+}
+
+.expandedCell {
+  padding: 20px;
+}
+
+/* 입력 폼 그리드 */
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+/* 입력창 공통 스타일 */
+.formInput {
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #dddddd; /* 요청하신 색상 */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 거래처 검색 드롭다운 */
+.dropdownContainer {
+  position: relative;
+  width: 100%;
+}
+
+.dropdownMenu {
+  position: absolute;
+  width: 100%;
+  background-color: #fff;
+  border: 1px solid #dddddd;
+  z-index: 100;
+  max-height: 150px;
+  overflow-y: auto;
+  border-radius: 4px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  top: 100%;
+}
+
+.dropdownItem {
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.dropdownItem:hover {
+  background-color: #f5f5f5;
+}
+
+/* 버튼 영역 */
+.buttonArea {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btnEdit {
+  border: 1px solid #0070f3;
+  color: #0070f3;
+  background-color: #fff;
+}
+
+.btnDelete {
+  border: 1px solid #d93025;
+  color: #d93025;
+  background-color: #fff;
+}
+
+.btnSave {
+  border: none;
+  color: #fff;
+  background-color: #0070f3;
+}
+
+.btnCancel {
+  border: 1px solid #888;
+  color: #666;
+  background-color: #fff;
+}
+
+/* 조수 컴포넌트용 */
+.editableItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.editableLabel {
+  color: #888;
+  min-width: 60px;
+  font-size: 0.85rem;
+}
+
+.editableValue {
+  font-weight: 500;
+}
+
+.fullWidthItem {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}

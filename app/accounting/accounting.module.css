@@ -1,0 +1,251 @@
+/* app/accounting/accounting.module.css */
+
+.container {
+  padding: 0;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+/* 아코디언 박스 공통 */
+.section {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  background-color: #fff;
+  overflow: hidden;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.header {
+  padding: 15px 20px;
+  background-color: #fcfcfc;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.headerClosed {
+  border-bottom: none;
+}
+
+.content {
+  padding: 20px;
+}
+
+/* 필터 컨트롤 영역 */
+.controls {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.controlItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input {
+  padding: 8px 12px;
+  border: 1px solid #dddddd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.checkboxLabel {
+  font-size: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* 테이블 스타일 */
+.tableContainer {
+  overflow-x: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 1000px;
+}
+
+.th {
+  background-color: #f1f3f5;
+  padding: 10px;
+  border-bottom: 2px solid #ddd;
+  text-align: center;
+  font-weight: bold;
+  color: #555;
+  white-space: nowrap;
+}
+
+.td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  text-align: center;
+  color: #333;
+  vertical-align: middle;
+}
+
+/* 거래처 그룹핑 스타일 */
+.clientGroup {
+  background-color: #fff;
+}
+
+.clientInfoCell {
+  background-color: #fafafa;
+  border-right: 1px solid #eee;
+  text-align: left;
+  vertical-align: top;
+  padding: 15px;
+  width: 200px;
+}
+
+.clientName {
+  font-weight: bold;
+  font-size: 1rem;
+  margin-bottom: 4px;
+  color: #0070f3;
+}
+
+.clientMeta {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 2px;
+}
+
+/* 카운터 입력 영역 */
+.counterInputGroup {
+  display: flex;
+  gap: 5px;
+  flex-direction: column;
+}
+
+.counterRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  font-size: 0.8rem;
+}
+
+.counterLabel {
+  color: #888;
+  width: 30px;
+  text-align: right;
+}
+
+.numberInput {
+  width: 70px;
+  padding: 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: right;
+}
+
+.readOnlyValue {
+  width: 70px;
+  text-align: right;
+  font-weight: 500;
+  color: #555;
+}
+
+/* 계산 결과 강조 */
+.usageValue {
+  font-weight: bold;
+  color: #0070f3;
+}
+
+.feeValue {
+  font-weight: bold;
+  color: #d93025;
+}
+
+/* 기계 상태 뱃지 */
+.badge {
+  font-size: 0.7rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background-color: #eee;
+  color: #666;
+  margin-right: 4px;
+}
+
+.badgeReplaced {
+  background-color: #fff0f0;
+  color: #d93025;
+  border: 1px solid #d93025;
+}
+
+/* 하단 액션 바 */
+.actionBar {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #333;
+  color: #fff;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.totalLabel {
+  font-size: 1.1rem;
+}
+
+.totalAmount {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ffeb3b;
+  margin-left: 10px;
+}
+
+.saveBtn {
+  background-color: #0070f3;
+  color: #fff;
+  border: none;
+  padding: 10px 25px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.saveBtn:disabled {
+  background-color: #777;
+  cursor: not-allowed;
+}
+
+/* 내역 테이블 전용 */
+.historyRow:hover {
+  background-color: #f5f5f5;
+}
+
+.deleteBtn {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  background-color: #fff;
+  color: #d93025;
+  border-radius: 4px;
+  cursor: pointer;
+}

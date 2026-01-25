@@ -3,13 +3,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-// 🔴 [중요] 대장(MainLayout)이 내려주는 명령을 정의합니다.
 type SidebarProps = {
   isCollapsed: boolean;
   toggleSidebar: () => void;
 }
 
-// 🔴 함수가 실행될 때 이 명령들(props)을 받도록 수정했습니다.
 export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
   const pathname = usePathname()
 
@@ -36,6 +34,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     { name: '홈 (대시보드)', path: '/', icon: '🏠' },
     { name: '거래처 관리', path: '/clients', icon: '👥' },
     { name: '자산 및 재고', path: '/inventory', icon: '📦' },
+    // 🔴 [추가] 정산 및 회계 관리 메뉴
+    { name: '정산 및 회계', path: '/accounting', icon: '💰' },
   ]
 
   return (
@@ -66,7 +66,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           </h2>
         )}
         
-        {/* 🔴 버튼을 누르면 대장에게 보고(toggleSidebar) */}
         <button 
           onClick={toggleSidebar}
           style={{
