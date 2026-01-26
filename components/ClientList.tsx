@@ -1,305 +1,225 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
-import styles from './ClientList.module.css'
+import ClientForm from './ClientForm'
+import PlanSettingModal from './PlanSettingModal'
 
-export default function ClientList({ refreshTrigger }: { refreshTrigger: number }) {
-  const [isListOpen, setIsListOpen] = useState(true)
-  const [clients, setClients] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editData, setEditData] = useState<any>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [clientAssets, setClientAssets] = useState<any[]>([])
-
+export default function ClientList() {
   const supabase = createClient()
 
+  // --- 상태 관리 ---
+  const [clients, setClients] = useState<any[]>([])
+  const [assetsMap, setAssetsMap] = useState<{[key: string]: any[]}>({})
+  const [loading, setLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+
+  // 모달 상태
+  const [isRegModalOpen, setIsRegModalOpen] = useState(false)
+  const [selectedClient, setSelectedClient] = useState<any>(null)
+  const [planModalOpen, setPlanModalOpen] = useState(false)
+  const [selectedAssetForPlan, setSelectedAssetForPlan] = useState<{id: string, clientId: string} | null>(null)
+
+  useEffect(() => {
+    fetchClients()
+  }, [])
+
+  // 데이터 불러오기
   const fetchClients = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
-      if (profile?.organization_id) {
-        const { data } = await supabase
-          .from('clients')
-          .select('*, parent:parent_id(name)')
-          .eq('organization_id', profile.organization_id)
-          .order('created_at', { ascending: false })
-        if (data) setClients(data)
+    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
+    const orgId = profile?.organization_id
+
+    if (orgId) {
+      const { data: clientData } = await supabase.from('clients').select('*').eq('organization_id', orgId).order('created_at', { ascending: false })
+      if (clientData) setClients(clientData)
+
+      const { data: assetData } = await supabase.from('inventory').select('*').eq('organization_id', orgId).not('client_id', 'is', null).order('created_at', { ascending: true })
+      
+      const map: {[key: string]: any[]} = {}
+      if (assetData) {
+        assetData.forEach((asset: any) => {
+          if (!map[asset.client_id]) map[asset.client_id] = []
+          map[asset.client_id].push(asset)
+        })
       }
+      setAssetsMap(map)
     }
     setLoading(false)
   }
 
-  useEffect(() => { fetchClients() }, [refreshTrigger])
-
-  const fetchClientAssets = async (clientId: string) => {
-    // 🔴 [수정] 철수된 기계도 이력에는 남겨야 하므로 모두 가져오되, 정렬
-    const { data } = await supabase.from('inventory')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false })
-    if (data) setClientAssets(data)
-    else setClientAssets([])
-  }
-
-  // 1. 단순 철수 기능
-  const handleWithdrawAsset = async (assetId: string, modelName: string) => {
-    if (confirm(`[${modelName}] 장비를 단순 철수(창고 반환) 하시겠습니까?`)) {
-      const { error } = await supabase.from('inventory').update({ status: '창고', client_id: null }).eq('id', assetId)
-      if (!error) {
-        alert('철수 완료! 창고로 이동되었습니다.')
-        if (expandedId) fetchClientAssets(expandedId)
-      } else { alert(error.message) }
+  // 삭제 기능
+  const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation() // 행 클릭 이벤트(펼치기) 방지
+    if (confirm(`'${name}' 거래처를 정말로 삭제하시겠습니까?`)) { 
+      const { error } = await supabase.from('clients').delete().eq('id', id);
+      if (error) alert('삭제 실패: ' + error.message);
+      else { alert('삭제되었습니다.'); fetchClients(); }
     }
   }
 
-  // 🔴 2. [추가] 기계 교체 기능
-  const handleReplaceAsset = async (assetId: string, modelName: string) => {
-    if (confirm(`[${modelName}] 장비를 '교체(철수)' 처리 하시겠습니까?\n\n확인 시:\n1. 이 장비는 '교체전(철수)' 상태가 됩니다.\n2. 정산 시 교체 전 데이터로 사용됩니다.\n3. 이후 [자산 및 재고] 탭에서 새 기계를 등록해주세요.`)) {
-      // 상태를 '교체전'으로 변경 (정산 시 식별용)
-      const { error } = await supabase.from('inventory')
-        .update({ status: '교체전(철수)' }) // client_id는 유지해야 정산 내역에 뜸
-        .eq('id', assetId)
-
-      if (!error) {
-        alert('처리되었습니다. \n이제 [자산 및 재고] 탭에서 교체할 새 기계를 등록해주세요.')
-        if (expandedId) fetchClientAssets(expandedId)
-      } else {
-        alert('오류 발생: ' + error.message)
-      }
-    }
+  // 아코디언 토글
+  const toggleExpand = (clientId: string) => {
+    const newSet = new Set(expandedRows)
+    if (newSet.has(clientId)) newSet.delete(clientId)
+    else newSet.add(clientId)
+    setExpandedRows(newSet)
   }
 
-  const startEditing = (client: any) => {
-    setEditingId(client.id)
-    setEditData({ ...client })
+  // 기계 교체
+  const handleReplace = async (assetId: string) => {
+    if (!confirm('이 기계를 교체(철수) 상태로 변경하시겠습니까?')) return
+    const { error } = await supabase.from('inventory').update({ status: '교체전(철수)' }).eq('id', assetId)
+    if (error) alert('오류 발생: ' + error.message)
+    else { alert('상태가 변경되었습니다.'); fetchClients() }
   }
 
-  const handleUpdate = async () => {
-    if (!editData.name) return alert('업체명은 필수입니다.')
-    const { parent, id, created_at, organization_id, ...cleanData } = editData
-    if (cleanData.parent_id === "") cleanData.parent_id = null
-    const { error } = await supabase.from('clients').update(cleanData).eq('id', editingId)
-    if (!error) { alert('수정완료'); setEditingId(null); fetchClients(); }
+  // 수정 모달 열기
+  const handleEdit = (e: React.MouseEvent, client: any) => {
+    e.stopPropagation() // 행 클릭 이벤트(펼치기) 방지
+    setSelectedClient(client)
+    setIsRegModalOpen(true)
   }
 
-const handleDelete = async (id: string, name: string) => {
-    // 🔴 요청하신 경고 문구 적용
-    if (confirm(`'${name}' 거래처를 정말로 삭제하시겠습니까?\n삭제 시 등록된 기기 이력은 사라지며 상태는 창고로 전환됩니다.`)) { 
-      
-      // 1. [선행 작업] 이 거래처에 연결된 기계들의 연결을 해제하고 '창고'로 변경
-      const { error: updateError } = await supabase
-        .from('inventory')
-        .update({ status: '창고', client_id: null })
-        .eq('client_id', id) // 여기서 id는 삭제하려는 거래처의 ID입니다.
-
-      if (updateError) {
-        alert('기기 상태 변경(철수 처리) 중 오류가 발생했습니다: ' + updateError.message)
-        return // 기기 처리에 실패하면 거래처 삭제를 진행하지 않고 멈춤
-      }
-
-      // 2. [삭제 작업] 기계 연결이 끊어졌으니, 이제 안전하게 거래처 삭제
-      const { error: deleteError } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', id)
-
-      if (deleteError) {
-        alert('거래처 삭제 실패: ' + deleteError.message)
-      } else {
-        alert('성공적으로 삭제되었습니다.')
-        fetchClients() // 목록 새로고침
-      }
-    }
-  }
-
-  const filteredClients = clients.filter(client => {
-    const searchLower = searchTerm.toLowerCase()
-    return (
-      (client.name && String(client.name).toLowerCase().includes(searchLower)) ||
-      (client.contact_person && String(client.contact_person).toLowerCase().includes(searchLower)) ||
-      (client.business_number && String(client.business_number).includes(searchTerm))
-    )
-  })
-
-  if (loading) return <div style={{ padding: '20px' }}>데이터 로딩 중...</div>
+  // 검색 필터
+  const filteredClients = clients.filter(c => 
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.address?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
-    <div className={styles.container}>
-      <div 
-        onClick={() => setIsListOpen(!isListOpen)} 
-        className={`${styles.header} ${!isListOpen ? styles.headerClosed : ''}`}
-      >
-        <span>📋 등록된 거래처 목록 ({searchTerm ? filteredClients.length : clients.length})</span>
-        <span>{isListOpen ? '▲' : '▼'}</span>
+    <div style={{ width: '100%', padding: '20px', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>🏢 거래처 관리</h2>
+        <button 
+          onClick={() => { setSelectedClient(null); setIsRegModalOpen(true); }}
+          style={{ padding: '10px 20px', backgroundColor: '#333', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+        >
+          + 신규 거래처 등록
+        </button>
       </div>
 
-      {isListOpen && (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div className={styles.searchContainer}>
-            <input
-              type="text"
-              placeholder="업체명, 담당자명, 번호 등으로 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={styles.searchInput}
-            />
-          </div>
+      <input 
+        placeholder="검색어 입력 (거래처명, 주소)" 
+        value={searchTerm}
+        onChange={e => setSearchTerm(e.target.value)}
+        style={{ width: '100%', padding: '10px', marginBottom: '20px', border: '1px solid #ddd', borderRadius: '4px' }}
+      />
 
-          <div className={styles.listHeader}>
-            <div style={{ flex: 2 }}>업체명 (본사/지사)</div>
-            <div style={{ flex: 1 }}>담당자</div>
-            <div style={{ flex: 1, textAlign: 'right' }}>등록일</div>
-          </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f5f5f5', textAlign: 'left' }}>
+            {/* 🔴 [수정] 헤더에 순번 타이틀 추가 */}
+            <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>순번 / 거래처명</th>
+            <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>연락처/주소</th>
+            <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>청구일</th>
+            <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>설치기기</th>
+            <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
+            <tr><td colSpan={5} style={{ padding: '20px', textAlign: 'center' }}>로딩 중...</td></tr>
+          ) : filteredClients.map((client, index) => (
+            <React.Fragment key={client.id}>
+              {/* 🔴 [수정] tr(행) 자체에 onClick 이벤트를 걸어서 어디든 누르면 펼쳐지게 함 */}
+              <tr 
+                onClick={() => toggleExpand(client.id)}
+                style={{ borderBottom: '1px solid #eee', cursor: 'pointer', backgroundColor: expandedRows.has(client.id) ? '#f0f9ff' : 'transparent' }}
+              >
+                <td style={{ padding: '12px', color: '#333' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* 순번 */}
+                    <span style={{ color: '#888', minWidth: '20px' }}>{index + 1}.</span>
+                    
+                    {/* 🔴 [복구] 본사/지사 구분 뱃지 */}
+                    {client.parent_id ? (
+                      <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e9ecef', color: '#495057', border:'1px solid #ced4da' }}>지사</span>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e3f2fd', color: '#0d6efd', border:'1px solid #9ec5fe' }}>본사</span>
+                    )}
 
-          {filteredClients.length === 0 ? (
-            <div className={styles.noResult}>결과가 없습니다.</div>
-          ) : (
-            filteredClients.map((client) => {
-              const isHead = !client.parent_id;
-              return (
-                <div key={client.id} className={styles.clientRow}>
-                  <div 
-                    onClick={() => { 
-                      const newId = expandedId === client.id ? null : client.id;
-                      setExpandedId(newId); 
-                      setEditingId(null);
-                      if (newId) fetchClientAssets(newId);
-                    }} 
-                    className={`${styles.clientSummary} ${expandedId === client.id ? styles.clientSummarySelected : ''}`}
-                  >
-                    <div style={{ flex: 2, display: 'flex', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 'bold' }}>{client.name}</span>
-                      <span className={`${styles.badge} ${isHead ? styles.badgeHead : styles.badgeBranch}`}>
-                        {isHead ? '본사' : '지사'}
-                      </span>
-                    </div>
-                    <div style={{ flex: 1 }}>{client.contact_person || '-'}</div>
-                    <div style={{ flex: 1, textAlign: 'right', fontSize: '0.8rem', color: '#888' }}>{new Date(client.created_at).toLocaleDateString()}</div>
+                    {/* 거래처명 */}
+                    <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{client.name}</span>
+                    
+                    {/* 화살표 아이콘 */}
+                    <span style={{ fontSize: '0.8rem', color: '#999' }}>{expandedRows.has(client.id) ? '▲' : '▼'}</span>
                   </div>
+                </td>
+                <td style={{ padding: '12px' }}>
+                  <div>{client.contact_person} ({client.contact_number})</div>
+                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{client.address}</div>
+                </td>
+                <td style={{ padding: '12px' }}>매월 {client.billing_date}일</td>
+                <td style={{ padding: '12px' }}>{assetsMap[client.id]?.length || 0}대</td>
+                <td style={{ padding: '12px' }}>
+                  {/* 버튼 클릭 시 행 클릭 이벤트가 발생하지 않도록 e.stopPropagation() 추가 */}
+                  <button onClick={(e) => handleEdit(e, client)} style={{ marginRight: '8px', border: '1px solid #ccc', background: '#fff', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>수정</button>
+                  <button onClick={(e) => handleDelete(e, client.id, client.name)} style={{ border: '1px solid #ff6b6b', background: '#fff', color: '#ff6b6b', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>삭제</button>
+                </td>
+              </tr>
 
-                  {expandedId === client.id && (
-                    <div className={styles.detailsContainer}>
-                      
-                      {/* 상세 정보 수정 */}
-                      <div style={{ marginBottom: '20px' }}>
-                         <div className={styles.sectionTitle}>👤 거래처 기본 정보</div>
-                         <div className={styles.gridForm}>
-                            <EditableItem label="업체명" name="name" value={client.name} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="사업자번호" name="business_number" value={client.business_number} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="대표자명" name="representative_name" value={client.representative_name} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="담당자명" name="contact_person" value={client.contact_person} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="휴대폰" name="phone" value={client.phone} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="사무실" name="office_phone" value={client.office_phone} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="이메일" name="email" value={client.email} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="상태" name="status" value={client.status} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} isSelect />
-                            <EditableItem label="주소" name="address" value={client.address} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} fullWidth />
-                            
-                            {/* 🔴 [추가] 요금제 수정 필드 */}
-                            <div className={styles.fullWidth} style={{marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '10px'}}>
-                                <span style={{fontWeight: 'bold', fontSize: '0.85rem', color: '#0070f3'}}>💰 요금제 설정</span>
-                            </div>
-                            <EditableItem label="청구일" name="billing_date" value={client.billing_date} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="기본료" name="basic_fee" value={client.basic_fee} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="흑백기본" name="basic_cnt_bw" value={client.basic_cnt_bw} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="칼라기본" name="basic_cnt_col" value={client.basic_cnt_col} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="흑백추가" name="extra_cost_bw" value={client.extra_cost_bw} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                            <EditableItem label="칼라추가" name="extra_cost_col" value={client.extra_cost_col} isEditing={editingId === client.id} editData={editData} setEditData={setEditData} />
-                         </div>
-                         
-                         <div className={styles.buttonGroup}>
-                          {editingId === client.id ? 
-                            ( <><button onClick={handleUpdate} className={`${styles.btn} ${styles.btnSave}`}>저장</button><button onClick={()=>setEditingId(null)} className={`${styles.btn} ${styles.btnCancel}`}>취소</button></> ) : 
-                            ( <><button onClick={()=>startEditing(client)} className={`${styles.btn} ${styles.btnEdit}`}>정보 수정</button><button onClick={()=>handleDelete(client.id, client.name)} className={`${styles.btn} ${styles.btnDelete}`}>거래처 삭제</button></> )
-                          }
+              {/* 확장 영역 */}
+              {expandedRows.has(client.id) && (
+                <tr>
+                  <td colSpan={5} style={{ backgroundColor: '#f8f9fa', padding: '20px', borderBottom:'2px solid #e9ecef' }}>
+                    
+                    {/* 거래처 상세 정보 섹션 */}
+                    <div style={{ marginBottom: '20px', backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #dee2e6', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                      <div style={{ fontSize: '1rem', fontWeight: 'bold', color: '#333', marginBottom: '15px', paddingBottom:'10px', borderBottom:'1px solid #eee', display:'flex', alignItems:'center', gap:'6px' }}>
+                        ℹ️ 거래처 상세 정보
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', fontSize: '0.9rem' }}>
+                        <div><span style={{color:'#666', fontWeight:'600', display:'inline-block', width:'60px'}}>이메일</span> {client.email || '-'}</div>
+                        <div><span style={{color:'#666', fontWeight:'600', display:'inline-block', width:'60px'}}>담당자</span> {client.contact_person} ({client.contact_number})</div>
+                        <div><span style={{color:'#666', fontWeight:'600', display:'inline-block', width:'60px'}}>주소</span> {client.address}</div>
+                        <div><span style={{color:'#666', fontWeight:'600', display:'inline-block', width:'60px'}}>청구일</span> 매월 {client.billing_date}일</div>
+                        <div style={{gridColumn: 'span 2', marginTop:'5px', padding:'10px', backgroundColor:'#f8f9fa', borderRadius:'6px', color:'#555'}}>
+                          <span style={{fontWeight:'bold', marginRight:'10px'}}>📝 메모</span> 
+                          {client.memo || '등록된 메모가 없습니다.'}
                         </div>
                       </div>
-
-                      <hr className={styles.divider} />
-
-                      {/* 설치된 자산 목록 */}
-                      <div className={styles.assetContainer}>
-                        <div className={styles.sectionTitle}>📦 설치된 자산 목록 ({clientAssets.length})</div>
-                        {clientAssets.length === 0 ? (
-                          <div className={styles.assetEmpty}>설치된 장비가 없습니다.</div>
-                        ) : (
-                          <table className={styles.assetTable}>
-                            <thead>
-                              <tr>
-                                <th className={styles.assetTh}>분류</th>
-                                <th className={styles.assetTh}>모델명</th>
-                                <th className={styles.assetTh}>S/N</th>
-                                <th className={styles.assetTh}>상태</th>
-                                <th style={{...thStyleCenter}}>관리</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {clientAssets.map((asset) => (
-                                <tr key={asset.id} style={{ opacity: asset.status.includes('철수') ? 0.6 : 1 }}>
-                                  <td className={styles.assetTd}>{asset.category}</td>
-                                  <td className={styles.assetTd} style={{fontWeight:'bold'}}>{asset.model_name}</td>
-                                  <td className={styles.assetTd}>{asset.serial_number}</td>
-                                  <td className={styles.assetTd}>{asset.status}</td>
-                                  <td className={styles.assetTd} style={{textAlign:'center', display:'flex', gap:'5px', justifyContent:'center'}}>
-                                    {/* 🔴 교체 버튼 & 철수 버튼 */}
-                                    {!asset.status.includes('철수') && (
-                                      <>
-                                        <button 
-                                          onClick={() => handleReplaceAsset(asset.id, asset.model_name)}
-                                          className={styles.btnWithdraw}
-                                          style={{borderColor: '#0070f3', color: '#0070f3'}}
-                                        >
-                                          🔄 교체
-                                        </button>
-                                        <button 
-                                          onClick={() => handleWithdrawAsset(asset.id, asset.model_name)}
-                                          className={styles.btnWithdraw}
-                                        >
-                                          철수
-                                        </button>
-                                      </>
-                                    )}
-                                    {asset.status.includes('철수') && <span style={{fontSize:'0.75rem', color:'#d93025'}}>철수됨</span>}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
-                      </div>
                     </div>
-                  )}
-                </div>
-              )
-            })
-          )}
-        </div>
-      )}
+
+                    {/* 자산 목록 섹션 */}
+                    <div style={{ marginBottom: '10px', fontSize: '1rem', fontWeight: 'bold', color: '#495057' }}>📦 설치된 자산 목록</div>
+                    {(!assetsMap[client.id] || assetsMap[client.id].length === 0) ? (
+                      <div style={{ color: '#888', padding: '15px', backgroundColor:'#fff', borderRadius:'8px', textAlign:'center', border:'1px solid #eee' }}>설치된 기기가 없습니다.</div>
+                    ) : (
+                      assetsMap[client.id].map((asset: any) => (
+                        <div key={asset.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '15px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                          <div>
+                            <div style={{marginBottom:'5px'}}>
+                              <span style={{ fontWeight: 'bold', color: '#333', fontSize:'1.05rem' }}>[{asset.type}]</span> 
+                              <span style={{ marginLeft: '8px', fontSize:'1.05rem' }}>{asset.model_name}</span>
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: '#666', marginBottom:'8px' }}>S/N: {asset.serial_number}</div>
+                            
+                            <div style={{fontSize:'0.85rem', color:'#0070f3', display:'flex', gap:'10px', alignItems:'center', background:'#f0f7ff', padding:'5px 10px', borderRadius:'4px', width:'fit-content'}}>
+                              <span>{asset.plan_basic_fee > 0 ? `💰 기본료: ${asset.plan_basic_fee.toLocaleString()}원` : '⚠️ 요금제 미설정'}</span>
+                              {asset.billing_group_id && (<span style={{backgroundColor:'#0070f3', color:'white', padding:'2px 6px', borderRadius:'4px', fontWeight:'bold', fontSize:'0.75rem'}}>🔗 합산청구중</span>)}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <div style={{ padding: '6px 10px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold', backgroundColor: asset.status === '설치' ? '#e6fffa' : '#fff5f5', color: asset.status === '설치' ? '#00b894' : '#d63031' }}>{asset.status}</div>
+                            <button onClick={() => { setSelectedAssetForPlan({ id: asset.id, clientId: client.id }); setPlanModalOpen(true) }} style={{ padding:'6px 12px', border:'1px solid #0070f3', color:'#0070f3', background:'white', borderRadius:'4px', cursor:'pointer', fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'4px' }}>⚙️ 요금제</button>
+                            <button onClick={() => handleReplace(asset.id)} style={{ padding: '6px 12px', border: '1px solid #ccc', background: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>🔄 교체</button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+
+      {isRegModalOpen && <ClientForm isOpen={isRegModalOpen} onClose={() => setIsRegModalOpen(false)} onSuccess={fetchClients} editData={selectedClient} />}
+      {planModalOpen && selectedAssetForPlan && <PlanSettingModal inventoryId={selectedAssetForPlan.id} clientId={selectedAssetForPlan.clientId} onClose={() => { setPlanModalOpen(false); setSelectedAssetForPlan(null) }} onUpdate={fetchClients} />}
     </div>
   )
 }
-
-function EditableItem({ label, name, value, isEditing, editData, setEditData, fullWidth = false, isSelect = false }: any) {
-  const handleChange = (e: any) => setEditData({ ...editData, [name]: e.target.value })
-  return (
-    <div className={`${styles.fieldContainer} ${fullWidth ? styles.fullWidth : ''}`}>
-      <span className={styles.label}>{label}</span>
-      {isEditing ? (
-        isSelect ? (
-          <select value={editData[name]} onChange={handleChange} className={styles.input}>
-            <option value="정상">정상</option><option value="중지">중지</option><option value="해지">해지</option>
-          </select>
-        ) : (
-          <input value={editData[name] || ''} onChange={handleChange} className={styles.input} />
-        )
-      ) : (
-        <span className={styles.valueText}>{value || '-'}</span>
-      )}
-    </div>
-  )
-}
-
-const thStyleCenter = { padding: '8px 10px', textAlign: 'center', color: '#555', fontSize: '0.8rem', backgroundColor: '#f1f3f5', borderBottom: '1px solid #ddd' } as const
