@@ -10,18 +10,14 @@ type AssetCalculation = {
   model_name: string
   serial_number: string
   billing_group_id: string | null
-  
   prev: { bw: number, col: number, bw_a3: number, col_a3: number }
   curr: { bw: number, col: number, bw_a3: number, col_a3: number }
-  
   usage: { bw: number, col: number, bw_a3: number, col_a3: number }
   converted: { bw: number, col: number } 
-  
   usageBreakdown: {
     basicBW: number, extraBW: number
     basicCol: number, extraCol: number
   }
-  
   plan: {
     basic_fee: number
     free_bw: number
@@ -29,7 +25,6 @@ type AssetCalculation = {
     price_bw: number
     price_col: number
   }
-
   rowCost: {
     basic: number
     extra: number
@@ -180,7 +175,7 @@ export default function AccountingPage() {
       }
     })
 
-    const groups: {[key: string]: typeof tempCalculations} = {}
+    const groups: {[key: string]: AssetCalculation[]} = {}
     tempCalculations.forEach(calc => {
       const groupKey = calc.billing_group_id || `INDIVIDUAL_${calc.inventory_id}`
       if (!groups[groupKey]) groups[groupKey] = []
@@ -235,13 +230,11 @@ export default function AccountingPage() {
       })
     })
 
-    const totalAmount = totalBasicFee + totalExtraFee
-
     return {
       details: tempCalculations,
       totalBasicFee,
       totalExtraFee,
-      totalAmount,
+      totalAmount: totalBasicFee + totalExtraFee,
       grandTotalUsageBW,
       grandTotalUsageCol
     }
@@ -262,6 +255,7 @@ export default function AccountingPage() {
   }
 
   const handleFinalSave = async () => {
+    setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
     const orgId = profile?.organization_id
@@ -299,6 +293,7 @@ export default function AccountingPage() {
     setSelectedClients(new Set())
     setInputData({}) 
     fetchHistoryData() 
+    setLoading(false)
   }
 
   const handleDeleteHistory = async (id: string) => {
@@ -359,20 +354,20 @@ export default function AccountingPage() {
                 <thead>
                   <tr>
                     <th className={styles.th} style={{width:'40px'}}>V</th>
-                    {/* 🔴 [수정] 거래처 너비 축소 */}
                     <th className={styles.th} style={{width:'80px'}}>거래처</th>
-                    {/* 🔴 [수정] 기계 너비 축소 */}
                     <th className={styles.th} style={{width:'180px'}}>기계 (모델/S.N)</th>
                     <th className={styles.th} style={{width:'60px'}}>구분</th>
-                    <th className={styles.th} style={{width:'80px'}}>전월</th>
-                    <th className={styles.th} style={{width:'80px'}}>당월(입력)</th>
+                    <th className={styles.th} style={{width:'80px', backgroundColor:'#f5f5f5'}}>전월</th>
+                    <th className={styles.th} style={{width:'80px', backgroundColor:'#e3f2fd'}}>당월(입력)</th>
                     <th className={styles.th} style={{width:'160px'}}>실사용량 (가중치)</th>
                     <th className={styles.th} style={{width:'140px'}}>기계별 청구액</th>
                     <th className={styles.th} style={{width:'120px', backgroundColor:'#fff9db'}}>총 합계</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (<tr><td colSpan={9} className={styles.td}>데이터 로딩 중...</td></tr>) : filteredClients.map(client => {
+                  {loading && filteredClients.length === 0 ? (
+                    <tr><td colSpan={9} className={styles.td}>데이터 로딩 중...</td></tr>
+                  ) : filteredClients.map(client => {
                     const assets = inventoryMap[client.id] || []
                     if (assets.length === 0) return null 
 
@@ -391,7 +386,6 @@ export default function AccountingPage() {
                             backgroundColor: isSelected ? '#f0f9ff' : (isReplaced ? '#fff5f5' : 'transparent'),
                             borderBottom: borderStyle 
                         }}>
-                          
                           {idx === 0 && (
                             <>
                               <td className={styles.td} rowSpan={rowSpan}>
@@ -411,26 +405,25 @@ export default function AccountingPage() {
                              {calc.billing_group_id && <div style={{fontSize:'0.7rem', color:'#0070f3', marginTop:'2px'}}>🔗 합산그룹</div>}
                           </td>
 
-                          {/* 🔴 [디자인 수정] 구분, 전월, 당월 컬럼을 Flexbox 컨테이너로 감싸서 높이 100% 채움 */}
                           <td className={styles.td} style={{padding:0, height:'1px'}}>
                             <div className={styles.splitCellContainer}>
-                              <div className={styles.rowGray} style={{fontSize:'0.8rem', fontWeight:'bold', color:'#666'}}>흑백A4</div>
-                              <div className={styles.rowBlue} style={{fontSize:'0.8rem', fontWeight:'bold', color:'#0070f3'}}>칼라A4</div>
-                              <div className={styles.rowGray} style={{fontSize:'0.8rem', fontWeight:'bold', color:'#666'}}>흑백A3</div>
-                              <div className={`${styles.rowBlue} ${styles.rowLast}`} style={{fontSize:'0.8rem', fontWeight:'bold', color:'#0070f3'}}>칼라A3</div>
+                              <div className={styles.rowGray}>흑A4</div>
+                              <div className={styles.rowBlue}>칼A4</div>
+                              <div className={styles.rowGray}>흑A3</div>
+                              <div className={`${styles.rowBlue} ${styles.rowLast}`}>칼A3</div>
                             </div>
                           </td>
 
-                          <td className={styles.td} style={{padding: 0, height:'1px'}}>
+                          <td className={styles.td} style={{padding: 0, height:'1px', backgroundColor:'#f9f9f9'}}>
                              <div className={styles.splitCellContainer}>
-                               <div className={styles.rowGray}><span className={styles.readOnlyValue}>{p.bw}</span></div>
-                               <div className={styles.rowBlue}><span className={styles.readOnlyValue}>{p.col}</span></div>
-                               <div className={styles.rowGray}><span className={styles.readOnlyValue}>{p.bw_a3}</span></div>
-                               <div className={`${styles.rowBlue} ${styles.rowLast}`}><span className={styles.readOnlyValue}>{p.col_a3}</span></div>
+                               <div className={styles.rowGray}>{p.bw}</div>
+                               <div className={styles.rowBlue}>{p.col}</div>
+                               <div className={styles.rowGray}>{p.bw_a3}</div>
+                               <div className={`${styles.rowBlue} ${styles.rowLast}`}>{p.col_a3}</div>
                              </div>
                           </td>
 
-                          <td className={styles.td} style={{padding: 0, height:'1px'}}>
+                          <td className={styles.td} style={{padding: 0, height:'1px', backgroundColor:'#eff6ff'}}>
                              <div className={styles.splitCellContainer}>
                                <div className={styles.rowGray}>
                                  <input type="number" className={styles.numberInput} placeholder={String(p.bw)} value={inputData[calc.inventory_id]?.bw ?? ''} onChange={e => handleInputChange(calc.inventory_id, 'bw', e.target.value)} />
@@ -448,54 +441,31 @@ export default function AccountingPage() {
                           </td>
                           
                           <td className={styles.td}>
-                            <div className={styles.billSection}>
-                               <span className={styles.billTitle}>- 기본매수</span>
-                               <div className={styles.billRow}><span>흑백</span> <span>{calc.usageBreakdown.basicBW.toLocaleString()}장</span></div>
-                               <div className={styles.billRow}><span>칼라</span> <span>{calc.usageBreakdown.basicCol.toLocaleString()}장</span></div>
-                             </div>
-                             <div className={styles.billSection}>
-                               <span className={styles.billTitle}>- 추가매수</span>
-                               <div className={styles.billRow}><span>흑백</span> <span>{calc.usageBreakdown.extraBW.toLocaleString()}장</span></div>
-                               <div className={styles.billRow}><span>칼라</span> <span>{calc.usageBreakdown.extraCol.toLocaleString()}장</span></div>
-                             </div>
+                            <div style={{fontSize:'0.8rem', textAlign:'left'}}>
+                                <div>흑: {calc.converted.bw.toLocaleString()}장</div>
+                                <div>칼: {calc.converted.col.toLocaleString()}장</div>
+                            </div>
                           </td>
                           
-                          {/* 🔴 [디자인 수정] 하단 정렬 적용 */}
                           {calc.isGroupLeader ? (
                             <td className={styles.td} rowSpan={calc.groupSpan} style={{textAlign:'right', verticalAlign:'bottom', paddingBottom:'20px', borderLeft:'1px solid #e0e0e0'}}>
-                              <div className={styles.billRow}>
-                                <span>기본금액:</span> <span>{calc.rowCost.basic.toLocaleString()}원</span>
-                              </div>
-                              <div className={styles.billRow}>
-                                <span>추가금액:</span> <span>{calc.rowCost.extra.toLocaleString()}원</span>
-                              </div>
-                              <div className={styles.billRowTotal}>
-                                <span>총합:</span> <span>{calc.rowCost.total.toLocaleString()}원</span>
-                              </div>
+                               <div style={{fontSize:'0.8rem', color:'#666'}}>
+                                 <div>기본: {calc.rowCost.basic.toLocaleString()}</div>
+                                 <div>추가: {calc.rowCost.extra.toLocaleString()}</div>
+                               </div>
+                               <div style={{fontWeight:'bold', borderTop:'1px solid #eee', marginTop:'4px'}}>
+                                 {calc.rowCost.total.toLocaleString()}원
+                               </div>
                             </td>
                           ) : null}
 
-                          {/* 🔴 [디자인 수정] 하단 정렬 적용 */}
                           {idx === 0 && (
                             <td className={styles.td} rowSpan={rowSpan} style={{backgroundColor:'#fffdf0', borderLeft:'2px solid #ddd', verticalAlign:'bottom', textAlign:'right', paddingBottom:'20px'}}>
-                              <div style={{minHeight:'80px', display:'flex', flexDirection:'column', justifyContent:'flex-end', height:'100%'}}>
-                                <div style={{marginBottom:'10px'}}>
-                                  {billData.details.filter(d => d.isGroupLeader).map((d, i) => (
-                                    <div key={i} style={{marginBottom:'4px', color:'#555', fontSize:'0.85rem'}}>
-                                      {d.rowCost.total.toLocaleString()}원
-                                    </div>
-                                  ))}
+                                <div style={{fontWeight:'bold', color:'#d93025', fontSize:'1.1rem'}}>
+                                  총 {billData.totalAmount.toLocaleString()}원
                                 </div>
-                                <div>
-                                  <div style={{borderTop:'2px solid #333', margin:'5px 0'}}></div>
-                                  <div style={{fontWeight:'bold', color:'#d93025', fontSize:'1.1rem'}}>
-                                    총합 {billData.totalAmount.toLocaleString()}원
-                                  </div>
-                                </div>
-                              </div>
                             </td>
                           )}
-
                         </tr>
                       )
                     })
@@ -510,15 +480,14 @@ export default function AccountingPage() {
                 <span className={styles.totalAmount}>{calculateSelectedTotal().toLocaleString()} 원</span>
               </div>
               <button onClick={handlePreSave} disabled={selectedClients.size === 0} className={styles.saveBtn}>
-                청구서 확정 및 저장
+                🚀 청구서 확정 및 저장
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* 내역 조회 및 모달 (기존 동일) */}
-      <div className={styles.section}>
+      <div className={styles.section} style={{marginTop: '30px'}}>
         <div onClick={() => setIsHistOpen(!isHistOpen)} className={styles.header}>
           <span>📋 청구 내역 조회 및 관리</span>
           <span>{isHistOpen ? '▲' : '▼'}</span>
@@ -539,22 +508,18 @@ export default function AccountingPage() {
                   <tr>
                     <th className={styles.th}>청구월</th>
                     <th className={styles.th}>거래처명</th>
-                    <th className={styles.th}>청구 기준일</th>
                     <th className={styles.th}>총 사용량 (흑/칼)</th>
                     <th className={styles.th}>최종 청구액</th>
-                    <th className={styles.th}>작성일</th>
                     <th className={styles.th}>관리</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {historyList.length === 0 ? (<tr><td colSpan={7} className={styles.td} style={{color:'#999', padding:'30px'}}>조회된 내역이 없습니다.</td></tr>) : historyList.map(hist => (
+                  {historyList.length === 0 ? (<tr><td colSpan={5} className={styles.td} style={{color:'#999', padding:'30px'}}>조회된 내역이 없습니다.</td></tr>) : historyList.map(hist => (
                     <tr key={hist.id}>
                       <td className={styles.td}>{hist.billing_year}-{hist.billing_month}</td>
                       <td className={styles.td} style={{fontWeight:'bold'}}>{hist.client?.name}</td>
-                      <td className={styles.td}>{hist.billing_date}일</td>
                       <td className={styles.td}>{hist.total_usage_bw.toLocaleString()} / {hist.total_usage_col.toLocaleString()}</td>
                       <td className={styles.td} style={{color:'#0070f3', fontWeight:'bold'}}>{hist.total_amount.toLocaleString()}원</td>
-                      <td className={styles.td} style={{fontSize:'0.8rem', color:'#888'}}>{new Date(hist.created_at).toLocaleDateString()}</td>
                       <td className={styles.td}><button onClick={() => handleDeleteHistory(hist.id)} style={{color:'red', border:'1px solid #eee', background:'white', cursor:'pointer', padding:'4px 8px', borderRadius:'4px'}}>삭제</button></td>
                     </tr>
                   ))}
@@ -570,42 +535,71 @@ export default function AccountingPage() {
           <div className={styles.modalContent}>
             <div className={styles.modalTitle}>🧾 청구서 최종 확인</div>
             <div className={styles.modalSummary}>
-              총 청구 금액: {calculateSelectedTotal().toLocaleString()} 원 ({selectedClients.size}곳)
+              총 청구 금액: <strong>{calculateSelectedTotal().toLocaleString()}</strong> 원 (선택 거래처: {selectedClients.size}곳)
             </div>
-            {Array.from(selectedClients).map(cid => {
-              const client = clients.find(c => c.id === cid)
-              const bill = calculateClientBill(client)
-              return (
-                <div key={cid} style={{marginBottom:'30px'}}>
-                  <h3 style={{color:'#0070f3', borderBottom:'1px solid #eee', paddingBottom:'5px'}}>{client.name} ({client.billing_date}일 청구)</h3>
-                  <table className={styles.modalTable}>
-                    <thead>
-                      <tr><th>기계명</th><th>전월(흑/칼)</th><th>당월(흑/칼)</th><th>실사용(가중치)</th><th>금액</th></tr>
-                    </thead>
-                    <tbody>
-                      {bill.details.map((d, idx) => (
-                         <tr key={idx}>
-                           <td>{d.model_name}</td>
-                           <td>{d.prev.bw} / {d.prev.col}</td>
-                           <td>{d.curr.bw} / {d.curr.col}</td>
-                           <td>흑:{d.converted.bw.toLocaleString()} / 칼:{d.converted.col.toLocaleString()}</td>
-                           {d.isGroupLeader ? (
-                             <td rowSpan={d.groupSpan} style={{fontWeight:'bold'}}>{d.rowCost.total.toLocaleString()}원</td>
-                           ) : null}
-                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div style={{textAlign:'right', fontSize:'0.9rem'}}>
-                     기본료: <b>{bill.totalBasicFee.toLocaleString()}</b> + 추가요금: <b>{bill.totalExtraFee.toLocaleString()}</b> = 
-                     <span style={{color:'#d93025', fontWeight:'bold', fontSize:'1.1rem', marginLeft:'10px'}}>합계: {bill.totalAmount.toLocaleString()} 원</span>
+
+            <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '10px' }}>
+              {Array.from(selectedClients).map(cid => {
+                const client = clients.find(c => c.id === cid)
+                if (!client) return null;
+                const bill = calculateClientBill(client)
+                return (
+                  <div key={cid} style={{ marginBottom: '40px', border: '1px solid #eee', padding: '15px', borderRadius: '8px' }}>
+                    <h3 style={{ color: '#0070f3', borderBottom: '2px solid #0070f3', paddingBottom: '8px', marginTop: 0, fontSize: '1.1rem' }}>
+                      {client.name} <span style={{ fontSize: '0.8rem', color: '#666', fontWeight: 'normal' }}>({client.billing_date}일 청구 기준)</span>
+                    </h3>
+                    <table className={styles.modalTable} style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '15px' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f8f9fa' }}>
+                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>기계명(S/N)</th>
+                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>전월(흑/칼)</th>
+                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>당월(흑/칼)</th>
+                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>실사용(가중치)</th>
+                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>금액</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bill.details.map((d, idx) => (
+                          <tr key={idx}>
+                            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                              <div style={{ fontWeight: 'bold' }}>{d.model_name}</div>
+                              <div style={{ fontSize: '0.7rem', color: '#999' }}>{d.serial_number}</div>
+                            </td>
+                            <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>
+                              {d.prev.bw} / {d.prev.col}
+                            </td>
+                            <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>
+                              {d.curr.bw} / {d.curr.col}
+                            </td>
+                            <td style={{ border: '1px solid #ddd', padding: '8px', fontSize: '0.85rem' }}>
+                              흑: {d.converted.bw.toLocaleString()} / 칼: {d.converted.col.toLocaleString()}
+                            </td>
+                            {d.isGroupLeader ? (
+                              <td rowSpan={d.groupSpan} style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold', textAlign: 'right', backgroundColor: '#fffdf0' }}>
+                                {d.rowCost.total.toLocaleString()}원
+                              </td>
+                            ) : null}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div style={{ textAlign: 'right', fontSize: '0.95rem', background: '#f9f9f9', padding: '10px', borderRadius: '4px' }}>
+                      <span>기본료: <b>{bill.totalBasicFee.toLocaleString()}원</b></span>
+                      <span style={{ margin: '0 10px', color: '#ccc' }}>+</span>
+                      <span>추가요금: <b>{bill.totalExtraFee.toLocaleString()}원</b></span>
+                      <span style={{ margin: '0 10px' }}>=</span>
+                      <span style={{ color: '#d93025', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                        합계: {bill.totalAmount.toLocaleString()} 원
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-            <div className={styles.modalActions}>
+                )
+              })}
+            </div>
+
+            <div className={styles.modalActions} style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
               <button onClick={() => setIsModalOpen(false)} className={styles.btnCancel}>취소</button>
-              <button onClick={handleFinalSave} className={styles.btnConfirm}>확인 및 저장</button>
+              <button onClick={handleFinalSave} className={styles.btnConfirm}>확인 및 DB 저장</button>
             </div>
           </div>
         </div>

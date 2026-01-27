@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
 import ClientForm from './ClientForm'
 import PlanSettingModal from './PlanSettingModal'
+import Button from './ui/Button'
+import styles from './ClientList.module.css'
 
 export default function ClientList() {
   const supabase = createClient()
 
-  // ... (상태 관리 로직은 기존과 동일) ...
+  // 상태 관리 로직 (기능 보존)
   const [clients, setClients] = useState<any[]>([])
   const [assetsMap, setAssetsMap] = useState<{[key: string]: any[]}>({})
   const [loading, setLoading] = useState(false)
@@ -21,14 +23,28 @@ export default function ClientList() {
 
   useEffect(() => { fetchClients() }, [])
 
+  // 데이터 로딩 로직 (기능 보존)
   const fetchClients = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
+    
     if (profile?.organization_id) {
-      const { data: clientData } = await supabase.from('clients').select('*').eq('organization_id', profile.organization_id).order('created_at', { ascending: false })
+      // 거래처 목록 조회
+      const { data: clientData } = await supabase.from('clients')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .order('created_at', { ascending: false })
+      
       if (clientData) setClients(clientData)
-      const { data: assetData } = await supabase.from('inventory').select('*').eq('organization_id', profile.organization_id).not('client_id', 'is', null).order('created_at', { ascending: true })
+
+      // 자산 목록 조회 및 매핑 (기능 보존)
+      const { data: assetData } = await supabase.from('inventory')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .not('client_id', 'is', null)
+        .order('created_at', { ascending: true })
+      
       const map: {[key: string]: any[]} = {}
       if (assetData) {
         assetData.forEach((asset: any) => {
@@ -76,120 +92,130 @@ export default function ClientList() {
   )
 
   return (
-    <div style={{ width: '100%', padding: '30px', backgroundColor: '#FFFFFF', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.02)', border: '1px solid #E5E5E5' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '25px', alignItems:'center' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#171717' }}>🏢 거래처 관리</h2>
-        <button 
-          onClick={() => { setSelectedClient(null); setIsRegModalOpen(true); }}
-          style={{ padding: '10px 20px', backgroundColor: '#171717', color: '#FFFFFF', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
-        >
-          + 신규 거래처 등록
-        </button>
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <span>🏢 거래처 관리</span>
+        <Button variant="primary" size="sm" onClick={() => { setSelectedClient(null); setIsRegModalOpen(true); }}>
+          + 등록
+        </Button>
       </div>
 
-      <input 
-        placeholder="검색어 입력 (거래처명, 주소)" 
-        value={searchTerm}
-        onChange={e => setSearchTerm(e.target.value)}
-        style={{ width: '100%', padding: '12px', marginBottom: '25px', border: '1px solid #E5E5E5', borderRadius: '6px', fontSize: '0.95rem', outline: 'none' }}
-      />
+      <div className={styles.searchContainer}>
+        <input 
+          className={styles.searchInput}
+          placeholder="거래처명 또는 주소로 검색..." 
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
+      </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#FFFFFF', textAlign: 'left', borderBottom: '1px solid #E5E5E5' }}>
-            <th style={{ padding: '15px 12px', color: '#666666', fontWeight: '600' }}>순번 / 거래처명</th>
-            <th style={{ padding: '15px 12px', color: '#666666', fontWeight: '600' }}>연락처/주소</th>
-            <th style={{ padding: '15px 12px', color: '#666666', fontWeight: '600' }}>청구일</th>
-            <th style={{ padding: '15px 12px', color: '#666666', fontWeight: '600' }}>설치기기</th>
-            <th style={{ padding: '15px 12px', color: '#666666', fontWeight: '600' }}>관리</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            <tr><td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: '#666' }}>로딩 중...</td></tr>
-          ) : filteredClients.map((client, index) => (
-            <React.Fragment key={client.id}>
-              <tr 
-                onClick={() => toggleExpand(client.id)}
-                style={{ borderBottom: '1px solid #E5E5E5', cursor: 'pointer', backgroundColor: expandedRows.has(client.id) ? '#FAFAFA' : 'transparent', transition:'background-color 0.2s' }}
-              >
-                <td style={{ padding: '15px 12px', color: '#171717' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#666666', minWidth: '20px' }}>{index + 1}.</span>
-                    {client.parent_id ? (
-                      <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#F5F5F5', color: '#666666', border:'1px solid #E5E5E5' }}>지사</span>
-                    ) : (
-                      <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(0, 112, 243, 0.1)', color: '#0070f3', border:'1px solid rgba(0, 112, 243, 0.2)' }}>본사</span>
-                    )}
-                    <span style={{ fontWeight: '600', fontSize: '1rem', color:'#171717' }}>{client.name}</span>
-                    <span style={{ fontSize: '0.7rem', color: '#666666' }}>{expandedRows.has(client.id) ? '▲' : '▼'}</span>
+      <div className={styles.listHeader}>
+        <div>거래처명</div>
+        <div>연락처/주소</div>
+        <div>청구일</div>
+        <div>기기</div>
+        <div style={{ textAlign: 'right' }}>관리</div>
+      </div>
+
+      {loading ? (
+        <div className={styles.noResult}>로딩 중...</div>
+      ) : filteredClients.map((client) => {
+        const isExpanded = expandedRows.has(client.id)
+        const assets = assetsMap[client.id] || []
+
+        return (
+          <div key={client.id} className={styles.clientRow}>
+            <div 
+              className={`${styles.clientSummary} ${isExpanded ? styles.clientSummarySelected : ''}`}
+              onClick={() => toggleExpand(client.id)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', fontWeight: '600' }}>
+                {client.parent_id ? (
+                  <span className={`${styles.badge} ${styles.badgeBranch}`}>지사</span>
+                ) : (
+                  <span className={`${styles.badge} ${styles.badgeHead}`}>본사</span>
+                )}
+                {client.name}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--notion-sub-text)' }}>
+                {client.phone || client.contact_person || '-'}
+              </div>
+              <div>매월 {client.billing_date}일</div>
+              <div>{assets.length}대</div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+                <Button variant="ghost" size="sm" onClick={(e) => handleEdit(e, client)}>수정</Button>
+                <Button variant="danger" size="sm" onClick={(e) => handleDelete(e, client.id, client.name)}>삭제</Button>
+              </div>
+            </div>
+
+            {isExpanded && (
+              <div className={styles.detailsContainer}>
+                <div className={styles.sectionTitle}>ℹ️ 상세 정보</div>
+                <div className={styles.gridForm}>
+                  <div className={styles.fieldContainer}>
+                    <span className={styles.label}>이메일</span>
+                    <span className={styles.valueText}>{client.email || '-'}</span>
                   </div>
-                </td>
-                <td style={{ padding: '15px 12px' }}>
-                  <div style={{color:'#171717', fontWeight:'500'}}>{client.contact_person} ({client.contact_number})</div>
-                  <div style={{ fontSize: '0.85rem', color: '#666666' }}>{client.address}</div>
-                </td>
-                <td style={{ padding: '15px 12px', color:'#171717' }}>매월 {client.billing_date}일</td>
-                <td style={{ padding: '15px 12px', color:'#171717' }}>{assetsMap[client.id]?.length || 0}대</td>
-                <td style={{ padding: '15px 12px' }}>
-                  <button onClick={(e) => handleEdit(e, client)} style={{ marginRight: '8px', border: '1px solid #E5E5E5', background: '#FFFFFF', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', color:'#171717', fontWeight:'500' }}>수정</button>
-                  <button onClick={(e) => handleDelete(e, client.id, client.name)} style={{ border: '1px solid #E5E5E5', background: '#FFFFFF', color: '#666666', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight:'500' }}>삭제</button>
-                </td>
-              </tr>
+                  <div className={styles.fieldContainer}>
+                    <span className={styles.label}>담당자</span>
+                    <span className={styles.valueText}>{client.contact_person || '-'}</span>
+                  </div>
+                  <div className={styles.fieldContainer} style={{ gridColumn: 'span 2' }}>
+                    <span className={styles.label}>주소</span>
+                    <span className={styles.valueText}>{client.address || '-'}</span>
+                  </div>
+                </div>
 
-              {expandedRows.has(client.id) && (
-                <tr>
-                  <td colSpan={5} style={{ backgroundColor: '#FAFAFA', padding: '30px', borderBottom:'1px solid #E5E5E5' }}>
-                    
-                    <div style={{ marginBottom: '20px', backgroundColor: '#FFFFFF', padding: '25px', borderRadius: '8px', border: '1px solid #E5E5E5' }}>
-                      <div style={{ fontSize: '1rem', fontWeight: '700', color: '#171717', marginBottom: '15px', paddingBottom:'10px', borderBottom:'1px solid #E5E5E5', display:'flex', alignItems:'center', gap:'6px' }}>
-                        ℹ️ 거래처 상세 정보
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '0.9rem' }}>
-                        <div><span style={{color:'#666666', fontWeight:'600', display:'inline-block', width:'60px'}}>이메일</span> {client.email || '-'}</div>
-                        <div><span style={{color:'#666666', fontWeight:'600', display:'inline-block', width:'60px'}}>담당자</span> {client.contact_person} ({client.contact_number})</div>
-                        <div><span style={{color:'#666666', fontWeight:'600', display:'inline-block', width:'60px'}}>주소</span> {client.address}</div>
-                        <div><span style={{color:'#666666', fontWeight:'600', display:'inline-block', width:'60px'}}>청구일</span> 매월 {client.billing_date}일</div>
-                        <div style={{gridColumn: 'span 2', marginTop:'10px', padding:'15px', backgroundColor:'#FAFAFA', borderRadius:'6px', color:'#171717', border:'1px solid #E5E5E5'}}>
-                          <span style={{fontWeight:'700', marginRight:'10px', color:'#0070f3'}}>📝 메모</span> 
-                          {client.memo || '등록된 메모가 없습니다.'}
-                        </div>
-                      </div>
-                    </div>
+                <div className={styles.divider} />
 
-                    <div style={{ marginBottom: '15px', fontSize: '1rem', fontWeight: '700', color: '#171717' }}>📦 설치된 자산 목록</div>
-                    {(!assetsMap[client.id] || assetsMap[client.id].length === 0) ? (
-                      <div style={{ color: '#666666', padding: '20px', backgroundColor:'#FFFFFF', borderRadius:'8px', textAlign:'center', border:'1px solid #E5E5E5' }}>설치된 기기가 없습니다.</div>
-                    ) : (
-                      assetsMap[client.id].map((asset: any) => (
-                        <div key={asset.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFFFFF', padding: '20px', marginBottom: '12px', borderRadius: '8px', border: '1px solid #E5E5E5', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                          <div>
-                            <div style={{marginBottom:'6px'}}>
-                              <span style={{ fontWeight: '700', color: '#171717', fontSize:'1.05rem' }}>[{asset.type}]</span> 
-                              <span style={{ marginLeft: '8px', fontSize:'1.05rem', color:'#171717' }}>{asset.model_name}</span>
+                <div className={styles.sectionTitle}>📦 설치된 자산 목록</div>
+                {assets.length === 0 ? (
+                  <div className={styles.assetEmpty}>설치된 기기가 없습니다.</div>
+                ) : (
+                  <table className={styles.assetTable}>
+                    <thead>
+                      <tr>
+                        <th className={styles.assetTh}>종류</th>
+                        <th className={styles.assetTh}>모델명 / S.N</th>
+                        <th className={styles.assetTh}>기본료</th>
+                        <th className={styles.assetTh} style={{ textAlign: 'right' }}>작업</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assets.map((asset) => (
+                        <tr key={asset.id}>
+                          <td className={styles.assetTd}>[{asset.type}]</td>
+                          <td className={styles.assetTd}>
+                            <div style={{ fontWeight: '600' }}>{asset.model_name}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--notion-sub-text)' }}>{asset.serial_number}</div>
+                          </td>
+                          <td className={styles.assetTd}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>{asset.plan_basic_fee?.toLocaleString()}원</span>
+                              {asset.billing_group_id && (
+                                <span className={`${styles.badge} ${styles.badgeHead}`} style={{ margin: 0 }}>합산</span>
+                              )}
                             </div>
-                            <div style={{ fontSize: '0.85rem', color: '#666666', marginBottom:'8px' }}>S/N: {asset.serial_number}</div>
-                            
-                            <div style={{fontSize:'0.85rem', color:'#0070f3', display:'flex', gap:'10px', alignItems:'center', background:'rgba(0,112,243,0.05)', padding:'6px 12px', borderRadius:'6px', width:'fit-content'}}>
-                              <span>{asset.plan_basic_fee > 0 ? `💰 기본료: ${asset.plan_basic_fee.toLocaleString()}원` : '⚠️ 요금제 미설정'}</span>
-                              {asset.billing_group_id && (<span style={{backgroundColor:'#0070f3', color:'white', padding:'2px 6px', borderRadius:'4px', fontWeight:'700', fontSize:'0.75rem'}}>🔗 합산청구중</span>)}
+                          </td>
+                          <td className={styles.assetTd} style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '4px' }}>
+                              <Button variant="outline" size="sm" onClick={() => { 
+                                setSelectedAssetForPlan({ id: asset.id, clientId: client.id }); 
+                                setPlanModalOpen(true); 
+                              }}>요금제</Button>
+                              <Button variant="outline" size="sm" onClick={() => handleReplace(asset.id)}>교체</Button>
                             </div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <div style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', backgroundColor: asset.status === '설치' ? 'rgba(0,112,243,0.1)' : '#FFF1F0', color: asset.status === '설치' ? '#0070f3' : '#F5222D' }}>{asset.status}</div>
-                            <button onClick={() => { setSelectedAssetForPlan({ id: asset.id, clientId: client.id }); setPlanModalOpen(true) }} style={{ padding:'8px 14px', border:'1px solid #0070f3', color:'#0070f3', background:'#FFFFFF', borderRadius:'6px', cursor:'pointer', fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'4px', fontWeight:'600' }}>⚙️ 요금제</button>
-                            <button onClick={() => handleReplace(asset.id)} style={{ padding: '8px 14px', border: '1px solid #E5E5E5', background: '#FFFFFF', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', color:'#171717' }}>🔄 교체</button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </td>
-                </tr>
-              )}
-            </React.Fragment>
-          ))}
-        </tbody>
-      </table>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
 
       {isRegModalOpen && <ClientForm isOpen={isRegModalOpen} onClose={() => setIsRegModalOpen(false)} onSuccess={fetchClients} editData={selectedClient} />}
       {planModalOpen && selectedAssetForPlan && <PlanSettingModal inventoryId={selectedAssetForPlan.id} clientId={selectedAssetForPlan.clientId} onClose={() => { setPlanModalOpen(false); setSelectedAssetForPlan(null) }} onUpdate={fetchClients} />}

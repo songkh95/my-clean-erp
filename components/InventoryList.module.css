@@ -1,27 +1,33 @@
 /* components/InventoryList.module.css */
 
-/* 전체 컨테이너 */
+/* 전체 컨테이너: 노션의 깔끔한 프레임 스타일 */
 .container {
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  background-color: #fff;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  background-color: var(--notion-bg);
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  margin-bottom: 24px;
 }
 
-/* 아코디언 헤더 */
+/* 아코디언 헤더: 텍스트 두께를 조정하여 노션 제목 느낌 부여 */
 .header {
-  padding: 15px 20px;
-  background-color: #fcfcfc;
-  font-weight: bold;
+  padding: 14px 20px;
+  background-color: var(--notion-bg);
+  font-weight: 600;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--notion-border);
+  color: var(--notion-main-text);
+  transition: background-color 0.2s;
 }
 
-/* 헤더가 접혔을 때 (밑줄 없애기) */
+.header:hover {
+  background-color: var(--notion-soft-bg);
+}
+
 .headerClosed {
   border-bottom: none;
 }
@@ -29,23 +35,32 @@
 /* 검색창 영역 */
 .searchContainer {
   padding: 10px 20px;
-  background-color: #fafafa;
-  border-bottom: 1px solid #eee;
+  background-color: var(--notion-bg);
+  border-bottom: 1px solid var(--notion-border);
 }
 
 .searchInput {
   width: 100%;
   padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid #dddddd; /* 요청하신 색상 */
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--notion-border);
   font-size: 0.9rem;
   outline: none;
+  background-color: var(--notion-soft-bg);
+  color: var(--notion-main-text);
+  transition: all 0.2s;
 }
 
-/* 테이블 영역 */
+.searchInput:focus {
+  background-color: var(--notion-bg);
+  border-color: var(--notion-blue);
+  box-shadow: 0 0 0 2px var(--notion-blue-light);
+}
+
+/* 테이블 영역: 노션 데이터베이스 인라인 뷰 스타일 */
 .tableContainer {
   overflow-x: auto;
-  min-height: 300px;
+  min-height: 200px;
 }
 
 .table {
@@ -55,87 +70,105 @@
 }
 
 .theadTr {
-  background-color: #f9f9f9;
-  border-bottom: 2px solid #eee;
+  background-color: var(--notion-bg);
+  border-bottom: 1px solid var(--notion-border);
 }
 
 .th {
-  padding: 12px 10px;
+  padding: 10px 12px;
   text-align: left;
-  color: #666;
-  font-weight: bold;
+  color: var(--notion-sub-text);
+  font-weight: 500;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .td {
-  padding: 12px 10px;
-  color: #333;
+  padding: 12px 12px;
+  color: var(--notion-main-text);
+  border-bottom: 1px solid var(--notion-border);
 }
 
 .noDataRow {
-  padding: 40px;
+  padding: 60px;
   text-align: center;
-  color: #999;
+  color: var(--notion-sub-text);
+  font-size: 0.9rem;
 }
 
-/* 데이터 행 (기본) */
+/* 데이터 행 스타일 */
 .dataRow {
-  border-bottom: 1px solid #eee;
   cursor: pointer;
-  background-color: transparent;
+  background-color: var(--notion-bg);
   transition: background-color 0.2s;
 }
 
-/* 데이터 행 (펼쳐졌을 때 강조) */
+.dataRow:hover {
+  background-color: var(--notion-soft-bg);
+}
+
+/* 행이 확장되었을 때의 강조 효과 */
 .dataRowExpanded {
-  background-color: #f0f7ff;
+  background-color: var(--notion-blue-light) !important;
 }
 
 .modelName {
-  font-weight: bold;
+  font-weight: 600;
+  color: var(--notion-main-text);
 }
 
-/* 상태 뱃지 */
+/* 상태 뱃지: 노션의 파스텔톤 태그 스타일 */
 .statusBadge {
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 2px 8px;
+  border-radius: 3px;
   font-size: 0.75rem;
+  font-weight: 500;
+  display: inline-block;
 }
 
 .statusWarehouse {
-  background-color: #eee;
-  color: #666;
+  background-color: #f1f1f0; /* 노션 Light Gray */
+  color: #504f4d;
 }
 
 .statusInstalled {
-  background-color: #e3f2fd;
-  color: #0070f3;
+  background-color: #d3e5ef; /* 노션 Light Blue */
+  color: #18445a;
 }
 
 /* 상세 정보 영역 (펼쳐진 곳) */
 .expandedRow {
-  background-color: #fcfcfc;
-  border-bottom: 1px solid #ddd;
+  background-color: #fafafa;
 }
 
 .expandedCell {
-  padding: 20px;
+  padding: 24px;
+  border-bottom: 1px solid var(--notion-border);
 }
 
-/* 입력 폼 그리드 */
+/* 입력 폼 그리드: 노션의 사이드바 편집창 느낌 */
 .formGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 15px;
-  margin-bottom: 15px;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
 /* 입력창 공통 스타일 */
 .formInput {
-  padding: 6px;
-  border-radius: 4px;
-  border: 1px solid #dddddd; /* 요청하신 색상 */
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--notion-border);
   width: 100%;
   box-sizing: border-box;
+  font-size: 0.9rem;
+  background-color: var(--notion-bg);
+  outline: none;
+}
+
+.formInput:focus {
+  border-color: var(--notion-blue);
+  box-shadow: 0 0 0 2px var(--notion-blue-light);
 }
 
 /* 거래처 검색 드롭다운 */
@@ -147,25 +180,27 @@
 .dropdownMenu {
   position: absolute;
   width: 100%;
-  background-color: #fff;
-  border: 1px solid #dddddd;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
   z-index: 100;
-  max-height: 150px;
+  max-height: 180px;
   overflow-y: auto;
-  border-radius: 4px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
   top: 100%;
+  margin-top: 4px;
 }
 
 .dropdownItem {
-  padding: 8px 10px;
+  padding: 8px 12px;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  color: var(--notion-main-text);
+  transition: background-color 0.2s;
 }
 
 .dropdownItem:hover {
-  background-color: #f5f5f5;
+  background-color: var(--notion-soft-bg);
 }
 
 /* 버튼 영역 */
@@ -173,59 +208,30 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: 24px;
 }
 
-.btn {
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.btnEdit {
-  border: 1px solid #0070f3;
-  color: #0070f3;
-  background-color: #fff;
-}
-
-.btnDelete {
-  border: 1px solid #d93025;
-  color: #d93025;
-  background-color: #fff;
-}
-
-.btnSave {
-  border: none;
-  color: #fff;
-  background-color: #0070f3;
-}
-
-.btnCancel {
-  border: 1px solid #888;
-  color: #666;
-  background-color: #fff;
-}
-
-/* 조수 컴포넌트용 */
+/* 조수 컴포넌트(필드 표시) 스타일 */
 .editableItem {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .editableLabel {
-  color: #888;
-  min-width: 60px;
-  font-size: 0.85rem;
+  color: var(--notion-sub-text);
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .editableValue {
   font-weight: 500;
+  font-size: 0.9rem;
 }
 
 .fullWidthItem {
   grid-column: 1 / -1;
   display: flex;
-  gap: 10px;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
 }
