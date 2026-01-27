@@ -16,7 +16,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   
-  // 요금제 데이터 (SQL public.inventory 컬럼과 1:1 매칭)
+  // 요금제 데이터 (billing_date 추가)
   const [formData, setFormData] = useState({
     plan_basic_fee: 0,
     plan_basic_cnt_bw: 0,
@@ -25,7 +25,8 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     plan_price_col: 0,
     plan_weight_a3_bw: 1,
     plan_weight_a3_col: 1,
-    billing_group_id: null as string | null
+    billing_group_id: null as string | null,
+    billing_date: '말일' // 기본값 설정
   })
 
   const [siblings, setSiblings] = useState<any[]>([])
@@ -36,7 +37,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
   }, [])
 
   const fetchData = async () => {
-    // 1. 현재 기계 정보 및 기존 요금제 로드
+    // 1. 현재 기계 정보 및 기존 요금제/청구일 로드
     const { data: current } = await supabase
       .from('inventory')
       .select('*')
@@ -53,7 +54,8 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
         plan_price_col: current.plan_price_col || 0,
         plan_weight_a3_bw: current.plan_weight_a3_bw || 1,
         plan_weight_a3_col: current.plan_weight_a3_col || 1,
-        billing_group_id: current.billing_group_id
+        billing_group_id: current.billing_group_id,
+        billing_date: current.billing_date || '말일' // DB 값 로드
       })
     }
 
@@ -68,12 +70,11 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     if (sibs) setSiblings(sibs)
   }
 
-  // 합산 청구 그룹 지정 로직 (기능 보존)
+  // 합산 청구 그룹 지정 로직
   const toggleGroup = (targetGroupId: string | null, targetInvId: string) => {
     if (formData.billing_group_id === targetGroupId && targetGroupId !== null) {
       setFormData({ ...formData, billing_group_id: null })
     } else {
-      // 상대방이 그룹이 없으면 임시 ID 부여, 있으면 해당 ID로 편입
       setFormData({ ...formData, billing_group_id: targetGroupId || 'NEW_GROUP_WITH_' + targetInvId })
     }
   }
@@ -83,17 +84,16 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     try {
       let finalGroupId = formData.billing_group_id
 
-      // 신규 그룹 생성 처리 (기능 보존)
+      // 신규 그룹 생성 처리
       if (finalGroupId && finalGroupId.startsWith('NEW_GROUP_WITH_')) {
         const targetId = finalGroupId.replace('NEW_GROUP_WITH_', '')
         const newGroupUUID = crypto.randomUUID()
         
-        // 상대방 기기 그룹 업데이트
         await supabase.from('inventory').update({ billing_group_id: newGroupUUID }).eq('id', targetId)
         finalGroupId = newGroupUUID
       }
 
-      // 현재 기기 요금제 및 그룹 정보 업데이트
+      // 현재 기기 요금제, 그룹 정보, 청구일 업데이트
       const { error } = await supabase
         .from('inventory')
         .update({
@@ -104,13 +104,14 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
           plan_price_col: formData.plan_price_col,
           plan_weight_a3_bw: formData.plan_weight_a3_bw,
           plan_weight_a3_col: formData.plan_weight_a3_col,
-          billing_group_id: finalGroupId
+          billing_group_id: finalGroupId,
+          billing_date: formData.billing_date // 청구일 저장
         })
         .eq('id', inventoryId)
 
       if (error) throw error
       
-      alert('요금제 설정이 완료되었습니다.')
+      alert('설정이 완료되었습니다.')
       onUpdate()
       onClose()
     } catch (e: any) {
@@ -135,7 +136,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
         boxShadow: '0 15px 50px rgba(0,0,0,0.1)'
       }}>
         <h2 style={{fontSize:'1.2rem', fontWeight:'700', marginBottom:'20px', color:'var(--notion-main-text)'}}>
-          ⚙️ 기계별 요금제 설정
+          ⚙️ 기계별 요금제 및 청구 설정
         </h2>
         
         {currentItem && (
@@ -144,6 +145,19 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
              S/N: {currentItem.serial_number}
           </div>
         )}
+
+        {/* 청구일 설정 필드 추가 */}
+        <InputField 
+          label="매월 정기 청구일" 
+          as="select" 
+          value={formData.billing_date} 
+          onChange={e => setFormData({ ...formData, billing_date: e.target.value })}
+        >
+          <option value="말일">매월 말일</option>
+          {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+            <option key={day} value={String(day)}>매월 {day}일</option>
+          ))}
+        </InputField>
 
         <InputField label="월 기본료 (원)" type="number" value={formData.plan_basic_fee} onChange={e => setFormData({...formData, plan_basic_fee: Number(e.target.value)})} />
 

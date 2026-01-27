@@ -10,7 +10,7 @@ import styles from './ClientList.module.css'
 export default function ClientList() {
   const supabase = createClient()
 
-  // 상태 관리 로직 (기능 보존)
+  // 상태 관리 로직
   const [clients, setClients] = useState<any[]>([])
   const [assetsMap, setAssetsMap] = useState<{[key: string]: any[]}>({})
   const [loading, setLoading] = useState(false)
@@ -23,7 +23,7 @@ export default function ClientList() {
 
   useEffect(() => { fetchClients() }, [])
 
-  // 데이터 로딩 로직 (기능 보존)
+  // 데이터 로딩 로직
   const fetchClients = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -38,7 +38,7 @@ export default function ClientList() {
       
       if (clientData) setClients(clientData)
 
-      // 자산 목록 조회 및 매핑 (기능 보존)
+      // 자산 목록 조회 및 매핑
       const { data: assetData } = await supabase.from('inventory')
         .select('*')
         .eq('organization_id', profile.organization_id)
@@ -112,7 +112,6 @@ export default function ClientList() {
       <div className={styles.listHeader}>
         <div>거래처명</div>
         <div>연락처/주소</div>
-        <div>청구일</div>
         <div>기기</div>
         <div style={{ textAlign: 'right' }}>관리</div>
       </div>
@@ -140,7 +139,6 @@ export default function ClientList() {
               <div style={{ fontSize: '0.85rem', color: 'var(--notion-sub-text)' }}>
                 {client.phone || client.contact_person || '-'}
               </div>
-              <div>매월 {client.billing_date}일</div>
               <div>{assets.length}대</div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
                 <Button variant="ghost" size="sm" onClick={(e) => handleEdit(e, client)}>수정</Button>
@@ -177,6 +175,7 @@ export default function ClientList() {
                       <tr>
                         <th className={styles.assetTh}>종류</th>
                         <th className={styles.assetTh}>모델명 / S.N</th>
+                        <th className={styles.assetTh}>청구일</th>
                         <th className={styles.assetTh}>기본료</th>
                         <th className={styles.assetTh} style={{ textAlign: 'right' }}>작업</th>
                       </tr>
@@ -188,6 +187,9 @@ export default function ClientList() {
                           <td className={styles.assetTd}>
                             <div style={{ fontWeight: '600' }}>{asset.model_name}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--notion-sub-text)' }}>{asset.serial_number}</div>
+                          </td>
+                          <td className={styles.assetTd}>
+                            매월 {asset.billing_date || '-'}일
                           </td>
                           <td className={styles.assetTd}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

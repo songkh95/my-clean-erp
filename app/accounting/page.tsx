@@ -1,38 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase'
 import styles from './accounting.module.css'
 
-type AssetCalculation = {
-  inv: any
-  inventory_id: string
-  model_name: string
-  serial_number: string
-  billing_group_id: string | null
-  prev: { bw: number, col: number, bw_a3: number, col_a3: number }
-  curr: { bw: number, col: number, bw_a3: number, col_a3: number }
-  usage: { bw: number, col: number, bw_a3: number, col_a3: number }
-  converted: { bw: number, col: number } 
-  usageBreakdown: {
-    basicBW: number, extraBW: number
-    basicCol: number, extraCol: number
-  }
-  plan: {
-    basic_fee: number
-    free_bw: number
-    free_col: number
-    price_bw: number
-    price_col: number
-  }
-  rowCost: {
-    basic: number
-    extra: number
-    total: number
-  }
-  isGroupLeader: boolean
-  groupSpan: number
-}
+import AccountingRegistration from '@/components/accounting/AccountingRegistration'
+import AccountingHistory from '@/components/accounting/AccountingHistory'
+import SettlementConfirmModal from '@/components/accounting/SettlementConfirmModal'
 
 export default function AccountingPage() {
   const supabase = createClient()
@@ -40,19 +14,26 @@ export default function AccountingPage() {
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   
+  // 입력용 상태 (입력창과 연결)
   const [regYear, setRegYear] = useState(new Date().getFullYear())
   const [regMonth, setRegMonth] = useState(new Date().getMonth() + 1)
-  const [targetDay, setTargetDay] = useState('all') 
+  const [targetDay, setTargetDay] = useState('all')
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // 실제 필터 적용 상태 (조회 버튼 클릭 시 업데이트)
+  const [filterConfig, setFilterConfig] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    day: 'all',
+    term: ''
+  })
 
   const [isRegOpen, setIsRegOpen] = useState(true)
   const [clients, setClients] = useState<any[]>([])
   const [inventoryMap, setInventoryMap] = useState<{[key: string]: any[]}>({}) 
-  
   const [inputData, setInputData] = useState<{[key: string]: any}>({}) 
   const [prevData, setPrevData] = useState<{[key: string]: any}>({})
-  
-  const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set()) 
-  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedInventories, setSelectedInventories] = useState<Set<string>>(new Set()) 
   const [showUnregistered, setShowUnregistered] = useState(false)
 
   const [isHistOpen, setIsHistOpen] = useState(true)
@@ -60,8 +41,18 @@ export default function AccountingPage() {
   const [histYear, setHistYear] = useState(new Date().getFullYear())
   const [histMonth, setHistMonth] = useState(new Date().getMonth() + 1)
 
-  useEffect(() => { fetchRegistrationData() }, [regYear, regMonth])
+  useEffect(() => { fetchRegistrationData() }, [filterConfig.year, filterConfig.month])
   useEffect(() => { fetchHistoryData() }, [histYear, histMonth])
+
+  // [조회] 버튼 클릭 시 필터링 실행
+  const handleSearch = () => {
+    setFilterConfig({
+      year: regYear,
+      month: regMonth,
+      day: targetDay,
+      term: searchTerm
+    })
+  }
 
   const fetchRegistrationData = async () => {
     setLoading(true)
@@ -71,7 +62,11 @@ export default function AccountingPage() {
 
     if (!orgId) return
 
-    const { data: clientData } = await supabase.from('clients').select('*').eq('organization_id', orgId).eq('status', '정상').order('name')
+    const { data: clientData } = await supabase.from('clients')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('name')
+    
     if (clientData) setClients(clientData)
 
     const { data: invData } = await supabase.from('inventory')
@@ -89,7 +84,7 @@ export default function AccountingPage() {
     }
     setInventoryMap(invMap)
 
-    let prevY = regYear, prevM = regMonth - 1
+    let prevY = filterConfig.year, prevM = filterConfig.month - 1
     if (prevM === 0) { prevM = 12; prevY -= 1 }
 
     const { data: prevSettlements } = await supabase.from('settlements').select('id, client_id').eq('organization_id', orgId).eq('billing_year', prevY).eq('billing_month', prevM)
@@ -127,17 +122,26 @@ export default function AccountingPage() {
     setInputData((prev: any) => ({ ...prev, [invId]: { ...prev[invId], [field]: numValue } }))
   }
 
-  const toggleClientSelection = (clientId: string) => {
-    const newSet = new Set(selectedClients)
-    if (newSet.has(clientId)) newSet.delete(clientId)
-    else newSet.add(clientId)
-    setSelectedClients(newSet)
+  const toggleInventorySelection = (invId: string) => {
+    const newSet = new Set(selectedInventories)
+    if (newSet.has(invId)) newSet.delete(invId)
+    else newSet.add(invId)
+    setSelectedInventories(newSet)
   }
+
+  const setSelectedInventoriesBulk = (ids: string[], action: 'add' | 'remove') => {
+  const newSet = new Set(selectedInventories);
+  ids.forEach(id => {
+    if (action === 'add') newSet.add(id);
+    else newSet.delete(id);
+  });
+  setSelectedInventories(newSet);
+}
 
   const calculateClientBill = (client: any) => {
     const assets = inventoryMap[client.id] || []
     
-    let tempCalculations: AssetCalculation[] = assets.map(inv => {
+    let tempCalculations: any[] = assets.map(inv => {
       const p = prevData[inv.id] || { bw:0, col:0, bw_a3:0, col_a3:0 }
       const c = inputData[inv.id] || { bw:0, col:0, bw_a3:0, col_a3:0 }
 
@@ -175,17 +179,12 @@ export default function AccountingPage() {
       }
     })
 
-    const groups: {[key: string]: AssetCalculation[]} = {}
+    const groups: {[key: string]: any[]} = {}
     tempCalculations.forEach(calc => {
       const groupKey = calc.billing_group_id || `INDIVIDUAL_${calc.inventory_id}`
       if (!groups[groupKey]) groups[groupKey] = []
       groups[groupKey].push(calc)
     })
-
-    let totalBasicFee = 0
-    let totalExtraFee = 0
-    let grandTotalUsageBW = 0
-    let grandTotalUsageCol = 0
 
     Object.values(groups).forEach(groupAssets => {
       const groupBasicFee = groupAssets.reduce((sum, item) => sum + item.plan.basic_fee, 0)
@@ -194,9 +193,6 @@ export default function AccountingPage() {
       
       const groupUsageBW = groupAssets.reduce((sum, item) => sum + item.converted.bw, 0)
       const groupUsageCol = groupAssets.reduce((sum, item) => sum + item.converted.col, 0)
-
-      grandTotalUsageBW += groupUsageBW
-      grandTotalUsageCol += groupUsageCol
 
       const usedBasicBW = Math.min(groupUsageBW, groupFreeBW)
       const usedExtraBW = Math.max(0, groupUsageBW - groupFreeBW)
@@ -209,9 +205,6 @@ export default function AccountingPage() {
 
       const groupExtraFee = (usedExtraBW * unitPriceBW) + (usedExtraCol * unitPriceCol)
       const groupTotal = groupBasicFee + groupExtraFee
-
-      totalBasicFee += groupBasicFee
-      totalExtraFee += groupExtraFee
 
       groupAssets.forEach((asset, idx) => {
         if (idx === 0) {
@@ -230,27 +223,56 @@ export default function AccountingPage() {
       })
     })
 
-    return {
-      details: tempCalculations,
-      totalBasicFee,
-      totalExtraFee,
-      totalAmount: totalBasicFee + totalExtraFee,
-      grandTotalUsageBW,
-      grandTotalUsageCol
-    }
+    const totalAmount = tempCalculations.reduce((sum, d) => sum + (d.isGroupLeader ? d.rowCost.total : 0), 0)
+
+    return { details: tempCalculations, totalAmount }
   }
 
-  const calculateSelectedTotal = () => {
+  // 기계별 청구일 기준 필터링된 클라이언트 리스트
+  const filteredClients = useMemo(() => {
+    return clients.filter(c => {
+      const assets = inventoryMap[c.id] || []
+      const hasMatchingAsset = assets.some(asset => {
+        const matchesDay = filterConfig.day === 'all' || asset.billing_date === filterConfig.day
+        const matchesTerm = filterConfig.term === '' || 
+                           c.name.includes(filterConfig.term) || 
+                           asset.model_name.includes(filterConfig.term) || 
+                           asset.serial_number.includes(filterConfig.term)
+        return matchesDay && matchesTerm
+      })
+
+      if (!hasMatchingAsset) return false
+      if (showUnregistered) {
+        return !historyList.some(h => h.client_id === c.id)
+      }
+      return true
+    })
+  }, [clients, inventoryMap, filterConfig, showUnregistered, historyList])
+
+  // 필터링된 계산 함수
+  const calculateClientBillFiltered = (client: any) => {
+    const originalBill = calculateClientBill(client)
+    originalBill.details = originalBill.details.filter((d: any) => 
+      filterConfig.day === 'all' || d.inv.billing_date === filterConfig.day
+    )
+    return originalBill
+  }
+
+  const calculateSelectedTotal = (): number => {
     let sum = 0
-    Array.from(selectedClients).forEach(cid => {
-      const client = clients.find(c => c.id === cid)
-      if (client) sum += calculateClientBill(client).totalAmount
+    clients.forEach(client => {
+      const billData = calculateClientBillFiltered(client)
+      billData.details.forEach((d: any) => {
+        if (selectedInventories.has(d.inventory_id) && d.isGroupLeader) {
+          sum += d.rowCost.total
+        }
+      })
     })
     return sum
   }
 
   const handlePreSave = () => {
-    if (selectedClients.size === 0) return alert('선택된 거래처가 없습니다.')
+    if (selectedInventories.size === 0) return alert('선택된 기계가 없습니다.')
     setIsModalOpen(true)
   }
 
@@ -260,40 +282,36 @@ export default function AccountingPage() {
     const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
     const orgId = profile?.organization_id
 
-    for (const clientId of Array.from(selectedClients)) {
+    const affectedClientIds = new Set<string>();
+    clients.forEach(c => {
+       const assets = inventoryMap[c.id] || [];
+       if(assets.some(a => selectedInventories.has(a.id))) affectedClientIds.add(c.id);
+    });
+
+    for (const clientId of Array.from(affectedClientIds)) {
       const client = clients.find(c => c.id === clientId)
       if (!client) continue
-      const billData = calculateClientBill(client)
+      const billData = calculateClientBillFiltered(client)
 
       const { data: settlement, error: sErr } = await supabase.from('settlements').insert({
         organization_id: orgId, client_id: clientId,
-        billing_year: regYear, billing_month: regMonth, billing_date: client.billing_date,
-        total_amount: billData.totalAmount, 
-        basic_fee_snapshot: billData.totalBasicFee, 
-        extra_fee: billData.totalExtraFee,
-        total_usage_bw: billData.grandTotalUsageBW, 
-        total_usage_col: billData.grandTotalUsageCol,
-        is_paid: false
+        billing_year: filterConfig.year, billing_month: filterConfig.month, 
+        total_amount: billData.totalAmount, is_paid: false
       }).select().single()
 
-      if (sErr || !settlement) { console.error('Error', sErr); continue }
+      if (sErr || !settlement) continue
 
-      const detailsPayload = billData.details.map((d) => ({
+      const detailsPayload = billData.details.map((d: any) => ({
         settlement_id: settlement.id, inventory_id: d.inventory_id,
         prev_count_bw: d.prev.bw, curr_count_bw: d.curr.bw, prev_count_col: d.prev.col, curr_count_col: d.curr.col,
         prev_count_bw_a3: d.prev.bw_a3, curr_count_bw_a3: d.curr.bw_a3, prev_count_col_a3: d.prev.col_a3, curr_count_col_a3: d.curr.col_a3,
-        usage_bw: d.usage.bw, usage_col: d.usage.col, usage_bw_a3: d.usage.bw_a3, usage_col_a3: d.usage.col_a3,
-        converted_usage_bw: d.converted.bw, converted_usage_col: d.converted.col,
         calculated_amount: d.rowCost.total
       }))
       await supabase.from('settlement_details').insert(detailsPayload)
     }
     alert('저장되었습니다!')
-    setIsModalOpen(false)
-    setSelectedClients(new Set())
-    setInputData({}) 
-    fetchHistoryData() 
-    setLoading(false)
+    setIsModalOpen(false); setSelectedInventories(new Set()); setInputData({}); 
+    fetchHistoryData(); setLoading(false)
   }
 
   const handleDeleteHistory = async (id: string) => {
@@ -303,306 +321,38 @@ export default function AccountingPage() {
     }
   }
 
-  const filteredClients = clients.filter(c => {
-    const matchName = c.name.includes(searchTerm)
-    if (!matchName) return false
-    if (targetDay !== 'all' && c.billing_date !== targetDay) return false
-    if (showUnregistered) {
-      const alreadyRegistered = historyList.some(h => h.client_id === c.id)
-      return !alreadyRegistered
-    }
-    return true
-  })
-
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>💰 정산 및 회계 관리</h1>
-
-      <div className={styles.section}>
-        <div onClick={() => setIsRegOpen(!isRegOpen)} className={`${styles.header} ${!isRegOpen ? styles.headerClosed : ''}`}>
-          <span>📝 사용매수 등록 및 청구 ({regYear}년 {regMonth}월)</span>
-          <span>{isRegOpen ? '▲' : '▼'}</span>
-        </div>
-
-        {isRegOpen && (
-          <div className={styles.content}>
-            <div className={styles.controls}>
-              <div className={styles.controlItem}>
-                <input type="number" value={regYear} onChange={e => setRegYear(Number(e.target.value))} className={styles.input} style={{width:'80px'}} />
-                <span>년</span>
-                <input type="number" value={regMonth} onChange={e => setRegMonth(Number(e.target.value))} className={styles.input} style={{width:'60px'}} />
-                <span>월</span>
-              </div>
-              <div className={styles.controlItem}>
-                <select value={targetDay} onChange={e => setTargetDay(e.target.value)} className={styles.input}>
-                  <option value="all">전체 납기일</option>
-                  <option value="말일">말일</option>
-                  {Array.from({length: 31}, (_, i) => i + 1).map(d => (<option key={d} value={String(d)}>{d}일</option>))}
-                </select>
-              </div>
-              <div className={styles.controlItem}>
-                <input placeholder="거래처 검색..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className={styles.input} />
-              </div>
-              <div className={styles.controlItem}>
-                <input type="checkbox" id="unreg" checked={showUnregistered} onChange={e => setShowUnregistered(e.target.checked)} />
-                <label htmlFor="unreg" style={{fontSize:'0.9rem', cursor:'pointer'}}>미등록 거래처만 보기</label>
-              </div>
-            </div>
-
-            <div className={styles.tableContainer}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th className={styles.th} style={{width:'40px'}}>V</th>
-                    <th className={styles.th} style={{width:'80px'}}>거래처</th>
-                    <th className={styles.th} style={{width:'180px'}}>기계 (모델/S.N)</th>
-                    <th className={styles.th} style={{width:'60px'}}>구분</th>
-                    <th className={styles.th} style={{width:'80px', backgroundColor:'#f5f5f5'}}>전월</th>
-                    <th className={styles.th} style={{width:'80px', backgroundColor:'#e3f2fd'}}>당월(입력)</th>
-                    <th className={styles.th} style={{width:'160px'}}>실사용량 (가중치)</th>
-                    <th className={styles.th} style={{width:'140px'}}>기계별 청구액</th>
-                    <th className={styles.th} style={{width:'120px', backgroundColor:'#fff9db'}}>총 합계</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading && filteredClients.length === 0 ? (
-                    <tr><td colSpan={9} className={styles.td}>데이터 로딩 중...</td></tr>
-                  ) : filteredClients.map(client => {
-                    const assets = inventoryMap[client.id] || []
-                    if (assets.length === 0) return null 
-
-                    const billData = calculateClientBill(client)
-                    const isSelected = selectedClients.has(client.id)
-                    const rowSpan = assets.length
-
-                    return billData.details.map((calc, idx) => {
-                      const p = calc.prev
-                      const isReplaced = calc.inv.status.includes('철수') || calc.inv.status.includes('교체전')
-                      const isLastRow = idx === assets.length - 1
-                      const borderStyle = isLastRow ? '2px solid #b0b0b0' : '1px solid #e0e0e0'
-
-                      return (
-                        <tr key={calc.inventory_id} style={{
-                            backgroundColor: isSelected ? '#f0f9ff' : (isReplaced ? '#fff5f5' : 'transparent'),
-                            borderBottom: borderStyle 
-                        }}>
-                          {idx === 0 && (
-                            <>
-                              <td className={styles.td} rowSpan={rowSpan}>
-                                <input type="checkbox" checked={isSelected} onChange={() => toggleClientSelection(client.id)} />
-                              </td>
-                              <td className={styles.clientInfoCell} rowSpan={rowSpan}>
-                                <div className={styles.clientName}>{client.name}</div>
-                                <div className={styles.clientMeta}>{client.billing_date}일</div>
-                              </td>
-                            </>
-                          )}
-
-                          <td className={styles.td} style={{textAlign: 'left'}}>
-                             {isReplaced && <span className={`${styles.badge} ${styles.badgeReplaced}`}>교체전</span>}
-                             <div style={{fontWeight:'bold', color:'#555'}}>{calc.model_name}</div>
-                             <div style={{fontSize:'0.75rem', color:'#999'}}>{calc.serial_number}</div>
-                             {calc.billing_group_id && <div style={{fontSize:'0.7rem', color:'#0070f3', marginTop:'2px'}}>🔗 합산그룹</div>}
-                          </td>
-
-                          <td className={styles.td} style={{padding:0, height:'1px'}}>
-                            <div className={styles.splitCellContainer}>
-                              <div className={styles.rowGray}>흑A4</div>
-                              <div className={styles.rowBlue}>칼A4</div>
-                              <div className={styles.rowGray}>흑A3</div>
-                              <div className={`${styles.rowBlue} ${styles.rowLast}`}>칼A3</div>
-                            </div>
-                          </td>
-
-                          <td className={styles.td} style={{padding: 0, height:'1px', backgroundColor:'#f9f9f9'}}>
-                             <div className={styles.splitCellContainer}>
-                               <div className={styles.rowGray}>{p.bw}</div>
-                               <div className={styles.rowBlue}>{p.col}</div>
-                               <div className={styles.rowGray}>{p.bw_a3}</div>
-                               <div className={`${styles.rowBlue} ${styles.rowLast}`}>{p.col_a3}</div>
-                             </div>
-                          </td>
-
-                          <td className={styles.td} style={{padding: 0, height:'1px', backgroundColor:'#eff6ff'}}>
-                             <div className={styles.splitCellContainer}>
-                               <div className={styles.rowGray}>
-                                 <input type="number" className={styles.numberInput} placeholder={String(p.bw)} value={inputData[calc.inventory_id]?.bw ?? ''} onChange={e => handleInputChange(calc.inventory_id, 'bw', e.target.value)} />
-                               </div>
-                               <div className={styles.rowBlue}>
-                                 <input type="number" className={styles.numberInput} placeholder={String(p.col)} value={inputData[calc.inventory_id]?.col ?? ''} onChange={e => handleInputChange(calc.inventory_id, 'col', e.target.value)} />
-                               </div>
-                               <div className={styles.rowGray}>
-                                 <input type="number" className={styles.numberInput} placeholder={String(p.bw_a3)} value={inputData[calc.inventory_id]?.bw_a3 ?? ''} onChange={e => handleInputChange(calc.inventory_id, 'bw_a3', e.target.value)} />
-                               </div>
-                               <div className={`${styles.rowBlue} ${styles.rowLast}`}>
-                                 <input type="number" className={styles.numberInput} placeholder={String(p.col_a3)} value={inputData[calc.inventory_id]?.col_a3 ?? ''} onChange={e => handleInputChange(calc.inventory_id, 'col_a3', e.target.value)} />
-                               </div>
-                             </div>
-                          </td>
-                          
-                          <td className={styles.td}>
-                            <div style={{fontSize:'0.8rem', textAlign:'left'}}>
-                                <div>흑: {calc.converted.bw.toLocaleString()}장</div>
-                                <div>칼: {calc.converted.col.toLocaleString()}장</div>
-                            </div>
-                          </td>
-                          
-                          {calc.isGroupLeader ? (
-                            <td className={styles.td} rowSpan={calc.groupSpan} style={{textAlign:'right', verticalAlign:'bottom', paddingBottom:'20px', borderLeft:'1px solid #e0e0e0'}}>
-                               <div style={{fontSize:'0.8rem', color:'#666'}}>
-                                 <div>기본: {calc.rowCost.basic.toLocaleString()}</div>
-                                 <div>추가: {calc.rowCost.extra.toLocaleString()}</div>
-                               </div>
-                               <div style={{fontWeight:'bold', borderTop:'1px solid #eee', marginTop:'4px'}}>
-                                 {calc.rowCost.total.toLocaleString()}원
-                               </div>
-                            </td>
-                          ) : null}
-
-                          {idx === 0 && (
-                            <td className={styles.td} rowSpan={rowSpan} style={{backgroundColor:'#fffdf0', borderLeft:'2px solid #ddd', verticalAlign:'bottom', textAlign:'right', paddingBottom:'20px'}}>
-                                <div style={{fontWeight:'bold', color:'#d93025', fontSize:'1.1rem'}}>
-                                  총 {billData.totalAmount.toLocaleString()}원
-                                </div>
-                            </td>
-                          )}
-                        </tr>
-                      )
-                    })
-                  })}
-                </tbody>
-              </table>
-            </div>
-            
-            <div className={styles.actionBar}>
-              <div className={styles.totalLabel}>
-                선택된 거래처 합계 ({selectedClients.size}곳):
-                <span className={styles.totalAmount}>{calculateSelectedTotal().toLocaleString()} 원</span>
-              </div>
-              <button onClick={handlePreSave} disabled={selectedClients.size === 0} className={styles.saveBtn}>
-                🚀 청구서 확정 및 저장
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className={styles.section} style={{marginTop: '30px'}}>
-        <div onClick={() => setIsHistOpen(!isHistOpen)} className={styles.header}>
-          <span>📋 청구 내역 조회 및 관리</span>
-          <span>{isHistOpen ? '▲' : '▼'}</span>
-        </div>
-        {isHistOpen && (
-          <div className={styles.content}>
-            <div className={styles.controls}>
-              <div className={styles.controlItem}>
-                <input type="number" value={histYear} onChange={e => setHistYear(Number(e.target.value))} className={styles.input} style={{width:'80px'}} />
-                <span>년</span>
-                <input type="number" value={histMonth} onChange={e => setHistMonth(Number(e.target.value))} className={styles.input} style={{width:'60px'}} />
-                <span>월 내역 조회</span>
-              </div>
-            </div>
-            <div className={styles.tableContainer}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th className={styles.th}>청구월</th>
-                    <th className={styles.th}>거래처명</th>
-                    <th className={styles.th}>총 사용량 (흑/칼)</th>
-                    <th className={styles.th}>최종 청구액</th>
-                    <th className={styles.th}>관리</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historyList.length === 0 ? (<tr><td colSpan={5} className={styles.td} style={{color:'#999', padding:'30px'}}>조회된 내역이 없습니다.</td></tr>) : historyList.map(hist => (
-                    <tr key={hist.id}>
-                      <td className={styles.td}>{hist.billing_year}-{hist.billing_month}</td>
-                      <td className={styles.td} style={{fontWeight:'bold'}}>{hist.client?.name}</td>
-                      <td className={styles.td}>{hist.total_usage_bw.toLocaleString()} / {hist.total_usage_col.toLocaleString()}</td>
-                      <td className={styles.td} style={{color:'#0070f3', fontWeight:'bold'}}>{hist.total_amount.toLocaleString()}원</td>
-                      <td className={styles.td}><button onClick={() => handleDeleteHistory(hist.id)} style={{color:'red', border:'1px solid #eee', background:'white', cursor:'pointer', padding:'4px 8px', borderRadius:'4px'}}>삭제</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-
+      <AccountingRegistration 
+        isRegOpen={isRegOpen} setIsRegOpen={setIsRegOpen}
+        regYear={regYear} setRegYear={setRegYear}
+        regMonth={regMonth} setRegMonth={setRegMonth}
+        targetDay={targetDay} setTargetDay={setTargetDay}
+        searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+        showUnregistered={showUnregistered} setShowUnregistered={setShowUnregistered}
+        loading={loading} filteredClients={filteredClients}
+        inventoryMap={inventoryMap} inputData={inputData}
+        prevData={prevData} selectedInventories={selectedInventories}
+        handleInputChange={handleInputChange} toggleInventorySelection={toggleInventorySelection}
+        calculateClientBill={calculateClientBillFiltered}
+        calculateSelectedTotal={calculateSelectedTotal}
+        handlePreSave={handlePreSave}
+        onSearch={handleSearch}
+        setSelectedInventoriesBulk={setSelectedInventoriesBulk}
+      />
+      <AccountingHistory 
+        isHistOpen={isHistOpen} setIsHistOpen={setIsHistOpen}
+        histYear={histYear} setHistYear={setHistYear}
+        histMonth={histMonth} setHistMonth={setHistMonth}
+        historyList={historyList} handleDeleteHistory={handleDeleteHistory}
+      />
       {isModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalTitle}>🧾 청구서 최종 확인</div>
-            <div className={styles.modalSummary}>
-              총 청구 금액: <strong>{calculateSelectedTotal().toLocaleString()}</strong> 원 (선택 거래처: {selectedClients.size}곳)
-            </div>
-
-            <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '10px' }}>
-              {Array.from(selectedClients).map(cid => {
-                const client = clients.find(c => c.id === cid)
-                if (!client) return null;
-                const bill = calculateClientBill(client)
-                return (
-                  <div key={cid} style={{ marginBottom: '40px', border: '1px solid #eee', padding: '15px', borderRadius: '8px' }}>
-                    <h3 style={{ color: '#0070f3', borderBottom: '2px solid #0070f3', paddingBottom: '8px', marginTop: 0, fontSize: '1.1rem' }}>
-                      {client.name} <span style={{ fontSize: '0.8rem', color: '#666', fontWeight: 'normal' }}>({client.billing_date}일 청구 기준)</span>
-                    </h3>
-                    <table className={styles.modalTable} style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '15px' }}>
-                      <thead>
-                        <tr style={{ backgroundColor: '#f8f9fa' }}>
-                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>기계명(S/N)</th>
-                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>전월(흑/칼)</th>
-                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>당월(흑/칼)</th>
-                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>실사용(가중치)</th>
-                          <th style={{ border: '1px solid #ddd', padding: '8px' }}>금액</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {bill.details.map((d, idx) => (
-                          <tr key={idx}>
-                            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                              <div style={{ fontWeight: 'bold' }}>{d.model_name}</div>
-                              <div style={{ fontSize: '0.7rem', color: '#999' }}>{d.serial_number}</div>
-                            </td>
-                            <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>
-                              {d.prev.bw} / {d.prev.col}
-                            </td>
-                            <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>
-                              {d.curr.bw} / {d.curr.col}
-                            </td>
-                            <td style={{ border: '1px solid #ddd', padding: '8px', fontSize: '0.85rem' }}>
-                              흑: {d.converted.bw.toLocaleString()} / 칼: {d.converted.col.toLocaleString()}
-                            </td>
-                            {d.isGroupLeader ? (
-                              <td rowSpan={d.groupSpan} style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold', textAlign: 'right', backgroundColor: '#fffdf0' }}>
-                                {d.rowCost.total.toLocaleString()}원
-                              </td>
-                            ) : null}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div style={{ textAlign: 'right', fontSize: '0.95rem', background: '#f9f9f9', padding: '10px', borderRadius: '4px' }}>
-                      <span>기본료: <b>{bill.totalBasicFee.toLocaleString()}원</b></span>
-                      <span style={{ margin: '0 10px', color: '#ccc' }}>+</span>
-                      <span>추가요금: <b>{bill.totalExtraFee.toLocaleString()}원</b></span>
-                      <span style={{ margin: '0 10px' }}>=</span>
-                      <span style={{ color: '#d93025', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                        합계: {bill.totalAmount.toLocaleString()} 원
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className={styles.modalActions} style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-              <button onClick={() => setIsModalOpen(false)} className={styles.btnCancel}>취소</button>
-              <button onClick={handleFinalSave} className={styles.btnConfirm}>확인 및 DB 저장</button>
-            </div>
-          </div>
-        </div>
+        <SettlementConfirmModal 
+          selectedInventories={selectedInventories} calculateSelectedTotal={calculateSelectedTotal}
+          clients={clients} inventoryMap={inventoryMap} calculateClientBill={calculateClientBillFiltered}
+          onClose={() => setIsModalOpen(false)} onSave={handleFinalSave}
+        />
       )}
     </div>
   )

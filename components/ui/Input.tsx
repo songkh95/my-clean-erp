@@ -5,7 +5,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement | HTMLSe
   as?: 'input' | 'select' | 'textarea'
 }
 
-export default function InputField({ label, as = 'input', style, ...props }: InputProps) {
+export default function InputField({ label, as = 'input', style, value, ...props }: InputProps) {
   const containerStyle = { marginBottom: '16px' }
   const labelStyle = { display: 'block', marginBottom: '4px', fontSize: '0.75rem', fontWeight: '500', color: 'var(--notion-sub-text)' }
   const inputStyle = { 
@@ -27,6 +27,8 @@ export default function InputField({ label, as = 'input', style, ...props }: Inp
       <label style={labelStyle}>{label}</label>
       <Tag 
         style={{ ...inputStyle, ...style }} 
+        // 🔴 value가 null이나 undefined일 경우 빈 문자열('')이 들어가도록 수정
+        value={value ?? ''} 
         onFocus={(e: any) => e.target.style.boxShadow = '0 0 0 2px var(--notion-blue-light)'}
         onBlur={(e: any) => e.target.style.boxShadow = 'none'}
         {...props} 

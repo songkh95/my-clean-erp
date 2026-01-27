@@ -45,7 +45,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         }}>
           {/* 중앙 집중형 레이아웃으로 시독성 향상 */}
           <div style={{
-            maxWidth: '1200px', 
+            maxWidth: '1400px', 
             margin: '0 auto',
             width: '100%'
           }}>

@@ -17,18 +17,18 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
   const [loading, setLoading] = useState(false)
   const [potentialParents, setPotentialParents] = useState<any[]>([])
 
-  const [formData, setFormData] = useState({
-    name: '', business_number: '', representative_name: '', contact_person: '',
-    phone: '', office_phone: '', email: '', address: '', billing_date: '말일', memo: '', parent_id: '', status: 'active'
-  })
+const [formData, setFormData] = useState({
+  name: '', business_number: '', representative_name: '', contact_person: '',
+  phone: '', office_phone: '', email: '', address: '', memo: '', parent_id: '', status: 'active'
+})
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchPotentialParents()
-      if (editData) setFormData({ ...editData, parent_id: editData.parent_id || '' })
-      else setFormData({ name: '', business_number: '', representative_name: '', contact_person: '', phone: '', office_phone: '', email: '', address: '', billing_date: '말일', memo: '', parent_id: '', status: 'active' })
-    }
-  }, [editData, isOpen])
+useEffect(() => {
+  if (isOpen) {
+    fetchPotentialParents()
+    if (editData) setFormData({ ...editData, parent_id: editData.parent_id || '' })
+    else setFormData({ name: '', business_number: '', representative_name: '', contact_person: '', phone: '', office_phone: '', email: '', address: '', memo: '', parent_id: '', status: 'active' })
+  }
+}, [editData, isOpen])
 
   const fetchPotentialParents = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -81,10 +81,6 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
           </div>
           <InputField label="이메일" type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
           <InputField label="주소" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
-          <InputField label="정기 청구일" as="select" value={formData.billing_date} onChange={e => setFormData({ ...formData, billing_date: e.target.value })}>
-            <option value="말일">매월 말일</option>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (<option key={day} value={String(day)}>매월 {day}일</option>))}
-          </InputField>
           <InputField label="메모" as="textarea" value={formData.memo} onChange={e => setFormData({ ...formData, memo: e.target.value })} style={{ height: '80px' }} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
             <Button variant="ghost" type="button" onClick={onClose}>취소</Button>

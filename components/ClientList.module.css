@@ -57,10 +57,10 @@
   box-shadow: 0 0 0 2px var(--notion-blue-light);
 }
 
-/* 리스트 헤더 (컬럼명): 텍스트는 연하게, 폰트는 작게 */
+/* 리스트 헤더 (컬럼명): 청구일 제외 4개 컬럼으로 조정 */
 .listHeader {
   display: grid;
-  grid-template-columns: 2fr 2fr 1fr 1fr 1.5fr; /* 기능적 너비 유지 */
+  grid-template-columns: 2fr 2fr 1fr 1.5fr;
   padding: 10px 20px;
   background-color: var(--notion-bg);
   border-bottom: 1px solid var(--notion-border);
@@ -74,9 +74,10 @@
   border-bottom: 1px solid var(--notion-border);
 }
 
+/* 요약 영역: 청구일 제외 4개 컬럼으로 조정 */
 .clientSummary {
   display: grid;
-  grid-template-columns: 2fr 2fr 1fr 1fr 1.5fr;
+  grid-template-columns: 2fr 2fr 1fr 1.5fr;
   padding: 14px 20px;
   cursor: pointer;
   align-items: center;
