@@ -2,252 +2,278 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
-import styles from './InventoryForm.module.css'
 
-// 🔴 [수정 포인트 1] FormField를 메인 함수 밖으로 뺐습니다.
-// 이렇게 해야 입력할 때마다 컴포넌트가 파괴되지 않아 포커스가 유지됩니다.
-const FormField = ({ label, children }: { label: string, children: React.ReactNode }) => (
-  <div className={styles.fieldContainer}>
-    <div className={styles.label}>{label}</div>
-    {children}
-  </div>
-)
+interface Props {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  editData?: any
+}
 
-export default function InventoryForm({ type, onSuccess }: { type: string, onSuccess: () => void }) {
+export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: Props) {
   const supabase = createClient()
-  const [isOpen, setIsOpen] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [clients, setClients] = useState<any[]>([])
 
-  // 폼 데이터 상태
-  const [formData, setFormData] = useState({
-    category: '', brand: '', model_name: '', serial_number: '', 
-    status: '창고', client_id: '', purchase_price: '', memo: '',
-    product_condition: '새제품', // 기본값
+  const initialValues = {
+    type: '복합기',
+    category: '컬러겸용',
+    brand: '',
+    model_name: '',
+    serial_number: '',
+    product_condition: '새제품',
+    status: '창고',
+    client_id: '',
+    purchase_date: '',
+    purchase_price: 0,
     initial_count_bw: 0,
     initial_count_col: 0,
     initial_count_bw_a3: 0,
-    initial_count_col_a3: 0
-  })
+    initial_count_col_a3: 0,
+    memo: ''
+  }
 
-  const [clients, setClients] = useState<any[]>([])
-  const [existingBrands, setExistingBrands] = useState<string[]>([]) 
-  const [existingModels, setExistingModels] = useState<string[]>([])
+  const [formData, setFormData] = useState(initialValues)
 
   useEffect(() => {
-    const loadData = async () => {
-      // 거래처 목록 불러오기
-      const { data: cData } = await supabase.from('clients').select('id, name')
-      if (cData) setClients(cData)
-
-      // 기존 브랜드 목록 불러오기 (자동완성용)
-      const { data: bData } = await supabase.from('inventory').select('brand')
-      if (bData) {
-        const brands = bData.map(d => d.brand).filter(b => b) as string[]
-        setExistingBrands(Array.from(new Set(brands)))
-      }
-
-      // 기존 모델명 목록 불러오기 (자동완성용)
-      const { data: mData } = await supabase.from('inventory').select('model_name')
-      if (mData) {
-        setExistingModels(Array.from(new Set(mData.map(d => d.model_name))))
+    const fetchClients = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
+      
+      if (profile?.organization_id) {
+        const { data } = await supabase.from('clients').select('id, name').eq('organization_id', profile.organization_id).eq('status', '정상').order('name')
+        if (data) setClients(data)
       }
     }
-    loadData()
+    fetchClients()
   }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      if (editData) {
+        setFormData({
+          type: editData.type || '복합기',
+          category: editData.category || '컬러겸용',
+          brand: editData.brand || '',
+          model_name: editData.model_name || '',
+          serial_number: editData.serial_number || '',
+          product_condition: editData.product_condition || '새제품',
+          status: editData.status || '창고',
+          client_id: editData.client_id || '',
+          purchase_date: editData.purchase_date || '',
+          purchase_price: editData.purchase_price || 0,
+          initial_count_bw: editData.initial_count_bw || 0,
+          initial_count_col: editData.initial_count_col || 0,
+          initial_count_bw_a3: editData.initial_count_bw_a3 || 0,
+          initial_count_col_a3: editData.initial_count_col_a3 || 0,
+          memo: editData.memo || ''
+        })
+      } else {
+        setFormData(initialValues)
+      }
+    }
+  }, [isOpen, editData])
+
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newStatus = e.target.value
+    setFormData(prev => ({
+      ...prev,
+      status: newStatus,
+      client_id: newStatus === '설치' ? prev.client_id : ''
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+    setLoading(true)
+
     if (formData.status === '설치' && !formData.client_id) {
-      alert("⚠️ 상태가 '설치'일 경우, 설치처를 반드시 선택해야 합니다.")
+      alert('상태가 [설치]일 경우 거래처를 반드시 선택해야 합니다.')
+      setLoading(false)
       return
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
 
-    // 새제품일 경우 초기 카운터 강제 0 처리
-    const finalData = {
-      ...formData,
-      initial_count_bw: formData.product_condition === '새제품' ? 0 : formData.initial_count_bw,
-      initial_count_col: formData.product_condition === '새제품' ? 0 : formData.initial_count_col,
-      initial_count_bw_a3: formData.product_condition === '새제품' ? 0 : formData.initial_count_bw_a3,
-      initial_count_col_a3: formData.product_condition === '새제품' ? 0 : formData.initial_count_col_a3,
-    }
+      const payload = {
+        organization_id: profile?.organization_id,
+        ...formData,
+        client_id: formData.client_id === '' ? null : formData.client_id,
+        purchase_date: formData.purchase_date === '' ? null : formData.purchase_date,
+        purchase_price: Number(formData.purchase_price) || 0,
+        initial_count_bw: Number(formData.initial_count_bw) || 0,
+        initial_count_col: Number(formData.initial_count_col) || 0,
+        initial_count_bw_a3: Number(formData.initial_count_bw_a3) || 0,
+        initial_count_col_a3: Number(formData.initial_count_col_a3) || 0,
+      }
 
-    const { error } = await supabase.from('inventory').insert({
-      ...finalData,
-      type,
-      client_id: formData.client_id || null, 
-      purchase_price: formData.purchase_price || null,
-      organization_id: profile?.organization_id
-    })
+      let error
+      if (editData) {
+        const { error: updateError } = await supabase.from('inventory').update(payload).eq('id', editData.id)
+        error = updateError
+      } else {
+        const { error: insertError } = await supabase.from('inventory').insert(payload)
+        error = insertError
+      }
 
-    if (!error) {
-      alert('등록 성공!')
-      // 초기화
-      setFormData({ 
-        category: '', brand: '', model_name: '', serial_number: '', status: '창고', client_id: '', purchase_price: '', memo: '',
-        product_condition: '새제품',
-        initial_count_bw: 0, initial_count_col: 0, initial_count_bw_a3: 0, initial_count_col_a3: 0
-      })
+      if (error) throw error
+      alert(editData ? '수정되었습니다.' : '등록되었습니다.')
       onSuccess()
-    } else {
-      alert('등록 실패: ' + error.message)
+      onClose()
+    } catch (error: any) {
+      console.error(error)
+      alert('오류 발생: ' + error.message)
+    } finally {
+      setLoading(false)
     }
   }
 
-  // 🔴 [수정 포인트 2] FormField 정의가 여기서 삭제되고 맨 위로 이동했습니다.
+  if (!isOpen) return null
+
+  // 공통 스타일
+  const labelStyle = { display: 'block', marginBottom: '6px', fontSize: '0.9rem', fontWeight: '600', color: '#171717' }
+  const subLabelStyle = { display: 'block', marginBottom: '4px', fontSize: '0.85rem', color: '#666666' }
+  const inputStyle = { width: '100%', padding: '10px', border: '1px solid #E5E5E5', borderRadius: '6px', fontSize: '0.95rem', color:'#171717', outline:'none' }
 
   return (
-    <div className={styles.container}>
-      <div onClick={() => setIsOpen(!isOpen)} className={styles.header}>
-        <span>➕ {type} 추가</span>
-        <span>{isOpen ? '▲' : '▼'}</span>
-      </div>
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+    }}>
+      <div style={{ backgroundColor: '#FFFFFF', padding: '30px', borderRadius: '12px', width: '650px', maxWidth: '90%', maxHeight:'90vh', overflowY:'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: '700', marginBottom: '25px', borderBottom: '1px solid #E5E5E5', paddingBottom: '15px', color: '#171717' }}>
+          {editData ? '✏️ 장비 정보 수정' : '📦 신규 장비 등록'}
+        </h2>
 
-      {isOpen && (
-        <form onSubmit={handleSubmit} className={styles.formContainer}>
-          
-          {/* 분류 선택 */}
-          <FormField label="분류*">
-            <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className={styles.input} required>
-              <option value="">분류를 선택해주세요</option>
-              <option value="A3 레이저 복합기">A3 레이저 복합기</option>
-              <option value="A4 레이저 복합기">A4 레이저 복합기</option>
-              <option value="A3 레이저 프린터">A3 레이저 프린터</option>
-              <option value="A4 레이저 프린터">A4 레이저 프린터</option>
-              <option value="A3 잉크젯 복합기">A3 잉크젯 복합기</option>
-              <option value="A4 잉크젯 복합기">A4 잉크젯 복합기</option>
-              <option value="A3 잉크젯 프린터">A3 잉크젯 프린터</option>
-              <option value="A4 잉크젯 프린터">A4 잉크젯 프린터</option>
-              <option value="기타">기타</option>
-            </select>
-          </FormField>
-
-          {/* 브랜드 입력 (자동완성 리스트 포함) */}
-          <FormField label="브랜드*">
-            <input 
-              list="brands" 
-              value={formData.brand} 
-              onChange={e => setFormData({...formData, brand: e.target.value})} 
-              className={styles.input} 
-              placeholder="예: 신도리코, 삼성" 
-              required
-            />
-            <datalist id="brands">
-              {existingBrands.map((b, i) => <option key={i} value={b} />)}
-            </datalist>
-          </FormField>
-
-          {/* 모델명 입력 (자동완성 리스트 포함) */}
-          <FormField label="모델명*">
-             <input 
-              list="models"
-              value={formData.model_name} 
-              onChange={e => setFormData({...formData, model_name: e.target.value})} 
-              className={styles.input} 
-              required
-            />
-            <datalist id="models">
-              {existingModels.map((m, i) => <option key={i} value={m} />)}
-            </datalist>
-          </FormField>
-
-          {/* S/N 입력 */}
-          <FormField label="Serial No.*">
-            <input 
-              value={formData.serial_number} 
-              onChange={e => setFormData({...formData, serial_number: e.target.value})} 
-              className={styles.input} 
-              required
-            />
-          </FormField>
-
-          {/* 제품 상태 (새제품/중고) */}
-          <FormField label="제품 상태*">
-            <div style={{display:'flex', gap:'20px', padding:'5px 0'}}>
-              <label style={{cursor:'pointer', display:'flex', alignItems:'center'}}>
-                <input 
-                  type="radio" 
-                  name="condition" 
-                  checked={formData.product_condition === '새제품'}
-                  onChange={() => setFormData({...formData, product_condition: '새제품'})}
-                  style={{marginRight:'5px'}}
-                /> 새제품 (초기값 0)
-              </label>
-              <label style={{cursor:'pointer', display:'flex', alignItems:'center'}}>
-                <input 
-                  type="radio" 
-                  name="condition" 
-                  checked={formData.product_condition === '중고'}
-                  onChange={() => setFormData({...formData, product_condition: '중고'})}
-                  style={{marginRight:'5px'}}
-                /> 중고 (초기값 입력)
-              </label>
-            </div>
-          </FormField>
-
-          {/* 초기 카운터 (중고일 때만 보임) */}
-          {formData.product_condition === '중고' && (
-            <div style={{backgroundColor:'#f9f9f9', padding:'10px', borderRadius:'8px', marginBottom:'15px', border:'1px solid #eee'}}>
-              <div style={{fontSize:'0.9rem', fontWeight:'bold', marginBottom:'10px', color:'#555'}}>🔢 초기 카운터 설정 (중고)</div>
-              <div style={{display:'flex', gap:'10px', marginBottom:'10px'}}>
-                <div style={{flex:1}}>
-                   <span style={{fontSize:'0.8rem', color:'#666'}}>흑백</span>
-                   <input type="number" value={formData.initial_count_bw} onChange={e => setFormData({...formData, initial_count_bw: Number(e.target.value)})} className={styles.input} />
-                </div>
-                <div style={{flex:1}}>
-                   <span style={{fontSize:'0.8rem', color:'#666'}}>칼라</span>
-                   <input type="number" value={formData.initial_count_col} onChange={e => setFormData({...formData, initial_count_col: Number(e.target.value)})} className={styles.input} />
-                </div>
-              </div>
-              <div style={{display:'flex', gap:'10px'}}>
-                <div style={{flex:1}}>
-                   <span style={{fontSize:'0.8rem', color:'#666'}}>흑백(A3)</span>
-                   <input type="number" value={formData.initial_count_bw_a3} onChange={e => setFormData({...formData, initial_count_bw_a3: Number(e.target.value)})} className={styles.input} />
-                </div>
-                <div style={{flex:1}}>
-                   <span style={{fontSize:'0.8rem', color:'#666'}}>칼라(A3)</span>
-                   <input type="number" value={formData.initial_count_col_a3} onChange={e => setFormData({...formData, initial_count_col_a3: Number(e.target.value)})} className={styles.input} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 설치 상태 (창고/설치/수리중/폐기) */}
-          <FormField label="현재 위치(상태)">
-            <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className={styles.input}>
-              <option value="창고">창고 (보관중)</option>
-              <option value="설치">설치 (거래처)</option>
-              <option value="수리중">수리중</option>
-              <option value="폐기">폐기</option>
-            </select>
-          </FormField>
-
-          {/* 설치처 (상태가 '설치'일 때만 보임) */}
-          {formData.status === '설치' && (
-            <FormField label="설치된 거래처*">
-              <select value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})} className={styles.input} required>
-                <option value="">거래처를 선택하세요</option>
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>장비 종류</label>
+              <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} style={inputStyle}>
+                <option value="복합기">복합기</option>
+                <option value="프린터">프린터</option>
+                <option value="PC/노트북">PC/노트북</option>
+                <option value="기타">기타</option>
               </select>
-            </FormField>
-          )}
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>세부 구분</label>
+              <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} style={inputStyle}>
+                <option value="컬러겸용">컬러겸용</option>
+                <option value="흑백전용">흑백전용</option>
+                <option value="잉크젯">잉크젯</option>
+                <option value="기타">기타</option>
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>상태</label>
+              <select value={formData.status} onChange={handleStatusChange} style={inputStyle}>
+                <option value="창고">창고 (미설치)</option>
+                <option value="수리중">수리중</option>
+                <option value="폐기">폐기</option>
+                <option value="분실">분실</option>
+                <option value="설치">설치됨</option>
+              </select>
+            </div>
+          </div>
 
-          {/* 매입가 & 메모 */}
-          <FormField label="매입가">
-            <input type="number" value={formData.purchase_price} onChange={e => setFormData({...formData, purchase_price: e.target.value})} className={styles.input} placeholder="숫자만 입력" />
-          </FormField>
+          <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: formData.status === '설치' ? 'rgba(0, 112, 243, 0.05)' : '#FAFAFA', borderRadius: '8px', border: formData.status === '설치' ? '1px solid #0070f3' : '1px solid #E5E5E5' }}>
+            <label style={{ ...labelStyle, color: formData.status === '설치' ? '#0070f3' : '#999' }}>
+              🏢 설치된 거래처 {formData.status !== '설치' && '(설치 상태일 때만 활성)'}
+            </label>
+            <select
+              value={formData.client_id}
+              onChange={e => setFormData({...formData, client_id: e.target.value})}
+              disabled={formData.status !== '설치'}
+              style={{ ...inputStyle, backgroundColor: formData.status === '설치' ? '#FFFFFF' : '#F5F5F5', borderColor: formData.status === '설치' ? '#0070f3' : '#E5E5E5' }}
+            >
+              <option value="">거래처를 선택하세요</option>
+              {clients.map(client => (<option key={client.id} value={client.id}>{client.name}</option>))}
+            </select>
+          </div>
 
-          <FormField label="메모">
-            <input value={formData.memo} onChange={e => setFormData({...formData, memo: e.target.value})} className={styles.input} placeholder="특이사항" />
-          </FormField>
+          <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>브랜드</label>
+              <input value={formData.brand} onChange={e => setFormData({ ...formData, brand: e.target.value })} placeholder="예: 삼성" style={inputStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>모델명 *</label>
+              <input required value={formData.model_name} onChange={e => setFormData({ ...formData, model_name: e.target.value })} style={inputStyle} />
+            </div>
+          </div>
 
-          <button type="submit" className={styles.submitBtn}>등록완료</button>
+          <div style={{ display: 'flex', gap: '15px', marginBottom: '25px' }}>
+            <div style={{ flex: 2 }}>
+              <label style={labelStyle}>Serial Number (S/N) *</label>
+              <input required value={formData.serial_number} onChange={e => setFormData({ ...formData, serial_number: e.target.value })} style={inputStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>제품 상태</label>
+              <select value={formData.product_condition} onChange={e => setFormData({ ...formData, product_condition: e.target.value })} style={inputStyle}>
+                <option value="새제품">새제품</option>
+                <option value="중고">중고</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ backgroundColor: '#FAFAFA', padding: '20px', borderRadius: '8px', marginBottom: '25px', border:'1px solid #E5E5E5' }}>
+            <label style={{ display: 'block', marginBottom: '15px', fontSize: '0.95rem', fontWeight: '700', color: '#171717', borderBottom:'1px solid #E5E5E5', paddingBottom:'8px' }}>
+              🔢 초기 카운터 (Meter Reading)
+            </label>
+            <div style={{ display: 'flex', gap: '15px', marginBottom:'15px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={subLabelStyle}>흑백 A4</label>
+                <input type="number" value={formData.initial_count_bw} onChange={e => setFormData({ ...formData, initial_count_bw: Number(e.target.value) })} style={inputStyle} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={subLabelStyle}>칼라 A4</label>
+                <input type="number" value={formData.initial_count_col} onChange={e => setFormData({ ...formData, initial_count_col: Number(e.target.value) })} style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={subLabelStyle}>흑백 A3</label>
+                <input type="number" value={formData.initial_count_bw_a3} onChange={e => setFormData({ ...formData, initial_count_bw_a3: Number(e.target.value) })} style={inputStyle} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={subLabelStyle}>칼라 A3</label>
+                <input type="number" value={formData.initial_count_col_a3} onChange={e => setFormData({ ...formData, initial_count_col_a3: Number(e.target.value) })} style={inputStyle} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>매입일/제조일</label>
+              <input type="date" value={formData.purchase_date} onChange={e => setFormData({ ...formData, purchase_date: e.target.value })} style={inputStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>매입가 (원)</label>
+              <input type="number" value={formData.purchase_price} onChange={e => setFormData({ ...formData, purchase_price: Number(e.target.value) })} style={inputStyle} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '25px' }}>
+            <label style={labelStyle}>비고 (특이사항)</label>
+            <textarea
+              value={formData.memo}
+              onChange={e => setFormData({ ...formData, memo: e.target.value })}
+              placeholder="특이사항을 입력하세요."
+              style={{ ...inputStyle, height:'80px', resize:'none' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop:'1px solid #E5E5E5', paddingTop:'20px' }}>
+            <button type="button" onClick={onClose} style={{ padding: '10px 24px', border: '1px solid #E5E5E5', background: '#FFFFFF', color:'#171717', borderRadius: '6px', cursor: 'pointer', fontWeight:'600' }}>취소</button>
+            <button type="submit" disabled={loading} style={{ padding: '10px 24px', background: '#171717', color: '#FFFFFF', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight:'600' }}>
+              {loading ? '저장 중...' : (editData ? '수정 완료' : '장비 등록')}
+            </button>
+          </div>
         </form>
-      )}
+      </div>
     </div>
   )
 }

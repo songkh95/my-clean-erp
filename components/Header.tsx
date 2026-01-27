@@ -14,7 +14,6 @@ export default function Header() {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        // 🔴 [수정] 이메일이 없으면 null을 넣도록 '?? null' 추가
         setUserEmail(user.email ?? null)
       }
     }
@@ -30,45 +29,53 @@ export default function Header() {
     if (path === '/') return '🏠 홈 (대시보드)'
     if (path.startsWith('/clients')) return '👥 거래처 관리'
     if (path.startsWith('/inventory')) return '📦 자산 및 재고 관리'
+    if (path.startsWith('/accounting')) return '💰 정산 및 회계 관리'
     return '🧼 My Clean ERP'
   }
 
   return (
     <header style={{
-      height: '60px',
-      backgroundColor: '#333',
-      color: '#fff',
+      height: '70px', // 높이 약간 증가
+      backgroundColor: '#FFFFFF', // White
+      borderBottom: '1px solid #E5E5E5', // Soft Gray
+      color: '#171717', // Off Black
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '0 30px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      padding: '0 40px',
+      position: 'sticky',
+      top: 0,
+      zIndex: 90
     }}>
-      <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>
+      <h2 style={{ fontSize: '1.4rem', fontWeight: '700', margin: 0 }}>
         {getPageTitle(pathname)}
       </h2>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.9rem' }}>
         {userEmail ? (
           <>
-            <span>👤 {userEmail} 님</span>
+            <span style={{color: '#666666', fontWeight:'500'}}>👤 {userEmail} 님</span>
             <button 
               onClick={handleLogout}
               style={{
-                padding: '6px 12px',
-                backgroundColor: '#555',
-                border: '1px solid #777',
-                color: '#fff',
-                borderRadius: '4px',
+                padding: '8px 16px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #E5E5E5',
+                color: '#171717',
+                borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '0.8rem'
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                transition: 'all 0.2s'
               }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F5F5F5'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
             >
               로그아웃
             </button>
           </>
         ) : (
-          <span>로그인 정보 확인 중...</span>
+          <span style={{color:'#666666'}}>확인 중...</span>
         )}
       </div>
     </header>

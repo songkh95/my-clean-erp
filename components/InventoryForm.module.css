@@ -1,96 +1,191 @@
-/* components/InventoryForm.module.css */
+/* app/inventory/inventory.module.css */
 
 .container {
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  background-color: #fff;
-  overflow: hidden;
+  padding: 0; 
+  max-width: 1600px; 
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.5rem; 
+  font-weight: 700; 
+  margin-bottom: 20px; 
+  color: #171717; /* Off Black */
+}
+
+/* 카드 섹션 스타일 */
+.section {
+  border: 1px solid #E5E5E5; /* Soft Gray */
+  border-radius: 12px; 
+  background-color: #FFFFFF; /* White */
+  overflow: hidden; 
+  margin-bottom: 30px; 
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02); /* 아주 은은한 그림자 */
 }
 
 .header {
-  padding: 15px 20px;
+  padding: 15px 20px; 
+  background-color: #FFFFFF; 
+  border-bottom: 1px solid #E5E5E5;
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
   cursor: pointer;
-  background-color: #fcfcfc;
-  display: flex;
-  justify-content: space-between;
-  font-weight: bold;
+  font-weight: 600; 
+  font-size: 1.1rem;
+  color: #171717;
 }
 
-.formContainer {
+.content { padding: 20px; }
+
+/* 컨트롤 영역 */
+.controls {
+  display: flex; 
+  gap: 12px; 
+  margin-bottom: 20px; 
+  align-items: center; 
+  flex-wrap: wrap;
+}
+
+.input, .select { 
+  padding: 10px 12px; 
+  border: 1px solid #E5E5E5; 
+  border-radius: 6px; 
+  font-size: 0.9rem; 
+  outline: none; 
+  color: #171717;
+  background-color: #FFFFFF;
+  transition: border-color 0.2s;
+}
+
+.input:focus, .select:focus {
+  border-color: #0070f3; /* Accent Blue */
+}
+
+/* 테이블 스타일 */
+.tableContainer {
+  overflow-x: auto; 
+  border: 1px solid #E5E5E5; 
+  border-radius: 8px;
+}
+
+.table {
+  width: 100%; 
+  border-collapse: collapse; 
+  font-size: 0.9rem; 
+  min-width: 1000px;
+}
+
+.th {
+  background-color: #FFFFFF; /* 헤더도 깔끔하게 화이트 */
+  padding: 15px 12px; 
+  border-bottom: 1px solid #E5E5E5;
+  text-align: left; 
+  font-weight: 600; 
+  color: #666666; /* 헤더 텍스트는 서브 컬러로 은은하게 */
+  white-space: nowrap;
+}
+
+/* 셀 스타일 */
+.td {
+  padding: 15px 12px; 
+  border-bottom: 1px solid #E5E5E5; 
+  color: #171717; 
+  vertical-align: middle;
+}
+
+/* 행 스타일 */
+.tr {
+  background-color: #FFFFFF;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.tr:hover {
+  background-color: #FAFAFA; /* 호버 시 아주 미세한 회색 */
+}
+
+.trSelected {
+  background-color: rgba(0, 112, 243, 0.03); /* 선택 시 아주 연한 블루 틴트 */
+}
+
+/* 버튼 스타일 */
+.primaryBtn {
+  background-color: #171717; /* 메인 액션은 Off Black (또는 #0070f3) */
+  color: #FFFFFF;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.2s;
+}
+
+.primaryBtn:hover {
+  background-color: #000000;
+}
+
+.secondaryBtn {
+  background-color: #FFFFFF;
+  color: #171717;
+  border: 1px solid #E5E5E5;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.secondaryBtn:hover {
+  border-color: #171717;
+  background-color: #FAFAFA;
+}
+
+.deleteBtn {
+  background-color: #FFFFFF;
+  color: #666666; /* 너무 빨간색 남발 방지, 호버시 강조 */
+  border: 1px solid #E5E5E5;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.deleteBtn:hover {
+  color: #ff4d4f; /* 기능적 색상(삭제)은 유지하되 평소엔 얌전하게 */
+  border-color: #ff4d4f;
+  background-color: #fff1f0;
+}
+
+/* 아코디언 상세 영역 */
+.detailRow {
+  background-color: #FAFAFA; /* 아주 연한 회색 배경 */
+}
+
+.detailContent {
+  padding: 24px;
+  border-bottom: 1px solid #E5E5E5;
+}
+
+.detailBox {
+  background-color: #FFFFFF;
+  border: 1px solid #E5E5E5;
+  border-radius: 8px;
   padding: 20px;
 }
 
-/* 개별 입력 필드 감싸는 박스 */
-.fieldContainer {
-  margin-bottom: 12px;
-}
-
 .label {
-  margin-bottom: 5px;
-  font-size: 0.85rem;
-  font-weight: bold;
-  color: #555;
+  font-size: 0.8rem;
+  color: #666666;
+  margin-bottom: 4px;
 }
 
-/* 입력창 공통 스타일 */
-.input {
-  width: 100%;
-  padding: 10px;
-  border-radius: 6px;
-  border: 1px solid #dddddd; /* 요청하신 색상 */
-  box-sizing: border-box;
-  font-size: 0.9rem;
-  background-color: #fff;
-}
-
-.textarea {
-  width: 100%;
-  padding: 10px;
-  border-radius: 6px;
-  border: 1px solid #dddddd;
-  box-sizing: border-box;
-  font-size: 0.9rem;
-  background-color: #fff;
-  height: 60px;
-}
-
-/* 등록 버튼 */
-.submitBtn {
-  width: 100%;
-  padding: 12px;
-  border-radius: 6px;
-  border: none;
-  background-color: #0070f3;
-  color: #fff;
-  font-weight: bold;
-  cursor: pointer;
-  margin-top: 10px;
-}
-
-/* 검색 드롭다운용 컨테이너 */
-.relativeContainer {
-  position: relative;
-}
-
-.dropdownMenu {
-  position: absolute;
-  width: 100%;
-  background-color: #fff;
-  border: 1px solid #dddddd;
-  z-index: 10;
-  max-height: 150px;
-  overflow-y: auto;
-  border-radius: 0 0 6px 6px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-.dropdownItem {
-  padding: 10px;
-  cursor: pointer;
-  border-bottom: 1px solid #eee;
-  font-size: 0.9rem;
-}
-
-.dropdownItem:hover {
-  background-color: #f5f5f5;
+.value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #171717;
 }

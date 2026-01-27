@@ -1,123 +1,116 @@
 /* app/accounting/accounting.module.css */
 
 .container {
-  padding: 0; max-width: 1600px; margin: 0 auto; /* 테이블이 넓으니 컨테이너도 확보 */
+  padding: 0; max-width: 1600px; margin: 0 auto;
 }
 .title {
-  font-size: 1.5rem; font-weight: bold; margin-bottom: 20px; color: #333;
+  font-size: 1.5rem; font-weight: 700; margin-bottom: 20px; color: #171717;
 }
 .section {
-  border: 1px solid #e0e0e0; border-radius: 12px; background-color: #fff;
-  overflow: hidden; margin-bottom: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  border: 1px solid #E5E5E5; border-radius: 12px; background-color: #FFFFFF;
+  overflow: hidden; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.02);
 }
 .header {
-  padding: 15px 20px; background-color: #fcfcfc; border-bottom: 1px solid #eee;
+  padding: 15px 20px; background-color: #FFFFFF; border-bottom: 1px solid #E5E5E5;
   display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-  font-weight: bold; font-size: 1.1rem;
+  font-weight: 700; font-size: 1.1rem; color: #171717;
 }
 .headerClosed { border-bottom: none; }
 .content { padding: 20px; }
 
 /* 컨트롤 영역 */
 .controls {
-  display: flex; gap: 15px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;
-  padding: 15px; background-color: #f9f9f9; border-radius: 8px; border: 1px solid #eee;
+  display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;
+  padding: 15px; background-color: #FFFFFF; border: 1px solid #E5E5E5; border-radius: 8px;
 }
-.controlItem { display: flex; align-items: center; gap: 8px; }
-.input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; outline: none; }
+.controlItem { display: flex; align-items: center; gap: 8px; color: #171717; }
+.input { 
+  padding: 8px 12px; border: 1px solid #E5E5E5; border-radius: 6px; 
+  font-size: 0.9rem; outline: none; color: #171717; background-color: #FFFFFF;
+}
+.input:focus { border-color: #0070f3; }
 
 /* 테이블 스타일 */
 .tableContainer {
-  overflow-x: auto; border: 1px solid #ccc; border-radius: 0;
+  overflow-x: auto; border: 1px solid #E5E5E5; border-radius: 8px;
 }
 .table {
   width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 1300px;
 }
 .th {
-  background-color: #f1f3f5; padding: 10px; border: 1px solid #d0d0d0;
-  text-align: center; font-weight: bold; color: #333; white-space: nowrap;
+  background-color: #FFFFFF; padding: 12px; border: 1px solid #E5E5E5;
+  text-align: center; font-weight: 600; color: #666666; white-space: nowrap;
 }
 .td {
-  padding: 10px; border: 1px solid #e0e0e0; text-align: center; color: #333; vertical-align: middle;
+  padding: 10px; border: 1px solid #E5E5E5; text-align: center; color: #171717; vertical-align: middle;
 }
 
 /* 거래처 정보 */
 .clientInfoCell {
-  background-color: #fafafa; text-align: left; vertical-align: top; padding: 15px;
-  /* 너비는 인라인 스타일에서 제어 */
+  background-color: #FAFAFA; text-align: left; vertical-align: top; padding: 15px; width: 120px;
 }
-.clientName { font-weight: bold; font-size: 1rem; margin-bottom: 6px; color: #0070f3; }
-.clientMeta { font-size: 0.8rem; color: #666; margin-bottom: 4px; }
+.clientName { font-weight: 700; font-size: 1rem; margin-bottom: 6px; color: #0070f3; }
+.clientMeta { font-size: 0.8rem; color: #666666; margin-bottom: 4px; }
 
-/* 🔴 [디자인 수정] 카운터 행 스타일 (Flexbox 적용) */
-/* 셀 높이를 꽉 채우기 위한 컨테이너 클래스 추가 */
-.splitCellContainer {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 140px; /* 최소 높이 보장 */
-}
+/* 카운터 행 스타일 */
+.splitCellContainer { display: flex; flex-direction: column; height: 100%; min-height: 140px; }
 
-/* 각 행은 남은 공간을 1:1로 나눠가짐 */
 .rowGray {
-  background-color: #f8f9fa; /* 옅은 회색 */
-  flex: 1; /* 고정 높이 제거하고 늘어나게 함 */
-  display: flex; align-items: center; justify-content: center; width: 100%;
-  border-bottom: 1px solid #eee;
-  padding: 4px 0; /* 내용물 여백 */
+  background-color: #FAFAFA; /* Soft Gray보다 연한 배경 */
+  flex: 1; display: flex; align-items: center; justify-content: center; width: 100%;
+  border-bottom: 1px solid #E5E5E5; padding: 4px 0; color: #666666;
 }
 .rowBlue {
-  background-color: #f0f7ff; /* 옅은 파란색 */
-  flex: 1; /* 고정 높이 제거하고 늘어나게 함 */
-  display: flex; align-items: center; justify-content: center; width: 100%;
-  border-bottom: 1px solid #eee;
-  padding: 4px 0;
+  background-color: rgba(0, 112, 243, 0.05); /* Accent Blue의 아주 연한 버전 */
+  flex: 1; display: flex; align-items: center; justify-content: center; width: 100%;
+  border-bottom: 1px solid #E5E5E5; padding: 4px 0; color: #0070f3;
 }
 .rowLast { border-bottom: none; }
 
-/* 입력창 스타일 */
 .numberInput {
   width: 100%; height: 100%; border: none; background: transparent;
-  text-align: right; font-size: 0.9rem; outline: none; padding: 0 5px;
+  text-align: right; font-size: 0.9rem; outline: none; padding: 0 5px; color: #171717;
 }
-.numberInput::-webkit-outer-spin-button,
-.numberInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .numberInput[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.readOnlyValue { font-weight: 600; color: #171717; }
 
-.readOnlyValue { font-weight: 500; color: #333; }
-
-/* 요금 내역 스타일 */
+/* 요금 내역 */
 .billSection { text-align: right; margin-bottom: 8px; }
-.billTitle { font-weight: bold; font-size: 0.8rem; color: #555; margin-bottom: 2px; display: block; text-align: left;}
-.billRow { display: flex; justify-content: space-between; font-size: 0.85rem; color: #444; margin-bottom: 2px; }
-.billRowTotal { display: flex; justify-content: space-between; font-size: 0.95rem; color: #d93025; font-weight: bold; margin-top: 5px; padding-top: 5px; border-top: 1px solid #999; }
+.billTitle { font-weight: 700; font-size: 0.8rem; color: #666666; margin-bottom: 2px; display: block; text-align: left;}
+.billRow { display: flex; justify-content: space-between; font-size: 0.85rem; color: #171717; margin-bottom: 2px; }
+.billRowTotal { 
+  display: flex; justify-content: space-between; font-size: 0.95rem; 
+  color: #0070f3; font-weight: 700; margin-top: 5px; padding-top: 5px; 
+  border-top: 1px solid #E5E5E5; 
+}
 
 /* 뱃지 */
-.badge { font-size: 0.7rem; padding: 2px 4px; border-radius: 4px; background-color: #eee; color: #666; margin-right: 4px; }
-.badgeReplaced { background-color: #fff0f0; color: #d93025; border: 1px solid #d93025; }
+.badge { font-size: 0.7rem; padding: 2px 4px; border-radius: 4px; background-color: #E5E5E5; color: #666666; margin-right: 4px; }
+.badgeReplaced { background-color: #fff1f0; color: #ff4d4f; border: 1px solid #ff4d4f; }
 
-/* 액션바 & 모달 */
+/* 액션바 */
 .actionBar {
-  margin-top: 20px; padding: 20px; background-color: #333; color: #fff; border-radius: 8px;
+  margin-top: 20px; padding: 20px; background-color: #171717; color: #FFFFFF; border-radius: 8px;
   display: flex; justify-content: space-between; align-items: center;
 }
 .totalLabel { font-size: 1.1rem; }
-.totalAmount { font-size: 1.5rem; font-weight: bold; color: #ffeb3b; margin-left: 10px; }
-.saveBtn { background-color: #0070f3; color: #fff; border: none; padding: 10px 25px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem; }
-.saveBtn:disabled { background-color: #777; cursor: not-allowed; }
+.totalAmount { font-size: 1.5rem; font-weight: 700; color: #0070f3; margin-left: 10px; } /* 노란색 대신 블루 계열 강조 */
+.saveBtn { background-color: #0070f3; color: #fff; border: none; padding: 10px 25px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 1rem; }
+.saveBtn:disabled { background-color: #666666; cursor: not-allowed; }
 
+/* 모달 */
 .modalOverlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5);
   display: flex; justify-content: center; align-items: center; z-index: 1000;
 }
 .modalContent {
-  background-color: #fff; padding: 30px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  background-color: #FFFFFF; padding: 30px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
 }
-.modalTitle { font-size: 1.4rem; font-weight: bold; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-.modalSummary { background-color: #f1f3f5; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; text-align: right; font-size: 1.2rem; }
+.modalTitle { font-size: 1.4rem; font-weight: 700; margin-bottom: 20px; border-bottom: 2px solid #171717; padding-bottom: 10px; color: #171717; }
+.modalSummary { background-color: #FAFAFA; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: 700; text-align: right; font-size: 1.2rem; color: #171717; border: 1px solid #E5E5E5; }
 .modalTable { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.85rem; }
-.modalTable th, .modalTable td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-.modalTable th { background-color: #eee; }
+.modalTable th, .modalTable td { border: 1px solid #E5E5E5; padding: 8px; text-align: center; }
+.modalTable th { background-color: #FAFAFA; color: #666666; }
 .modalActions { display: flex; justify-content: flex-end; gap: 10px; }
-.btnConfirm { background-color: #0070f3; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-.btnCancel { background-color: #fff; border: 1px solid #ccc; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+.btnConfirm { background-color: #171717; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.btnCancel { background-color: #FFFFFF; border: 1px solid #E5E5E5; color: #171717; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
