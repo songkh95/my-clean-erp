@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
 import ClientForm from './ClientForm'
-import PlanSettingModal from './PlanSettingModal'
-import Button from './ui/Button'
+import PlanSettingModal from './../PlanSettingModal'
+import MachineReplaceModal from './../MachineReplaceModal'
+import MachineWithdrawModal from './../MachineWithdrawModal' // 🔴 추가
+import Button from './../ui/Button'
 import styles from './ClientList.module.css'
 
 export default function ClientList() {
@@ -16,21 +18,29 @@ export default function ClientList() {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  
+  // 모달 제어 상태
   const [isRegModalOpen, setIsRegModalOpen] = useState(false)
   const [selectedClient, setSelectedClient] = useState<any>(null)
   const [planModalOpen, setPlanModalOpen] = useState(false)
   const [selectedAssetForPlan, setSelectedAssetForPlan] = useState<{id: string, clientId: string} | null>(null)
+  
+  // 기계 교체 모달 관련
+  const [replaceModalOpen, setReplaceModalOpen] = useState(false)
+  const [selectedAssetForReplace, setSelectedAssetForReplace] = useState<any>(null)
+
+  // 🔴 기계 철수 모달 관련 상태 추가
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
+  const [selectedAssetForWithdraw, setSelectedAssetForWithdraw] = useState<any>(null)
 
   useEffect(() => { fetchClients() }, [])
 
-  // 데이터 로딩 로직
   const fetchClients = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
     
     if (profile?.organization_id) {
-      // 거래처 목록 조회
       const { data: clientData } = await supabase.from('clients')
         .select('*')
         .eq('organization_id', profile.organization_id)
@@ -38,7 +48,6 @@ export default function ClientList() {
       
       if (clientData) setClients(clientData)
 
-      // 자산 목록 조회 및 매핑
       const { data: assetData } = await supabase.from('inventory')
         .select('*')
         .eq('organization_id', profile.organization_id)
@@ -73,11 +82,15 @@ export default function ClientList() {
     setExpandedRows(newSet)
   }
 
-  const handleReplace = async (assetId: string) => {
-    if (!confirm('이 기계를 교체(철수) 상태로 변경하시겠습니까?')) return
-    const { error } = await supabase.from('inventory').update({ status: '교체전(철수)' }).eq('id', assetId)
-    if (error) alert('오류: ' + error.message)
-    else { alert('상태가 변경되었습니다.'); fetchClients() }
+  const handleReplaceClick = (asset: any) => {
+    setSelectedAssetForReplace(asset)
+    setReplaceModalOpen(true)
+  }
+
+  // 🔴 철수 클릭 핸들러 추가
+  const handleWithdrawClick = (asset: any) => {
+    setSelectedAssetForWithdraw(asset)
+    setWithdrawModalOpen(true)
   }
 
   const handleEdit = (e: React.MouseEvent, client: any) => {
@@ -205,7 +218,9 @@ export default function ClientList() {
                                 setSelectedAssetForPlan({ id: asset.id, clientId: client.id }); 
                                 setPlanModalOpen(true); 
                               }}>요금제</Button>
-                              <Button variant="outline" size="sm" onClick={() => handleReplace(asset.id)}>교체</Button>
+                              <Button variant="outline" size="sm" onClick={() => handleReplaceClick(asset)}>교체</Button>
+                              {/* 🔴 철수 버튼 추가 */}
+                              <Button variant="danger" size="sm" onClick={() => handleWithdrawClick(asset)} style={{ border: '1px solid #ff4d4f', background: 'transparent' }}>철수</Button>
                             </div>
                           </td>
                         </tr>
@@ -220,7 +235,34 @@ export default function ClientList() {
       })}
 
       {isRegModalOpen && <ClientForm isOpen={isRegModalOpen} onClose={() => setIsRegModalOpen(false)} onSuccess={fetchClients} editData={selectedClient} />}
-      {planModalOpen && selectedAssetForPlan && <PlanSettingModal inventoryId={selectedAssetForPlan.id} clientId={selectedAssetForPlan.clientId} onClose={() => { setPlanModalOpen(false); setSelectedAssetForPlan(null) }} onUpdate={fetchClients} />}
+      
+      {planModalOpen && selectedAssetForPlan && (
+        <PlanSettingModal 
+          inventoryId={selectedAssetForPlan.id} 
+          clientId={selectedAssetForPlan.clientId} 
+          onClose={() => { setPlanModalOpen(false); setSelectedAssetForPlan(null) }} 
+          onUpdate={fetchClients} 
+        />
+      )}
+
+      {replaceModalOpen && selectedAssetForReplace && (
+        <MachineReplaceModal 
+          oldAsset={selectedAssetForReplace} 
+          clientId={selectedAssetForReplace.client_id} 
+          onClose={() => { setReplaceModalOpen(false); setSelectedAssetForReplace(null) }} 
+          onSuccess={fetchClients} 
+        />
+      )}
+
+      {/* 🔴 철수 모달 추가 */}
+      {withdrawModalOpen && selectedAssetForWithdraw && (
+        <MachineWithdrawModal 
+          asset={selectedAssetForWithdraw} 
+          clientId={selectedAssetForWithdraw.client_id} 
+          onClose={() => { setWithdrawModalOpen(false); setSelectedAssetForWithdraw(null) }} 
+          onSuccess={fetchClients} 
+        />
+      )}
     </div>
   )
 }

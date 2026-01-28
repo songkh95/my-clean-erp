@@ -1,6 +1,6 @@
 // app/clients/page.tsx
 
-import ClientList from '@/components/ClientList'
+import ClientList from '@/components/client/ClientList'
 
 export default function ClientsPage() {
   return (

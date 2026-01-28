@@ -16,13 +16,11 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
   const [searchTerm, setSearchTerm] = useState('')
   const [isListOpen, setIsListOpen] = useState(true)
 
-  // 상세 보기 및 수정 상태 (기능 보존)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<any>(null)
   const [clients, setClients] = useState<any[]>([])
 
-  // 거래처 검색용 상태 (기능 보존)
   const [clientSearchTerm, setClientSearchTerm] = useState('')
   const [showClientList, setShowClientList] = useState(false)
 
@@ -34,7 +32,6 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
     if (user) {
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
       
-      // SQL 스키마 기반 데이터 조회
       const { data } = await supabase
         .from('inventory')
         .select('*, client:client_id(name)')
@@ -43,7 +40,6 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
         .order('created_at', { ascending: false })
       if (data) setItems(data)
 
-      // 거래처 선택용 데이터 (SQL status: active 기준)
       const { data: cData } = await supabase.from('clients').select('id, name').eq('status', 'active')
       if (cData) setClients(cData)
     }
@@ -67,18 +63,23 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
   }
 
   const handleUpdate = async () => {
-    const { client, id, created_at, organization_id, ...cleanData } = editData
+    // 🔴 중요: 'client' 객체와 불필요한 필드를 엄격하게 제거합니다.
+    const { client, id, created_at, organization_id, last_status_updated_at, ...updateFields } = editData
     
-    // 비즈니스 로직: 설치 상태 시 거래처 필수 (기능 보존)
-    if (cleanData.status === '설치' && !cleanData.client_id) {
+    if (updateFields.status === '설치' && !updateFields.client_id) {
       alert("⚠️ 상태가 '설치'일 경우, 설치처를 반드시 입력(선택)해야 합니다.")
       return
     }
 
-    if (!cleanData.client_id) cleanData.client_id = null
-    if (cleanData.purchase_price === "") cleanData.purchase_price = null
+    const payload = {
+      ...updateFields,
+      client_id: updateFields.client_id || null,
+      purchase_price: updateFields.purchase_price === "" ? null : Number(updateFields.purchase_price),
+      // 상태 변경 시 날짜 기록 추가
+      last_status_updated_at: new Date().toISOString()
+    }
 
-    const { error } = await supabase.from('inventory').update(cleanData).eq('id', editingId)
+    const { error } = await supabase.from('inventory').update(payload).eq('id', editingId)
 
     if (!error) {
       alert('수정 완료!')

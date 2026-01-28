@@ -44,18 +44,34 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (formData.status === '설치' && !formData.client_id) return alert('설치 상태일 경우 거래처를 선택해야 합니다.')
+    
+    if (editData) {
+      if ((editData.status === '교체전(철수)' || editData.status === '설치') && formData.status === '창고') {
+        alert("거래처에 등록된 기계는 직접 '창고'로 변경할 수 없습니다. [거래처 관리]에서 '철수' 기능을 이용하시거나 정산을 완료해주세요.");
+        return;
+      }
+    }
+
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
+      
+      const { client, id, created_at, updated_at, ...pureData } = formData as any;
+
       const payload = { 
-        ...formData, 
+        ...pureData, 
         organization_id: profile?.organization_id, 
         client_id: formData.client_id || null,
         purchase_date: formData.purchase_date || null,
-        purchase_price: Number(formData.purchase_price) || 0
+        purchase_price: Number(formData.purchase_price) || 0,
+        last_status_updated_at: new Date().toISOString()
       }
-      const { error } = editData ? await supabase.from('inventory').update(payload).eq('id', editData.id) : await supabase.from('inventory').insert(payload)
+
+      const { error } = editData 
+        ? await supabase.from('inventory').update(payload).eq('id', editData.id) 
+        : await supabase.from('inventory').insert(payload)
+      
       if (error) throw error
       onSuccess(); onClose()
     } catch (error: any) { alert('오류: ' + error.message) } finally { setLoading(false) }
@@ -77,6 +93,8 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
             </InputField>
             <InputField label="상태" as="select" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value, client_id: e.target.value === '설치' ? formData.client_id : '' })}>
               <option value="창고">창고</option><option value="설치">설치됨</option>
+              <option value="수리중">수리중</option><option value="폐기">폐기</option>
+              <option value="교체전(철수)">교체전(철수)</option>
             </InputField>
           </div>
           <div className={`${styles.highlightBox} ${formData.status === '설치' ? styles.activeBox : ''}`}>

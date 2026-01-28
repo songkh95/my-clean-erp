@@ -58,7 +58,6 @@ export default function AccountingRegistration({
     }
   };
 
-  // 숫자만 입력 허용 및 마이너스/문자 차단 핸들러
   const onNumberKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (['-', '+', 'e', 'E'].includes(e.key)) {
       e.preventDefault();
@@ -72,16 +71,10 @@ export default function AccountingRegistration({
 
   return (
     <div className={styles.section}>
-      {/* 화살표 제거를 위한 인라인 스타일 */}
       <style dangerouslySetInnerHTML={{ __html: `
         input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        input[type=number] {
-          -moz-appearance: textfield;
-        }
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
       `}} />
 
       <div onClick={() => setIsRegOpen(!isRegOpen)} className={`${styles.header} ${!isRegOpen ? styles.headerClosed : ''}`}>
@@ -113,13 +106,7 @@ export default function AccountingRegistration({
               <label htmlFor="unreg" style={{ fontSize: '0.9rem', cursor: 'pointer' }}>미등록 거래처만 보기</label>
             </div>
             <div className={styles.controlItem}>
-              <button 
-                onClick={onSearch} 
-                className={styles.saveBtn} 
-                style={{ padding: '8px 16px', height: 'auto', backgroundColor: '#0070f3' }}
-              >
-                🔍 조회
-              </button>
+              <button onClick={onSearch} className={styles.saveBtn} style={{ padding: '8px 16px', height: 'auto', backgroundColor: '#0070f3' }}>🔍 조회</button>
             </div>
           </div>
 
@@ -127,9 +114,7 @@ export default function AccountingRegistration({
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.th} style={{ width: '40px' }}>
-                    <input type="checkbox" checked={isAllSelected} onChange={handleToggleAll} />
-                  </th>
+                  <th className={styles.th} style={{ width: '40px' }}><input type="checkbox" checked={isAllSelected} onChange={handleToggleAll} /></th>
                   <th className={styles.th} style={{ width: '100px' }}>거래처</th>
                   <th className={styles.th} style={{ width: '180px' }}>기계 (모델/S.N)</th>
                   <th className={styles.th} style={{ width: '60px' }}>구분</th>
@@ -151,11 +136,11 @@ export default function AccountingRegistration({
                   return billData.details.map((calc: any, idx: number) => {
                     const isItemSelected = selectedInventories.has(calc.inventory_id)
                     const isLastRow = idx === rowSpan - 1
-                    const hasExtra = (calc.usageBreakdown.extraBW + calc.usageBreakdown.extraCol) > 0;
-                    
+                    const isWithdrawn = calc.inv.is_withdrawn; // ✨ 회수 여부 확인
+
                     return (
                       <tr key={calc.inventory_id} style={{
-                        backgroundColor: isItemSelected ? 'rgba(0, 112, 243, 0.05)' : 'transparent',
+                        backgroundColor: isWithdrawn ? '#fff1f0' : (isItemSelected ? 'rgba(0, 112, 243, 0.05)' : 'transparent'),
                         borderBottom: isLastRow ? '2px solid #ddd' : '1px solid #eee'
                       }}>
                         <td className={styles.td}>
@@ -168,7 +153,10 @@ export default function AccountingRegistration({
                           </td>
                         )}
                         <td className={styles.td} style={{ textAlign: 'left' }}>
-                           <div style={{ fontWeight: 'bold' }}>{calc.model_name}</div>
+                           <div style={{ fontWeight: 'bold' }}>
+                             {isWithdrawn && <span className={styles.badge} style={{backgroundColor:'#ff4d4f', color:'white', marginRight:'4px'}}>회수됨</span>}
+                             {calc.model_name}
+                           </div>
                            <div style={{ fontSize: '0.75rem', color: '#999' }}>{calc.serial_number}</div>
                         </td>
                         <td className={styles.td} style={{ padding: 0 }}>
@@ -183,85 +171,56 @@ export default function AccountingRegistration({
                             <div className={styles.rowGray}>{calc.prev.bw_a3}</div><div className={`${styles.rowBlue} ${styles.rowLast}`}>{calc.prev.col_a3}</div>
                           </div>
                         </td>
-                        <td className={styles.td} style={{ padding: 0, backgroundColor: '#eff6ff' }}>
-                          <div className={styles.splitCellContainer}>
-                            <div className={styles.rowGray}>
-                              <input 
-                                type="number" 
-                                className={styles.numberInput} 
-                                placeholder="당월 흑백 A4"
-                                value={inputData[calc.inventory_id]?.bw ?? ''} 
-                                onKeyDown={onNumberKeyDown}
-                                onChange={e => onNumberChange(calc.inventory_id, 'bw', e.target.value)} 
-                              />
+                        <td className={styles.td} style={{ padding: 0, backgroundColor: isWithdrawn ? '#fff1f0' : '#eff6ff' }}>
+                          {isWithdrawn ? (
+                            <div className={styles.splitCellContainer}>
+                              <div className={styles.rowGray} style={{fontWeight:'bold'}}>{calc.curr.bw}</div>
+                              <div className={styles.rowBlue} style={{fontWeight:'bold'}}>{calc.curr.col}</div>
+                              <div className={styles.rowGray} style={{fontWeight:'bold'}}>{calc.curr.bw_a3}</div>
+                              <div className={`${styles.rowBlue} ${styles.rowLast}`} style={{fontWeight:'bold'}}>{calc.curr.col_a3}</div>
                             </div>
-                            <div className={styles.rowBlue}>
-                              <input 
-                                type="number" 
-                                className={styles.numberInput} 
-                                placeholder="당월 칼라 A4"
-                                value={inputData[calc.inventory_id]?.col ?? ''} 
-                                onKeyDown={onNumberKeyDown}
-                                onChange={e => onNumberChange(calc.inventory_id, 'col', e.target.value)} 
-                              />
+                          ) : (
+                            <div className={styles.splitCellContainer}>
+                              <div className={styles.rowGray}>
+                                <input type="number" className={styles.numberInput} placeholder="당월 흑백 A4" value={inputData[calc.inventory_id]?.bw ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'bw', e.target.value)} />
+                              </div>
+                              <div className={styles.rowBlue}>
+                                <input type="number" className={styles.numberInput} placeholder="당월 컬러 A4" value={inputData[calc.inventory_id]?.col ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'col', e.target.value)} />
+                              </div>
+                              <div className={styles.rowGray}>
+                                <input type="number" className={styles.numberInput} placeholder="당월 흑백 A3" value={inputData[calc.inventory_id]?.bw_a3 ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'bw_a3', e.target.value)} />
+                              </div>
+                              <div className={`${styles.rowBlue} ${styles.rowLast}`}>
+                                <input type="number" className={styles.numberInput} placeholder="당월 컬러 A3" value={inputData[calc.inventory_id]?.col_a3 ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'col_a3', e.target.value)} />
+                              </div>
                             </div>
-                            <div className={styles.rowGray}>
-                              <input 
-                                type="number" 
-                                className={styles.numberInput} 
-                                placeholder="당월 흑백 A3"
-                                value={inputData[calc.inventory_id]?.bw_a3 ?? ''} 
-                                onKeyDown={onNumberKeyDown}
-                                onChange={e => onNumberChange(calc.inventory_id, 'bw_a3', e.target.value)} 
-                              />
-                            </div>
-                            <div className={`${styles.rowBlue} ${styles.rowLast}`}>
-                              <input 
-                                type="number" 
-                                className={styles.numberInput} 
-                                placeholder="당월 칼라 A3"
-                                value={inputData[calc.inventory_id]?.col_a3 ?? ''} 
-                                onKeyDown={onNumberKeyDown}
-                                onChange={e => onNumberChange(calc.inventory_id, 'col_a3', e.target.value)} 
-                              />
-                            </div>
-                          </div>
+                          )}
                         </td>
-                        {/* 🔴 실사용량(가중치) 표시 - 추가 매수 색상 수정 */}
                         <td className={styles.td} style={{ textAlign: 'left', fontSize: '0.8rem', lineHeight: '1.4' }}>
                           <div style={{ fontWeight: '600', color: '#555' }}>기본매수</div>
                           <div style={{ paddingLeft: '4px', color: '#555' }}>
-                            흑백: {calc.usageBreakdown.basicBW.toLocaleString()}장<br />
-                            칼라: {calc.usageBreakdown.basicCol.toLocaleString()}장
+                            흑백: {calc.usageBreakdown.basicBW.toLocaleString()}장 / 컬러: {calc.usageBreakdown.basicCol.toLocaleString()}장
                           </div>
                           <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
                           <div style={{ fontWeight: '600', color: '#d93025' }}>추가매수</div>
                           <div style={{ paddingLeft: '4px', color: '#d93025' }}>
-                            흑백: {calc.usageBreakdown.extraBW.toLocaleString()}장<br />
-                            칼라: {calc.usageBreakdown.extraCol.toLocaleString()}장
+                            흑백: {calc.usageBreakdown.extraBW.toLocaleString()}장 / 컬러: {calc.usageBreakdown.extraCol.toLocaleString()}장
                           </div>
                         </td>
                         {calc.isGroupLeader ? (
                           <td className={styles.td} rowSpan={calc.groupSpan} style={{ textAlign: 'right', verticalAlign: 'bottom', paddingBottom: '10px' }}>
                             <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '4px' }}>
-                              기본금액: {calc.rowCost.basic.toLocaleString()}원<br />
-                              추가금액: {calc.rowCost.extra.toLocaleString()}원
+                              기본금액: {calc.rowCost.basic.toLocaleString()}원<br />추가금액: {calc.rowCost.extra.toLocaleString()}원
                             </div>
-                            <div style={{ fontWeight: 'bold', borderTop: '1px solid #eee', paddingTop: '4px', color: '#0070f3' }}>
-                              {calc.rowCost.total.toLocaleString()}원
-                            </div>
+                            <div style={{ fontWeight: 'bold', borderTop: '1px solid #eee', paddingTop: '4px', color: '#0070f3' }}>{calc.rowCost.total.toLocaleString()}원</div>
                           </td>
                         ) : (
-                          <td className={styles.td} style={{ backgroundColor: '#fafafa', color: '#ccc', fontSize: '0.7rem' }}>
-                            합산 그룹원
-                          </td>
+                          <td className={styles.td} style={{ backgroundColor: '#fafafa', color: '#ccc', fontSize: '0.7rem' }}>합산 그룹원</td>
                         )}
                         {idx === 0 && (
                           <td className={styles.td} rowSpan={rowSpan} style={{ backgroundColor: '#fffdf0', textAlign: 'right', verticalAlign: 'bottom' }}>
                             <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '4px' }}>거래처 총액</div>
-                            <div style={{ fontWeight: 'bold', color: '#d93025', fontSize: '1.1rem' }}>
-                              {billData.totalAmount.toLocaleString()}원
-                            </div>
+                            <div style={{ fontWeight: 'bold', color: '#d93025', fontSize: '1.1rem' }}>{billData.totalAmount.toLocaleString()}원</div>
                           </td>
                         )}
                       </tr>
@@ -273,13 +232,8 @@ export default function AccountingRegistration({
           </div>
 
           <div className={styles.actionBar}>
-            <div className={styles.totalLabel}>
-              선택 합계 ({selectedInventories.size}대): 
-              <span className={styles.totalAmount}>{calculateSelectedTotal().toLocaleString()} 원</span>
-            </div>
-            <button onClick={handlePreSave} disabled={selectedInventories.size === 0} className={styles.saveBtn}>
-              🚀 청구서 확정 및 저장
-            </button>
+            <div className={styles.totalLabel}>선택 합계 ({selectedInventories.size}대): <span className={styles.totalAmount}>{calculateSelectedTotal().toLocaleString()} 원</span></div>
+            <button onClick={handlePreSave} disabled={selectedInventories.size === 0} className={styles.saveBtn}>🚀 청구서 확정 및 저장</button>
           </div>
         </div>
       )}

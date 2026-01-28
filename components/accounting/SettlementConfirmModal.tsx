@@ -36,7 +36,15 @@ export default function SettlementConfirmModal({
                                         <tbody>
                                             {bill.details.filter((d: any) => selectedInventories.has(d.inventory_id)).map((d: any) => (
                                                 <tr key={d.inventory_id}>
-                                                    <td>{d.model_name}<br /><small>{d.serial_number}</small></td>
+                                                    <td>
+                                                        <div style={{fontSize: '0.7rem', marginBottom: '2px'}}>
+                                                            {d.inv.is_replacement_before && <span style={{color: '#ff4d4f'}}>[교체전] </span>}
+                                                            {d.inv.is_replacement_after && <span style={{color: '#0070f3'}}>[교체후] </span>}
+                                                            {d.inv.is_withdrawal && <span style={{color: '#8c8c8c'}}>[철수] </span>}
+                                                        </div>
+                                                        <strong>{d.model_name}</strong><br />
+                                                        <small>{d.serial_number}</small>
+                                                    </td>
                                                     <td>{d.prev.bw}/{d.prev.col}</td>
                                                     <td>{d.curr.bw}/{d.curr.col}</td>
                                                     <td>{d.converted.bw}/{d.converted.col}</td>
