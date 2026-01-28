@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
-import InventoryForm from '@/components/InventoryForm'
+import InventoryForm from '@/components/inventory/InventoryForm'
 import styles from './inventory.module.css'
 
 export default function InventoryPage() {

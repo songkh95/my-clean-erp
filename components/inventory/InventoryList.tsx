@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
 import styles from './InventoryList.module.css'
-import Button from './ui/Button'
+import Button from './../ui/Button'
 
 interface InventoryListProps {
   type: string
