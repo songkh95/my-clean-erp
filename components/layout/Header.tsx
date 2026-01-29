@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
 import { useRouter, usePathname } from 'next/navigation'
-import Button from './ui/Button'
+import Button from './../ui/Button'
 
 export default function Header() {
   const [userEmail, setUserEmail] = useState<string | null>(null)

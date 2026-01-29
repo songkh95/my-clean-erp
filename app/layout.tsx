@@ -3,10 +3,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
 import { usePathname } from 'next/navigation'
-import MainLayout from "@/components/MainLayout";
+import MainLayout from "@/components/layout/MainLayout";
 
 
 export default function RootLayout({

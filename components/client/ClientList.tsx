@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
 import ClientForm from './ClientForm'
-import PlanSettingModal from './../PlanSettingModal'
-import MachineReplaceModal from './../MachineReplaceModal'
-import MachineWithdrawModal from './../MachineWithdrawModal' // 🔴 추가
-import Button from './../ui/Button'
+import PlanSettingModal from './PlanSettingModal'
+import MachineReplaceModal from './MachineReplaceModal'
+import MachineWithdrawModal from './MachineWithdrawModal'
+import Button from '@/components/ui/Button' 
 import styles from './ClientList.module.css'
 
 export default function ClientList() {

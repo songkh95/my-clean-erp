@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase'
-import Button from './ui/Button'
-import InputField from './ui/Input'
+import Button from './../ui/Button'
+import InputField from './../ui/Input'
 
 interface Props {
   asset: any

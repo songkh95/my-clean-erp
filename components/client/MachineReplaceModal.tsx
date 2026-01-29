@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
-import Button from './ui/Button'
-import InputField from './ui/Input'
+import Button from './../ui/Button'
+import InputField from './../ui/Input'
 
 interface Props {
   oldAsset: any         // 회수할 기계 정보

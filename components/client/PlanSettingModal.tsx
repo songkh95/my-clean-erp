@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
-import Button from './ui/Button'
-import InputField from './ui/Input'
+import Button from '@/components/ui/Button'
+import InputField from '@/components/ui/Input'
 
 interface Props {
   inventoryId: string

@@ -11,15 +11,15 @@ interface Props {
   histMonth: number
   setHistMonth: (month: number) => void
   historyList: any[]
-  handleRebillHistory: (id: string) => void // ✅ 추가
-  handleDeleteHistory: (id: string) => void // ✅ 추가
+  handleDeleteHistory: (id: string) => void
   monthMachineHistory: any[] 
   handleDeleteDetail: (settlementId: string, detailId: string, inventoryId: string, amount: number, isReplacement: boolean) => void 
+  handleDetailRebill: (settlementId: string, detailId: string, inventoryId: string, isReplacement: boolean, clientId: string) => void
 }
 
 export default function AccountingHistory({
   isHistOpen, setIsHistOpen, histYear, setHistYear, histMonth, setHistMonth, historyList, 
-  handleRebillHistory, handleDeleteHistory, monthMachineHistory, handleDeleteDetail
+  handleDeleteHistory, monthMachineHistory, handleDeleteDetail, handleDetailRebill
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -103,21 +103,6 @@ export default function AccountingHistory({
                       </td>
                       <td className={styles.td}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                          {/* ✅ [수정] 재청구 버튼 */}
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRebillHistory(hist.id);
-                            }} 
-                            style={{ 
-                              color: '#0070f3', border: '1px solid #91d5ff', background: 'white', 
-                              cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' 
-                            }}
-                            title="삭제 후 기계 상태를 복구하여 다시 청구할 수 있게 합니다."
-                          >
-                            재청구
-                          </button>
-                          {/* ✅ [수정] 삭제 버튼 */}
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
@@ -127,9 +112,9 @@ export default function AccountingHistory({
                               color: '#d93025', border: '1px solid #ffccc7', background: 'white', 
                               cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' 
                             }}
-                            title="청구 이력만 삭제합니다."
+                            title="청구 이력을 삭제합니다."
                           >
-                            삭제
+                            전체 삭제
                           </button>
                         </div>
                       </td>
@@ -146,18 +131,20 @@ export default function AccountingHistory({
                                   <th style={{ padding: '10px', color: '#666', textAlign: 'center' }}>카운터 (전월 → 당월)</th>
                                   <th style={{ padding: '10px', color: '#666', textAlign: 'center' }}>실사용량</th>
                                   <th style={{ padding: '10px', color: '#666', textAlign: 'center' }}>청구 금액</th>
-                                  <th style={{ padding: '10px', color: '#666', textAlign: 'center', width: '80px' }}>관리</th>
+                                  <th style={{ padding: '10px', color: '#666', textAlign: 'center', width: '140px' }}>관리</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {hist.details?.map((detail: any) => {
-                                  // 기존 뱃지 로직
+                                  // 기계 상태 뱃지
                                   let badgeLabel = detail.inventory?.status || '설치';
                                   let badgeStyle = { backgroundColor: '#f5f5f5', color: '#666', border: '1px solid #d9d9d9' };
+                                  let isComplexCase = false; // 교체/철수 케이스 여부
 
                                   if (detail.is_replacement_record) {
                                     badgeLabel = "교체(철수)";
                                     badgeStyle = { backgroundColor: '#fff1f0', color: '#cf1322', border: '1px solid #ffa39e' };
+                                    isComplexCase = true;
                                   } else {
                                     const isInstalledThisMonth = monthMachineHistory?.some(mh => 
                                       mh.inventory_id === detail.inventory_id && mh.action_type === 'INSTALL'
@@ -165,6 +152,7 @@ export default function AccountingHistory({
                                     if (isInstalledThisMonth) {
                                       badgeLabel = "교체(설치)";
                                       badgeStyle = { backgroundColor: '#e6f7ff', color: '#096dd9', border: '1px solid #91d5ff' };
+                                      isComplexCase = true;
                                     } else {
                                       badgeLabel = "설치";
                                       badgeStyle = { backgroundColor: '#f6ffed', color: '#389e0d', border: '1px solid #b7eb8f' };
@@ -210,15 +198,33 @@ export default function AccountingHistory({
                                         {detail.calculated_amount?.toLocaleString()}원
                                       </td>
                                       <td style={{ padding: '12px', textAlign: 'center', verticalAlign: 'middle' }}>
-                                        <button 
-                                          onClick={() => handleDeleteDetail(hist.id, detail.id, detail.inventory_id, detail.calculated_amount, detail.is_replacement_record)}
-                                          style={{
-                                            backgroundColor: '#fff', border: '1px solid #ffccc7', color: '#d93025',
-                                            cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem'
-                                          }}
-                                        >
-                                          개별 삭제
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                          {/* ✅ 기계별 재청구 버튼 (모두 표시) */}
+                                          <button 
+                                            onClick={() => handleDetailRebill(hist.id, detail.id, detail.inventory_id, detail.is_replacement_record, hist.client_id)}
+                                            style={{
+                                              color: '#0070f3', border: '1px solid #91d5ff', background: 'white',
+                                              cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem'
+                                            }}
+                                            title="이 기계만 청구를 취소하고 [사용매수 등록]에 다시 표시합니다."
+                                          >
+                                            재청구
+                                          </button>
+                                          
+                                          {/* ✅ 개별 삭제 버튼: 일반 기계는 숨김, 복잡한 케이스(교체/철수)만 표시 */}
+                                          {isComplexCase && (
+                                            <button 
+                                              onClick={() => handleDeleteDetail(hist.id, detail.id, detail.inventory_id, detail.calculated_amount, detail.is_replacement_record)}
+                                              style={{
+                                                backgroundColor: '#fff', border: '1px solid #ffccc7', color: '#d93025',
+                                                cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem'
+                                              }}
+                                              title="이 기계의 기록을 완전히 삭제하여 목록에서 제거합니다."
+                                            >
+                                              삭제
+                                            </button>
+                                          )}
+                                        </div>
                                       </td>
                                     </tr>
                                   );
