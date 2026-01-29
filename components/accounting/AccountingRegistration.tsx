@@ -30,6 +30,7 @@ interface Props {
   handlePreSave: () => void
   onSearch: () => void
   handleExcludeAsset: (asset: any) => void
+  onOpenManualAdd: () => void // ✅ [추가됨] 수동 등록 모달 열기 함수
 }
 
 export default function AccountingRegistration({
@@ -38,7 +39,7 @@ export default function AccountingRegistration({
   loading, filteredClients, inventoryMap, inputData, prevData, selectedInventories,
   handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk, 
   calculateClientBill, calculateSelectedTotal, handlePreSave, onSearch,
-  handleExcludeAsset
+  handleExcludeAsset, onOpenManualAdd // ✅ [추가됨]
 }: Props) {
 
   const currentVisibleIds = useMemo(() => {
@@ -125,6 +126,22 @@ export default function AccountingRegistration({
             </div>
             <div className={styles.controlItem}>
               <button onClick={onSearch} className={styles.saveBtn} style={{ padding: '8px 16px', height: 'auto', backgroundColor: '#0070f3' }}>🔍 조회</button>
+              
+              {/* ✅ [여기 추가됨] 거래처 청구 등록 버튼 */}
+              <button 
+                onClick={onOpenManualAdd} 
+                className={styles.saveBtn} 
+                style={{ 
+                  padding: '8px 16px', 
+                  height: 'auto', 
+                  backgroundColor: '#fff', 
+                  color: '#0070f3', 
+                  border: '1px solid #0070f3',
+                  marginLeft: '8px'
+                }}
+              >
+                ➕ 거래처 청구 등록
+              </button>
             </div>
           </div>
 
@@ -273,7 +290,6 @@ export default function AccountingRegistration({
                           )}
                         </td>
 
-                        {/* ✅ 수정: 조건부 렌더링 시 null 대신 빈 Fragment나 false 반환하지 않고 명확하게 처리 */}
                         {calc.isGroupLeader && (
                           <td className={styles.td} rowSpan={calc.groupSpan} style={{ textAlign: 'right', verticalAlign: 'bottom', paddingBottom: '10px' }}>
                             <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '4px' }}>

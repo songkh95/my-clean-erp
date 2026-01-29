@@ -7,12 +7,14 @@ import styles from './accounting.module.css'
 import AccountingRegistration from '@/components/accounting/AccountingRegistration'
 import AccountingHistory from '@/components/accounting/AccountingHistory'
 import SettlementConfirmModal from '@/components/accounting/SettlementConfirmModal'
+import ManualBillingModal from '@/components/accounting/ManualBillingModal'
 
 export default function AccountingPage() {
   const supabase = createClient()
   
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false)
   
   // 입력용 상태
   const [regYear, setRegYear] = useState(new Date().getFullYear())
@@ -40,16 +42,10 @@ export default function AccountingPage() {
   const [historyList, setHistoryList] = useState<any[]>([])
   const [histYear, setHistYear] = useState(new Date().getFullYear())
   const [histMonth, setHistMonth] = useState(new Date().getMonth() + 1)
-  // 내역 조회 시 해당 월의 설치/회수 이력을 저장할 상태
   const [monthMachineHistory, setMonthMachineHistory] = useState<any[]>([])
 
-  useEffect(() => { 
-    fetchRegistrationData() 
-  }, [filterConfig.year, filterConfig.month])
-
-  useEffect(() => { 
-    fetchHistoryData() 
-  }, [histYear, histMonth]) 
+  useEffect(() => { fetchRegistrationData() }, [filterConfig.year, filterConfig.month])
+  useEffect(() => { fetchHistoryData() }, [histYear, histMonth]) 
 
   const handleSearch = () => {
     setFilterConfig({
@@ -71,7 +67,6 @@ export default function AccountingPage() {
     const { data: clientData } = await supabase.from('clients').select('*').eq('organization_id', orgId).order('name')
     if (clientData) setClients(clientData)
 
-    // ✅ [확인] 정렬 순서 적용됨
     const { data: invData } = await supabase.from('inventory')
       .select('*')
       .eq('organization_id', orgId)
@@ -170,7 +165,6 @@ export default function AccountingPage() {
     setInputData((prev: any) => ({ ...prev, [invId]: { ...prev[invId], [field]: numValue } }))
   }
 
-  // ✅ [확인] 합산 그룹 일괄 선택/해제 로직
   const toggleInventorySelection = (invId: string) => {
     const newSet = new Set(selectedInventories)
     
@@ -368,7 +362,6 @@ export default function AccountingPage() {
         settlementId = settlement.id;
       }
 
-      // ✅ [확인] 수익 분석용 데이터 저장 (기본료/추가금 분리)
       const detailsPayload = selectedDetails.map((d: any) => {
         let finalAmount = 0;
         if (d.billing_group_id) {
@@ -406,7 +399,7 @@ export default function AccountingPage() {
     setLoading(false);
   }
 
-  // ✅ [확인] 재청구 버튼 (상태 복구 포함)
+  // ✅ [수정됨] 재청구 버튼 (상태 복구 포함 - 기존 로직 유지)
   const handleRebillHistory = async (id: string) => {
     if (confirm('정말 재청구하시겠습니까?\n(청구 내역이 삭제되고, 관련 기계들의 상태가 청구 전으로 복구됩니다.)')) {
       const { data: details } = await supabase.from('settlement_details').select('inventory_id').eq('settlement_id', id).eq('is_replacement_record', true);
@@ -421,9 +414,9 @@ export default function AccountingPage() {
     }
   }
 
-  // ✅ [확인] 삭제 버튼 (기계 상태 '창고' + 거래처 해제 -> 목록에서 사라짐)
+  // ✅ [수정됨] 삭제 버튼: 청구 이력 삭제 + 이번 달 이력 삭제 (기계 상태 변경 X)
   const handleDeleteHistory = async (id: string) => {
-    if (confirm('정말 삭제하시겠습니까?\n\n이 작업은 청구 이력을 삭제하고,\n관련 기계들을 모두 [창고] 상태로 변경하여 거래처 목록에서 제외합니다.')) {
+    if (confirm('정말 삭제하시겠습니까?\n\n이 작업은 청구 이력과 해당 월의 설치/회수 기록을 삭제하여\n목록에서 해당 건을 완전히 제외합니다.\n(기계의 물리적 상태는 변경되지 않습니다)')) {
       setLoading(true);
       try {
         const { data: details } = await supabase
@@ -431,19 +424,25 @@ export default function AccountingPage() {
           .select('inventory_id')
           .eq('settlement_id', id);
 
+        const invIds = details?.map(d => d.inventory_id) || [];
+
+        // 1. 정산 내역 삭제
         const { error } = await supabase.from('settlements').delete().eq('id', id);
         if (error) throw error;
 
-        if (details && details.length > 0) {
-          const invIds = details.map(d => d.inventory_id);
-          await supabase.from('inventory').update({ 
-            status: '창고', 
-            client_id: null, 
-            last_status_updated_at: new Date().toISOString() 
-          }).in('id', invIds);
+        // 2. 이번 달 이력(machine_history) 삭제 -> 목록 재진입 방지
+        if (invIds.length > 0) {
+          const startDate = new Date(histYear, histMonth - 1, 1).toISOString();
+          const endDate = new Date(histYear, histMonth, 0, 23, 59, 59).toISOString();
+          
+          await supabase.from('machine_history')
+            .delete()
+            .in('inventory_id', invIds)
+            .gte('recorded_at', startDate)
+            .lte('recorded_at', endDate);
         }
         
-        alert('완전히 삭제되었습니다. 기계는 창고로 이동되었습니다.');
+        alert('완전히 삭제되었습니다.');
         await fetchHistoryData();
         await fetchRegistrationData();
       } catch (e: any) {
@@ -454,6 +453,7 @@ export default function AccountingPage() {
     }
   }
 
+  // ✅ [수정됨] 개별 삭제: inventory 업데이트 로직 제거
   const handleDeleteDetail = async (settlementId: string, detailId: string, inventoryId: string, amount: number, isReplacement: boolean) => {
     if (!confirm('이 기계의 정산 내역만 삭제하시겠습니까?')) return;
     try {
@@ -463,9 +463,8 @@ export default function AccountingPage() {
         const newTotal = Math.max(0, settlement.total_amount - amount);
         await supabase.from('settlements').update({ total_amount: newTotal }).eq('id', settlementId);
       }
-      if (isReplacement) {
-        await supabase.from('inventory').update({ status: '설치' }).eq('id', inventoryId);
-      }
+      // inventory 상태 업데이트 로직 제거됨 (사용자 요청)
+
       const { count } = await supabase.from('settlement_details').select('*', { count: 'exact', head: true }).eq('settlement_id', settlementId);
       if (count === 0) await supabase.from('settlements').delete().eq('id', settlementId);
 
@@ -477,7 +476,6 @@ export default function AccountingPage() {
     }
   }
 
-  // ✅ [확인] 청구 제외(0원 마감) 기능 포함
   const handleExcludeAsset = async (asset: any) => {
     if (!confirm(`[${asset.model_name}] 기계를 이번 달 청구 목록에서 제외하시겠습니까?\n(0원으로 정산 처리되어 목록에서 사라집니다.)`)) return;
 
@@ -539,9 +537,43 @@ export default function AccountingPage() {
     }
   }
 
+  const handleManualAdd = (client: any, asset: any) => {
+    const targetClient = client || { id: 'TEMP_CLIENT_' + asset.id, name: '(미지정 거래처)' };
+    
+    const clientExists = clients.some(c => c.id === targetClient.id);
+    if (!clientExists) {
+      setClients(prev => [...prev, targetClient].sort((a,b) => a.name.localeCompare(b.name)));
+    }
+
+    const newAsset = {
+      ...asset,
+      is_active: true,
+      plan_basic_fee: asset.plan_basic_fee || 0,
+      plan_price_bw: asset.plan_price_bw || 0,
+    };
+
+    setInventoryMap(prev => {
+      const newList = [...(prev[targetClient.id] || [])];
+      if (!newList.some(a => a.id === asset.id)) {
+        newList.push(newAsset);
+      }
+      return { ...prev, [targetClient.id]: newList };
+    });
+
+    setIsManualModalOpen(false);
+    alert(`[${asset.model_name}] 기계가 목록에 추가되었습니다.\n작성 후 '청구서 확정 및 저장'을 눌러야 반영됩니다.`);
+  }
+
+  const existingInventoryIds = useMemo(() => {
+    const ids = new Set<string>();
+    Object.values(inventoryMap).forEach(list => list.forEach(item => ids.add(item.id)));
+    return ids;
+  }, [inventoryMap]);
+
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>💰 정산 및 회계 관리</h1>
+      
       <AccountingRegistration 
         isRegOpen={isRegOpen} setIsRegOpen={setIsRegOpen}
         regYear={regYear} setRegYear={setRegYear}
@@ -559,7 +591,9 @@ export default function AccountingPage() {
         onSearch={handleSearch}
         setSelectedInventoriesBulk={setSelectedInventoriesBulk}
         handleExcludeAsset={handleExcludeAsset}
+        onOpenManualAdd={() => setIsManualModalOpen(true)}
       />
+
       <AccountingHistory 
         isHistOpen={isHistOpen} setIsHistOpen={setIsHistOpen}
         histYear={histYear} setHistYear={setHistYear}
@@ -570,6 +604,16 @@ export default function AccountingPage() {
         monthMachineHistory={monthMachineHistory} 
         handleDeleteDetail={handleDeleteDetail}   
       />
+
+      {isManualModalOpen && (
+        <ManualBillingModal 
+          isOpen={isManualModalOpen}
+          onClose={() => setIsManualModalOpen(false)}
+          onAdd={handleManualAdd}
+          existingIds={existingInventoryIds}
+        />
+      )}
+      
       {isModalOpen && (
         <SettlementConfirmModal 
           selectedInventories={selectedInventories} calculateSelectedTotal={() => calculateSelectedTotal(clients)}
