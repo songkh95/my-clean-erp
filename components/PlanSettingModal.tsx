@@ -16,7 +16,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   
-  // 요금제 데이터 (billing_date 추가)
+  // 요금제 데이터
   const [formData, setFormData] = useState({
     plan_basic_fee: 0,
     plan_basic_cnt_bw: 0,
@@ -26,7 +26,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     plan_weight_a3_bw: 1,
     plan_weight_a3_col: 1,
     billing_group_id: null as string | null,
-    billing_date: '말일' // 기본값 설정
+    billing_date: '말일'
   })
 
   const [siblings, setSiblings] = useState<any[]>([])
@@ -37,7 +37,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
   }, [])
 
   const fetchData = async () => {
-    // 1. 현재 기계 정보 및 기존 요금제/청구일 로드
+    // 1. 현재 기계 정보 로드
     const { data: current } = await supabase
       .from('inventory')
       .select('*')
@@ -55,14 +55,14 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
         plan_weight_a3_bw: current.plan_weight_a3_bw || 1,
         plan_weight_a3_col: current.plan_weight_a3_col || 1,
         billing_group_id: current.billing_group_id,
-        billing_date: current.billing_date || '말일' // DB 값 로드
+        billing_date: current.billing_date || '말일'
       })
     }
 
-    // 2. 합산 청구가 가능한 같은 거래처의 다른 기기 조회
+    // 2. 같은 거래처의 다른 기기 조회 (요금제 정보 포함)
     const { data: sibs } = await supabase
       .from('inventory')
-      .select('id, model_name, serial_number, billing_group_id')
+      .select('id, model_name, serial_number, billing_group_id, plan_price_bw, plan_price_col, plan_weight_a3_bw, plan_weight_a3_col')
       .eq('client_id', clientId)
       .neq('id', inventoryId)
       .not('status', 'in', '("창고","폐기")') 
@@ -70,14 +70,53 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     if (sibs) setSiblings(sibs)
   }
 
-  // 합산 청구 그룹 지정 로직
-  const toggleGroup = (targetGroupId: string | null, targetInvId: string) => {
-    if (formData.billing_group_id === targetGroupId && targetGroupId !== null) {
-      setFormData({ ...formData, billing_group_id: null })
-    } else {
-      setFormData({ ...formData, billing_group_id: targetGroupId || 'NEW_GROUP_WITH_' + targetInvId })
+  // ✅ [추가됨] 단가 통일 및 그룹 선택 로직
+  const handleGroupSelect = (targetAsset: any) => {
+    // 1. 이미 선택된 그룹을 다시 클릭하면 해제 (단독 청구로 변경)
+    if (formData.billing_group_id === targetAsset.billing_group_id && targetAsset.billing_group_id !== null) {
+      setFormData({ ...formData, billing_group_id: null });
+      return;
     }
-  }
+
+    // 2. 단가 비교 (현재 입력값 vs 대상 기계의 DB값)
+    const isPriceDifferent = 
+      formData.plan_price_bw !== targetAsset.plan_price_bw ||
+      formData.plan_price_col !== targetAsset.plan_price_col ||
+      formData.plan_weight_a3_bw !== targetAsset.plan_weight_a3_bw ||
+      formData.plan_weight_a3_col !== targetAsset.plan_weight_a3_col;
+
+    if (isPriceDifferent) {
+      // 단가가 다를 경우 사용자에게 확인
+      const confirmSync = confirm(
+        `⚠️ 선택한 기계 [${targetAsset.model_name}]와 초과 단가 또는 가중치가 다릅니다.\n\n` +
+        `합산 청구를 하려면 단가가 동일해야 합니다.\n` +
+        `현재 기계의 단가를 대상 기계와 동일하게 변경하고 묶으시겠습니까?\n\n` +
+        ` - 대상 흑백단가: ${targetAsset.plan_price_bw}원 (현재: ${formData.plan_price_bw}원)\n` +
+        ` - 대상 컬러단가: ${targetAsset.plan_price_col}원 (현재: ${formData.plan_price_col}원)`
+      );
+
+      if (confirmSync) {
+        // '확인' 시 단가를 덮어쓰고 그룹 지정
+        setFormData({
+          ...formData,
+          plan_price_bw: targetAsset.plan_price_bw,
+          plan_price_col: targetAsset.plan_price_col,
+          plan_weight_a3_bw: targetAsset.plan_weight_a3_bw,
+          plan_weight_a3_col: targetAsset.plan_weight_a3_col,
+          billing_group_id: targetAsset.billing_group_id || 'NEW_GROUP_WITH_' + targetAsset.id
+        });
+      } else {
+        // '취소' 시 아무 작업 안 함
+        return; 
+      }
+    } else {
+      // 단가가 같으면 바로 그룹 지정
+      setFormData({ 
+        ...formData, 
+        billing_group_id: targetAsset.billing_group_id || 'NEW_GROUP_WITH_' + targetAsset.id 
+      });
+    }
+  };
 
   const handleSave = async () => {
     setLoading(true)
@@ -89,11 +128,12 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
         const targetId = finalGroupId.replace('NEW_GROUP_WITH_', '')
         const newGroupUUID = crypto.randomUUID()
         
+        // 대상 기계의 그룹 ID 업데이트
         await supabase.from('inventory').update({ billing_group_id: newGroupUUID }).eq('id', targetId)
         finalGroupId = newGroupUUID
       }
 
-      // 현재 기기 요금제, 그룹 정보, 청구일 업데이트
+      // 현재 기기 업데이트
       const { error } = await supabase
         .from('inventory')
         .update({
@@ -105,7 +145,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
           plan_weight_a3_bw: formData.plan_weight_a3_bw,
           plan_weight_a3_col: formData.plan_weight_a3_col,
           billing_group_id: finalGroupId,
-          billing_date: formData.billing_date // 청구일 저장
+          billing_date: formData.billing_date
         })
         .eq('id', inventoryId)
 
@@ -146,7 +186,6 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
           </div>
         )}
 
-        {/* 청구일 설정 필드 추가 */}
         <InputField 
           label="매월 정기 청구일" 
           as="select" 
@@ -196,7 +235,12 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
 
                 return (
                   <label key={sib.id} style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', fontSize:'0.85rem', cursor:'pointer'}}>
-                    <input type="radio" name="grouping" checked={!!(isLinked || isTempLinked)} onChange={() => toggleGroup(sib.billing_group_id, sib.id)} />
+                    <input 
+                      type="radio" 
+                      name="grouping" 
+                      checked={!!(isLinked || isTempLinked)} 
+                      onChange={() => handleGroupSelect(sib)} // ✅ 수정된 핸들러 사용
+                    />
                     <span>{sib.model_name} ({sib.serial_number})</span>
                   </label>
                 )

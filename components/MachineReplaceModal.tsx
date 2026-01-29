@@ -19,12 +19,12 @@ export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuc
   
   // 폼 데이터 상태
   const [formData, setFormData] = useState({
-    // 기존 기계 회수 정보
+    // 기존 기계 회수 정보 (A4, A3 모두 포함)
     final_bw: 0,
     final_col: 0,
     final_bw_a3: 0,
     final_col_a3: 0,
-    // 새 기계 설치 정보
+    // 새 기계 설치 정보 (A4, A3 모두 포함)
     new_asset_id: '',
     new_initial_bw: 0,
     new_initial_col: 0,
@@ -118,9 +118,16 @@ export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuc
         <div style={{ padding: '16px', backgroundColor: '#fff1f0', borderRadius: '8px', marginBottom: '20px', border: '1px solid #ffa39e' }}>
           <div style={{ fontWeight: '600', marginBottom: '10px', color: '#cf1322' }}>[기존 기계 회수] {oldAsset.model_name} ({oldAsset.serial_number})</div>
           <div style={{ fontSize: '0.85rem', marginBottom: '12px', color: '#666' }}>회수 시점의 최종 카운터를 입력하세요. (정산 근거가 됩니다)</div>
+          
+          {/* A4 카운터 */}
           <div style={{ display: 'flex', gap: '10px' }}>
-            <InputField label="최종 흑백" type="number" value={formData.final_bw} onChange={e => setFormData({ ...formData, final_bw: Number(e.target.value) })} />
-            <InputField label="최종 컬러" type="number" value={formData.final_col} onChange={e => setFormData({ ...formData, final_col: Number(e.target.value) })} />
+            <InputField label="최종 흑백(A4)" type="number" value={formData.final_bw} onChange={e => setFormData({ ...formData, final_bw: Number(e.target.value) })} />
+            <InputField label="최종 컬러(A4)" type="number" value={formData.final_col} onChange={e => setFormData({ ...formData, final_col: Number(e.target.value) })} />
+          </div>
+          {/* A3 카운터 (추가됨) */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '-10px' }}>
+            <InputField label="최종 흑백(A3)" type="number" value={formData.final_bw_a3} onChange={e => setFormData({ ...formData, final_bw_a3: Number(e.target.value) })} />
+            <InputField label="최종 컬러(A3)" type="number" value={formData.final_col_a3} onChange={e => setFormData({ ...formData, final_col_a3: Number(e.target.value) })} />
           </div>
         </div>
 
@@ -133,9 +140,16 @@ export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuc
               <option key={item.id} value={item.id}>{item.brand} {item.model_name} ({item.serial_number})</option>
             ))}
           </InputField>
+          
+          {/* A4 카운터 */}
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <InputField label="설치 흑백" type="number" value={formData.new_initial_bw} onChange={e => setFormData({ ...formData, new_initial_bw: Number(e.target.value) })} />
-            <InputField label="설치 컬러" type="number" value={formData.new_initial_col} onChange={e => setFormData({ ...formData, new_initial_col: Number(e.target.value) })} />
+            <InputField label="설치 흑백(A4)" type="number" value={formData.new_initial_bw} onChange={e => setFormData({ ...formData, new_initial_bw: Number(e.target.value) })} />
+            <InputField label="설치 컬러(A4)" type="number" value={formData.new_initial_col} onChange={e => setFormData({ ...formData, new_initial_col: Number(e.target.value) })} />
+          </div>
+          {/* A3 카운터 (추가됨) */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '-10px' }}>
+            <InputField label="설치 흑백(A3)" type="number" value={formData.new_initial_bw_a3} onChange={e => setFormData({ ...formData, new_initial_bw_a3: Number(e.target.value) })} />
+            <InputField label="설치 컬러(A3)" type="number" value={formData.new_initial_col_a3} onChange={e => setFormData({ ...formData, new_initial_col_a3: Number(e.target.value) })} />
           </div>
         </div>
 

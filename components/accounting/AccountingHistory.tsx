@@ -11,13 +11,15 @@ interface Props {
   histMonth: number
   setHistMonth: (month: number) => void
   historyList: any[]
-  handleDeleteHistory: (id: string) => void
-  monthMachineHistory: any[] // 추가: 이력 데이터
-  handleDeleteDetail: (settlementId: string, detailId: string, inventoryId: string, amount: number, isReplacement: boolean) => void // 추가
+  handleRebillHistory: (id: string) => void // ✅ 추가
+  handleDeleteHistory: (id: string) => void // ✅ 추가
+  monthMachineHistory: any[] 
+  handleDeleteDetail: (settlementId: string, detailId: string, inventoryId: string, amount: number, isReplacement: boolean) => void 
 }
 
 export default function AccountingHistory({
-  isHistOpen, setIsHistOpen, histYear, setHistYear, histMonth, setHistMonth, historyList, handleDeleteHistory, monthMachineHistory, handleDeleteDetail
+  isHistOpen, setIsHistOpen, histYear, setHistYear, histMonth, setHistMonth, historyList, 
+  handleRebillHistory, handleDeleteHistory, monthMachineHistory, handleDeleteDetail
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -100,15 +102,36 @@ export default function AccountingHistory({
                         </span>
                       </td>
                       <td className={styles.td}>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteHistory(hist.id);
-                          }} 
-                          style={{ color: '#d93025', border: '1px solid #ffccc7', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}
-                        >
-                          전체 삭제
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                          {/* ✅ [수정] 재청구 버튼 */}
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRebillHistory(hist.id);
+                            }} 
+                            style={{ 
+                              color: '#0070f3', border: '1px solid #91d5ff', background: 'white', 
+                              cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' 
+                            }}
+                            title="삭제 후 기계 상태를 복구하여 다시 청구할 수 있게 합니다."
+                          >
+                            재청구
+                          </button>
+                          {/* ✅ [수정] 삭제 버튼 */}
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteHistory(hist.id);
+                            }} 
+                            style={{ 
+                              color: '#d93025', border: '1px solid #ffccc7', background: 'white', 
+                              cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' 
+                            }}
+                            title="청구 이력만 삭제합니다."
+                          >
+                            삭제
+                          </button>
+                        </div>
                       </td>
                     </tr>
 
@@ -128,17 +151,14 @@ export default function AccountingHistory({
                               </thead>
                               <tbody>
                                 {hist.details?.map((detail: any) => {
-                                  // 뱃지 판단 로직
+                                  // 기존 뱃지 로직
                                   let badgeLabel = detail.inventory?.status || '설치';
                                   let badgeStyle = { backgroundColor: '#f5f5f5', color: '#666', border: '1px solid #d9d9d9' };
 
-                                  // 1. 회수(교체 전) 확인
                                   if (detail.is_replacement_record) {
                                     badgeLabel = "교체(철수)";
                                     badgeStyle = { backgroundColor: '#fff1f0', color: '#cf1322', border: '1px solid #ffa39e' };
-                                  } 
-                                  // 2. 설치(교체 후) 확인: 해당 월의 machine_history에서 INSTALL 기록 조회
-                                  else {
+                                  } else {
                                     const isInstalledThisMonth = monthMachineHistory?.some(mh => 
                                       mh.inventory_id === detail.inventory_id && mh.action_type === 'INSTALL'
                                     );
@@ -169,7 +189,6 @@ export default function AccountingHistory({
                                         <div style={{ fontSize: '0.75rem', color: '#999' }}>{detail.inventory?.serial_number}</div>
                                       </td>
                                       <td style={{ padding: '8px', verticalAlign: 'middle' }}>
-                                        {/* 상세 카운터 표시 스타일 (등록화면과 유사하게) */}
                                         <div className={styles.splitCellContainer} style={{ minHeight: 'auto', border: '1px solid #eee', borderRadius: '4px' }}>
                                           <div style={{ display: 'flex', borderBottom: '1px solid #eee' }}>
                                             <div style={{ flex: 1, padding: '4px', textAlign: 'center', backgroundColor: '#fafafa', color: '#666', borderRight: '1px solid #eee' }}>{detail.prev_count_bw}</div>

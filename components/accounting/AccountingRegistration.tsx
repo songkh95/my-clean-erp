@@ -26,9 +26,10 @@ interface Props {
   toggleInventorySelection: (invId: string) => void
   setSelectedInventoriesBulk: (ids: string[], action: 'add' | 'remove') => void
   calculateClientBill: (client: any) => any
-  calculateSelectedTotal: () => number
+  calculateSelectedTotal: (targetClients?: any[]) => number
   handlePreSave: () => void
   onSearch: () => void
+  handleExcludeAsset: (asset: any) => void
 }
 
 export default function AccountingRegistration({
@@ -36,7 +37,8 @@ export default function AccountingRegistration({
   targetDay, setTargetDay, searchTerm, setSearchTerm, showUnregistered, setShowUnregistered,
   loading, filteredClients, inventoryMap, inputData, prevData, selectedInventories,
   handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk, 
-  calculateClientBill, calculateSelectedTotal, handlePreSave, onSearch
+  calculateClientBill, calculateSelectedTotal, handlePreSave, onSearch,
+  handleExcludeAsset
 }: Props) {
 
   const currentVisibleIds = useMemo(() => {
@@ -69,23 +71,17 @@ export default function AccountingRegistration({
     handleInputChange(invId, field, cleanValue);
   };
 
-  // 🔴 전체 데이터 중 유효성 검사 에러가 있는지 확인 (전월 > 당월 입력)
   const hasInputError = useMemo(() => {
     return filteredClients.some(client => {
       const billData = calculateClientBill(client);
       return billData.details.some((calc: any) => {
         const rawInput = inputData[calc.inventory_id] || {};
         const isWithdrawn = calc.inv.is_withdrawn;
-        
-        // 회수된 기계는 입력 대상이 아니므로 제외
         if (isWithdrawn) return false;
-
-        // 입력값이 있고, 전월보다 작은지 체크
         if (rawInput.bw !== undefined && rawInput.bw < (calc.prev?.bw ?? 0)) return true;
         if (rawInput.col !== undefined && rawInput.col < (calc.prev?.col ?? 0)) return true;
         if (rawInput.bw_a3 !== undefined && rawInput.bw_a3 < (calc.prev?.bw_a3 ?? 0)) return true;
         if (rawInput.col_a3 !== undefined && rawInput.col_a3 < (calc.prev?.col_a3 ?? 0)) return true;
-        
         return false;
       });
     });
@@ -132,22 +128,8 @@ export default function AccountingRegistration({
             </div>
           </div>
 
-          {/* 🔴 에러 메시지 표시 영역 (테이블 상단) */}
           {hasInputError && (
-            <div style={{ 
-              color: '#d93025', 
-              backgroundColor: '#fff1f0', 
-              padding: '12px 16px', 
-              marginBottom: '15px', 
-              borderRadius: '6px', 
-              border: '1px solid #ffa39e',
-              fontWeight: '600',
-              fontSize: '0.95rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}>
+            <div style={{ color: '#d93025', backgroundColor: '#fff1f0', padding: '12px 16px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #ffa39e', fontWeight: '600', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
               ⚠️ 전월보다 적은 사용매수를 입력할 수 없습니다. 입력값을 확인해주세요.
             </div>
           )}
@@ -186,8 +168,9 @@ export default function AccountingRegistration({
                     const isItemSelected = selectedInventories.has(calc.inventory_id)
                     const isLastRow = idx === rowSpan - 1
                     const isWithdrawn = calc.inv.is_withdrawn; 
-                    
                     const isPlanMissing = calc.plan.basic_fee === 0 && calc.plan.price_bw === 0 && calc.plan.price_col === 0;
+                    const isGroupMember = calc.billing_group_id && !calc.isGroupLeader;
+                    const showExcludeBtn = calc.inv.is_replacement_before || calc.inv.is_withdrawal;
 
                     let badgeLabel = calc.inv.status;
                     let badgeStyle = { backgroundColor: '#f5f5f5', color: '#666', border: '1px solid #d9d9d9' };
@@ -221,28 +204,29 @@ export default function AccountingRegistration({
                           </td>
                         )}
                         <td className={styles.td} style={{ textAlign: 'left' }}>
-                           <div style={{ marginBottom: '6px' }}>
+                           <div style={{ marginBottom: '6px', display:'flex', gap:'4px' }}>
                              <span className={styles.badge} style={{
                                ...badgeStyle,
-                               marginRight: '0',
-                               fontSize: '0.75rem',
-                               padding: '2px 6px',
-                               borderRadius: '4px',
-                               fontWeight: '600'
+                               marginRight: '0', fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', fontWeight: '600'
                              }}>
                                 {badgeLabel}
                              </span>
+                             {calc.billing_group_id && (
+                               <span className={styles.badge} style={{
+                                 backgroundColor: '#f9f0ff', color: '#722ed1', border: '1px solid #d3adf7',
+                                 fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', fontWeight: '600'
+                               }} title="이 기계는 다른 기계와 사용량이 합산 청구됩니다.">
+                                 🔗 합산
+                               </span>
+                             )}
                            </div>
-
-                           <div style={{ fontWeight: 'bold' }}>
-                             {calc.model_name}
-                           </div>
+                           <div style={{ fontWeight: 'bold' }}>{calc.model_name}</div>
                            <div style={{ fontSize: '0.75rem', color: '#999' }}>{calc.serial_number}</div>
-                           
-                           {isPlanMissing && (
-                             <div style={{ fontSize: '0.7rem', color: '#ff4d4f', marginTop: '4px', fontWeight: '500' }}>
-                               (요금제가 등록되어 있지 않음)
-                             </div>
+                           {isPlanMissing && <div style={{ fontSize: '0.7rem', color: '#ff4d4f', marginTop: '4px', fontWeight: '500' }}>(요금제가 등록되어 있지 않음)</div>}
+                           {showExcludeBtn && (
+                              <button onClick={(e) => { e.stopPropagation(); handleExcludeAsset(calc); }} style={{ marginTop: '6px', fontSize: '0.7rem', padding: '2px 6px', border: '1px solid #d9d9d9', borderRadius: '4px', backgroundColor: '#fff', color: '#888', cursor: 'pointer' }} title="이 기계는 청구하지 않고 목록에서 제외합니다 (0원 정산 처리)">
+                                🚫 청구 제외
+                              </button>
                            )}
                         </td>
                         <td className={styles.td} style={{ padding: 0 }}>
@@ -267,63 +251,30 @@ export default function AccountingRegistration({
                             </div>
                           ) : (
                             <div className={styles.splitCellContainer}>
-                              <div className={styles.rowGray}>
-                                <input 
-                                  type="number" 
-                                  className={styles.numberInput} 
-                                  placeholder="당월 흑백 A4" 
-                                  value={inputData[calc.inventory_id]?.bw ?? ''} 
-                                  onKeyDown={onNumberKeyDown} 
-                                  onChange={e => onNumberChange(calc.inventory_id, 'bw', e.target.value)} 
-                                />
-                              </div>
-                              <div className={styles.rowBlue}>
-                                <input 
-                                  type="number" 
-                                  className={styles.numberInput} 
-                                  placeholder="당월 컬러 A4" 
-                                  value={inputData[calc.inventory_id]?.col ?? ''} 
-                                  onKeyDown={onNumberKeyDown} 
-                                  onChange={e => onNumberChange(calc.inventory_id, 'col', e.target.value)} 
-                                />
-                              </div>
-                              <div className={styles.rowGray}>
-                                <input 
-                                  type="number" 
-                                  className={styles.numberInput} 
-                                  placeholder="당월 흑백 A3" 
-                                  value={inputData[calc.inventory_id]?.bw_a3 ?? ''} 
-                                  onKeyDown={onNumberKeyDown} 
-                                  onChange={e => onNumberChange(calc.inventory_id, 'bw_a3', e.target.value)} 
-                                />
-                              </div>
-                              <div className={`${styles.rowBlue} ${styles.rowLast}`}>
-                                <input 
-                                  type="number" 
-                                  className={styles.numberInput} 
-                                  placeholder="당월 컬러 A3" 
-                                  value={inputData[calc.inventory_id]?.col_a3 ?? ''} 
-                                  onKeyDown={onNumberKeyDown} 
-                                  onChange={e => onNumberChange(calc.inventory_id, 'col_a3', e.target.value)} 
-                                />
-                              </div>
+                              <div className={styles.rowGray}><input type="number" className={styles.numberInput} placeholder="당월 흑백 A4" value={inputData[calc.inventory_id]?.bw ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'bw', e.target.value)} /></div>
+                              <div className={styles.rowBlue}><input type="number" className={styles.numberInput} placeholder="당월 컬러 A4" value={inputData[calc.inventory_id]?.col ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'col', e.target.value)} /></div>
+                              <div className={styles.rowGray}><input type="number" className={styles.numberInput} placeholder="당월 흑백 A3" value={inputData[calc.inventory_id]?.bw_a3 ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'bw_a3', e.target.value)} /></div>
+                              <div className={`${styles.rowBlue} ${styles.rowLast}`}><input type="number" className={styles.numberInput} placeholder="당월 컬러 A3" value={inputData[calc.inventory_id]?.col_a3 ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'col_a3', e.target.value)} /></div>
                             </div>
                           )}
                         </td>
+                        
                         <td className={styles.td} style={{ textAlign: 'left', fontSize: '0.8rem', lineHeight: '1.4' }}>
-                          <div style={{ fontWeight: '600', color: '#555' }}>기본매수</div>
-                          <div style={{ paddingLeft: '4px', color: '#555' }}>
-                            흑백: {(calc.usageBreakdown?.basicBW ?? 0).toLocaleString()}장<br />
-                            컬러: {(calc.usageBreakdown?.basicCol ?? 0).toLocaleString()}장
-                          </div>
-                          <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
-                          <div style={{ fontWeight: '600', color: '#d93025' }}>추가매수</div>
-                          <div style={{ paddingLeft: '4px', color: '#d93025' }}>
-                            흑백: {(calc.usageBreakdown?.extraBW ?? 0).toLocaleString()}장<br />
-                            컬러: {(calc.usageBreakdown?.extraCol ?? 0).toLocaleString()}장
-                          </div>
+                          {isGroupMember ? (
+                            <div style={{ color: '#aaa', textAlign: 'center', padding: '20px 0', fontWeight: '600' }}>합산 그룹원</div>
+                          ) : (
+                            <>
+                              <div style={{ fontWeight: '600', color: '#555' }}>기본매수</div>
+                              <div style={{ paddingLeft: '4px', color: '#555' }}>흑백: {(calc.usageBreakdown?.basicBW ?? 0).toLocaleString()}장<br />컬러: {(calc.usageBreakdown?.basicCol ?? 0).toLocaleString()}장</div>
+                              <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
+                              <div style={{ fontWeight: '600', color: '#d93025' }}>추가매수</div>
+                              <div style={{ paddingLeft: '4px', color: '#d93025' }}>흑백: {(calc.usageBreakdown?.extraBW ?? 0).toLocaleString()}장<br />컬러: {(calc.usageBreakdown?.extraCol ?? 0).toLocaleString()}장</div>
+                            </>
+                          )}
                         </td>
-                        {calc.isGroupLeader ? (
+
+                        {/* ✅ 수정: 조건부 렌더링 시 null 대신 빈 Fragment나 false 반환하지 않고 명확하게 처리 */}
+                        {calc.isGroupLeader && (
                           <td className={styles.td} rowSpan={calc.groupSpan} style={{ textAlign: 'right', verticalAlign: 'bottom', paddingBottom: '10px' }}>
                             <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '4px' }}>
                               기본금액: {(calc.rowCost?.basic ?? 0).toLocaleString()}원<br />
@@ -331,9 +282,8 @@ export default function AccountingRegistration({
                             </div>
                             <div style={{ fontWeight: 'bold', borderTop: '1px solid #eee', paddingTop: '4px', color: '#0070f3' }}>{(calc.rowCost?.total ?? 0).toLocaleString()}원</div>
                           </td>
-                        ) : (
-                          <td className={styles.td} style={{ backgroundColor: '#fafafa', color: '#ccc', fontSize: '0.7rem' }}>합산 그룹원</td>
                         )}
+
                         {idx === 0 && (
                           <td className={styles.td} rowSpan={rowSpan} style={{ backgroundColor: '#fffdf0', textAlign: 'right', verticalAlign: 'bottom' }}>
                             <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '4px' }}>거래처 총액</div>
@@ -349,7 +299,7 @@ export default function AccountingRegistration({
           </div>
 
           <div className={styles.actionBar}>
-            <div className={styles.totalLabel}>선택 합계 ({selectedInventories.size}대): <span className={styles.totalAmount}>{calculateSelectedTotal().toLocaleString()} 원</span></div>
+            <div className={styles.totalLabel}>선택 합계 ({selectedInventories.size}대): <span className={styles.totalAmount}>{calculateSelectedTotal(filteredClients).toLocaleString()} 원</span></div>
             <button onClick={handlePreSave} disabled={selectedInventories.size === 0} className={styles.saveBtn}>🚀 청구서 확정 및 저장</button>
           </div>
         </div>

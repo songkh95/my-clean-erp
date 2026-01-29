@@ -18,12 +18,24 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
   const [loading, setLoading] = useState(false)
   const [clients, setClients] = useState<any[]>([])
 
-  const [formData, setFormData] = useState({
+  // 폼 데이터 초기값 (요금제 필드 추가)
+  const initialData = {
     type: '복합기', category: '컬러겸용', brand: '', model_name: '', serial_number: '',
     product_condition: '새제품', status: '창고', client_id: '', purchase_date: '',
     purchase_price: 0, initial_count_bw: 0, initial_count_col: 0,
-    initial_count_bw_a3: 0, initial_count_col_a3: 0, memo: ''
-  })
+    initial_count_bw_a3: 0, initial_count_col_a3: 0, memo: '',
+    // ✅ [추가] 요금제 관련 필드
+    billing_date: '말일',
+    plan_basic_fee: 0,
+    plan_basic_cnt_bw: 0,
+    plan_basic_cnt_col: 0,
+    plan_price_bw: 0,
+    plan_price_col: 0,
+    plan_weight_a3_bw: 1,
+    plan_weight_a3_col: 1
+  }
+
+  const [formData, setFormData] = useState(initialData)
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -38,7 +50,27 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
   }, [])
 
   useEffect(() => {
-    if (isOpen && editData) setFormData({ ...editData, client_id: editData.client_id || '', purchase_date: editData.purchase_date || '' })
+    if (isOpen) {
+      if (editData) {
+        setFormData({
+          ...initialData, // 기본값 깔고 병합
+          ...editData,
+          client_id: editData.client_id || '',
+          purchase_date: editData.purchase_date || '',
+          // 요금제 데이터가 없으면 기본값(0 or 1) 유지
+          billing_date: editData.billing_date || '말일',
+          plan_basic_fee: editData.plan_basic_fee || 0,
+          plan_basic_cnt_bw: editData.plan_basic_cnt_bw || 0,
+          plan_basic_cnt_col: editData.plan_basic_cnt_col || 0,
+          plan_price_bw: editData.plan_price_bw || 0,
+          plan_price_col: editData.plan_price_col || 0,
+          plan_weight_a3_bw: editData.plan_weight_a3_bw || 1,
+          plan_weight_a3_col: editData.plan_weight_a3_col || 1
+        })
+      } else {
+        setFormData(initialData)
+      }
+    }
   }, [isOpen, editData])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,6 +97,14 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
         client_id: formData.client_id || null,
         purchase_date: formData.purchase_date || null,
         purchase_price: Number(formData.purchase_price) || 0,
+        // ✅ [추가] 요금제 숫자 변환 저장
+        plan_basic_fee: Number(formData.plan_basic_fee),
+        plan_basic_cnt_bw: Number(formData.plan_basic_cnt_bw),
+        plan_basic_cnt_col: Number(formData.plan_basic_cnt_col),
+        plan_price_bw: Number(formData.plan_price_bw),
+        plan_price_col: Number(formData.plan_price_col),
+        plan_weight_a3_bw: Number(formData.plan_weight_a3_bw),
+        plan_weight_a3_col: Number(formData.plan_weight_a3_col),
         last_status_updated_at: new Date().toISOString()
       }
 
@@ -97,12 +137,52 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
               <option value="교체전(철수)">교체전(철수)</option>
             </InputField>
           </div>
+
           <div className={`${styles.highlightBox} ${formData.status === '설치' ? styles.activeBox : ''}`}>
-            <InputField label="🏢 설치 거래처" as="select" disabled={formData.status !== '설치'} value={formData.client_id} onChange={e => setFormData({ ...formData, client_id: e.target.value })} style={{ marginBottom: 0 }}>
+            <InputField label="🏢 설치 거래처" as="select" disabled={formData.status !== '설치'} value={formData.client_id} onChange={e => setFormData({ ...formData, client_id: e.target.value })} style={{ marginBottom: 16 }}>
               <option value="">거래처 선택</option>
               {clients.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </InputField>
+
+            {/* ✅ [추가] 상태가 '설치'일 때만 요금제 입력란 표시 */}
+            {formData.status === '설치' && (
+              <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px dashed #0070f3' }}>
+                <div className={styles.sectionTitle} style={{ color: '#0070f3' }}>💰 요금제 설정</div>
+                
+                <InputField 
+                  label="매월 청구일" 
+                  as="select" 
+                  value={formData.billing_date} 
+                  onChange={e => setFormData({ ...formData, billing_date: e.target.value })}
+                >
+                  <option value="말일">매월 말일</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                    <option key={day} value={String(day)}>매월 {day}일</option>
+                  ))}
+                </InputField>
+
+                <InputField label="월 기본료 (원)" type="number" value={formData.plan_basic_fee} onChange={e => setFormData({...formData, plan_basic_fee: Number(e.target.value)})} />
+
+                <div className={styles.grid2} style={{ marginBottom: 0 }}>
+                  <InputField label="흑백 무료매수" type="number" value={formData.plan_basic_cnt_bw} onChange={e => setFormData({...formData, plan_basic_cnt_bw: Number(e.target.value)})} />
+                  <InputField label="칼라 무료매수" type="number" value={formData.plan_basic_cnt_col} onChange={e => setFormData({...formData, plan_basic_cnt_col: Number(e.target.value)})} />
+                </div>
+                <div className={styles.grid2} style={{ marginBottom: 0 }}>
+                  <InputField label="흑백 초과단가" type="number" value={formData.plan_price_bw} onChange={e => setFormData({...formData, plan_price_bw: Number(e.target.value)})} />
+                  <InputField label="칼라 초과단가" type="number" value={formData.plan_price_col} onChange={e => setFormData({...formData, plan_price_col: Number(e.target.value)})} />
+                </div>
+
+                <details style={{ marginTop: '12px' }}>
+                  <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', fontWeight: '500' }}>A3 가중치 설정 (기본 1배) ▼</summary>
+                  <div className={styles.grid2} style={{ marginTop: '10px', marginBottom: 0 }}>
+                    <InputField label="A3 흑백 배수" type="number" step="0.1" value={formData.plan_weight_a3_bw} onChange={e => setFormData({...formData, plan_weight_a3_bw: Number(e.target.value)})} />
+                    <InputField label="A3 칼라 배수" type="number" step="0.1" value={formData.plan_weight_a3_col} onChange={e => setFormData({...formData, plan_weight_a3_col: Number(e.target.value)})} />
+                  </div>
+                </details>
+              </div>
+            )}
           </div>
+
           <div className={styles.grid2}>
             <InputField label="브랜드" value={formData.brand} onChange={e => setFormData({ ...formData, brand: e.target.value })} />
             <InputField required label="모델명 *" value={formData.model_name} onChange={e => setFormData({ ...formData, model_name: e.target.value })} />
