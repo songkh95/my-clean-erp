@@ -79,7 +79,6 @@ export default function InventoryPage() {
       
       <div style={{ marginTop: '30px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 className={styles.title}>📦 자산 및 재고 목록</h2>
           
           <div className={styles.controls}>
             <select 

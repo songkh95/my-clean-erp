@@ -1,53 +1,77 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/utils/supabase'
-import { useRouter } from 'next/navigation' // 1. 페이지 이동을 위해 추가
+// ✅ 수정 1: CSS 파일은 같은 폴더에 있으므로 ./ 로 가져옵니다.
+import styles from './accounting.module.css'
 
-export default function HomePage() {
-  const [loading, setLoading] = useState(true)
-  const [userName, setUserName] = useState('')
-  const [orgName, setOrgName] = useState('')
-  const supabase = createClient()
-  const router = useRouter() // 2. 라우터 초기화
+import AccountingRegistration from '@/components/accounting/AccountingRegistration'
+import AccountingHistory from '@/components/accounting/AccountingHistory'
+import SettlementConfirmModal from '@/components/accounting/SettlementConfirmModal'
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select(`name, organizations ( name )`)
-          .eq('id', user.id)
-          .single()
+// ✅ 수정 2: hooks 폴더가 app/accounting/hooks/ 위치에 있다면 아래와 같이 가져옵니다.
+import { useAccounting } from './accounting/hooks/useAccounting'
 
-        if (profile) {
-          setUserName(profile.name)
-          // @ts-ignore
-          setOrgName(profile.organizations?.name || '소속 없음')
-        }
-      }
-      setLoading(false)
-    }
-    fetchUserData()
-  }, [])
-
-  // 3. ✨ 로그아웃 일꾼(함수) 만들기
-  const handleLogout = async () => {
-    await supabase.auth.signOut() // 수파베이스에게 로그아웃 알리기
-    alert('로그아웃 되었습니다.')
-    router.push('/login') // 로그인 페이지로 보내기
-  }
-
-  if (loading) return <div style={{ padding: '20px' }}>데이터를 불러오는 중...</div>
+export default function AccountingPage() {
+  // 훅에서 모든 데이터와 함수를 가져옵니다.
+  const {
+    loading, isModalOpen, setIsModalOpen,
+    regYear, setRegYear, regMonth, setRegMonth, targetDay, setTargetDay, searchTerm, setSearchTerm,
+    isRegOpen, setIsRegOpen,
+    filteredClients, inventoryMap, inputData, prevData, selectedInventories, showUnregistered, setShowUnregistered,
+    isHistOpen, setIsHistOpen, historyList,
+    histYear, setHistYear, histMonth, setHistMonth, histTargetDay, setHistTargetDay, histSearchTerm, setHistSearchTerm,
+    monthMachineHistory, clients,
+    
+    handleSearch, handleHistSearch, handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk,
+    calculateClientBillFiltered, calculateSelectedTotal, handlePreSave, handleFinalSave,
+    handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset
+  } = useAccounting()
 
   return (
-    <div style={{ padding: '0' }}>
-      {/* 메인 내용 (대시보드 청소 버전) */}
-      <main style={{ padding: '40px' }}>
-        <h1 style={{ fontSize: '2rem' }}>🏠 홈 대시보드</h1>
-        <p style={{ color: '#666' }}>오늘도 화이팅하세요! 왼쪽 메뉴를 통해 거래처를 관리할 수 있습니다.</p>
-      </main>
+    <div className={styles.container}>
+      <h1 className={styles.title}>💰 정산 및 회계 관리</h1>
+      
+      <AccountingRegistration 
+        isRegOpen={isRegOpen} setIsRegOpen={setIsRegOpen}
+        regYear={regYear} setRegYear={setRegYear}
+        regMonth={regMonth} setRegMonth={setRegMonth}
+        targetDay={targetDay} setTargetDay={setTargetDay}
+        searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+        showUnregistered={showUnregistered} setShowUnregistered={setShowUnregistered}
+        loading={loading} filteredClients={filteredClients}
+        inventoryMap={inventoryMap} inputData={inputData}
+        prevData={prevData} selectedInventories={selectedInventories}
+        handleInputChange={handleInputChange} toggleInventorySelection={toggleInventorySelection}
+        calculateClientBill={calculateClientBillFiltered}
+        calculateSelectedTotal={calculateSelectedTotal}
+        handlePreSave={handlePreSave}
+        onSearch={handleSearch}
+        setSelectedInventoriesBulk={setSelectedInventoriesBulk}
+        handleExcludeAsset={handleExcludeAsset}
+      />
+
+      <AccountingHistory 
+        isHistOpen={isHistOpen} setIsHistOpen={setIsHistOpen}
+        histYear={histYear} setHistYear={setHistYear}
+        histMonth={histMonth} setHistMonth={setHistMonth}
+        historyList={historyList} 
+        handleDeleteHistory={handleDeleteHistory}
+        monthMachineHistory={monthMachineHistory} 
+        handleDeleteDetail={handleDeleteDetail}   
+        handleDetailRebill={handleDetailRebill} 
+        handleRebillHistory={handleRebillHistory}
+        targetDay={histTargetDay} setTargetDay={setHistTargetDay}
+        searchTerm={histSearchTerm} setSearchTerm={setHistSearchTerm}
+        onSearch={handleHistSearch}
+      />
+      
+      {isModalOpen && (
+        <SettlementConfirmModal 
+          selectedInventories={selectedInventories} calculateSelectedTotal={calculateSelectedTotal}
+          clients={clients} inventoryMap={inventoryMap} calculateClientBill={calculateClientBillFiltered}
+          onClose={() => setIsModalOpen(false)} onSave={handleFinalSave}
+          loading={loading}
+        />
+      )}
     </div>
   )
 }

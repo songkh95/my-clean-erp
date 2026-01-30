@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
 import ClientForm from './ClientForm'
 import PlanSettingModal from './PlanSettingModal'
-import MachineReplaceModal from './MachineReplaceModal'
-import MachineWithdrawModal from './MachineWithdrawModal'
+import MachineReplaceModal from './MachineReplaceModal' // (파일이 있다면 유지)
+import MachineWithdrawModal from './MachineWithdrawModal' // (파일이 있다면 유지)
+import InventoryForm from '../inventory/InventoryForm' // ✅ 자산 등록 폼 import
 import Button from '@/components/ui/Button' 
 import styles from './ClientList.module.css'
 
@@ -25,13 +26,15 @@ export default function ClientList() {
   const [planModalOpen, setPlanModalOpen] = useState(false)
   const [selectedAssetForPlan, setSelectedAssetForPlan] = useState<{id: string, clientId: string} | null>(null)
   
-  // 기계 교체 모달 관련
-  const [replaceModalOpen, setReplaceModalOpen] = useState(false)
-  const [selectedAssetForReplace, setSelectedAssetForReplace] = useState<any>(null)
+  // ✅ [추가] 기계 추가 모달 상태
+  const [addMachineModalOpen, setAddMachineModalOpen] = useState(false)
+  const [clientForMachineAdd, setClientForMachineAdd] = useState<any>(null)
 
-  // 🔴 기계 철수 모달 관련 상태 추가
-  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
-  const [selectedAssetForWithdraw, setSelectedAssetForWithdraw] = useState<any>(null)
+  // 기계 교체/철수 모달 관련 (기존 코드 유지)
+  const [replaceModalOpen, setReplaceModalOpen] = useState(false) // 만약 컴포넌트가 없다면 이 줄 제거
+  const [selectedAssetForReplace, setSelectedAssetForReplace] = useState<any>(null) // 만약 컴포넌트가 없다면 이 줄 제거
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false) // 만약 컴포넌트가 없다면 이 줄 제거
+  const [selectedAssetForWithdraw, setSelectedAssetForWithdraw] = useState<any>(null) // 만약 컴포넌트가 없다면 이 줄 제거
 
   useEffect(() => { fetchClients() }, [])
 
@@ -82,12 +85,17 @@ export default function ClientList() {
     setExpandedRows(newSet)
   }
 
+  // ✅ [추가] 기계 추가 버튼 핸들러
+  const handleAddMachineClick = (client: any) => {
+    setClientForMachineAdd(client)
+    setAddMachineModalOpen(true)
+  }
+
+  // 기존 핸들러들 (교체/철수 기능이 있다면 유지, 없다면 제거하셔도 됩니다)
   const handleReplaceClick = (asset: any) => {
     setSelectedAssetForReplace(asset)
     setReplaceModalOpen(true)
   }
-
-  // 🔴 철수 클릭 핸들러 추가
   const handleWithdrawClick = (asset: any) => {
     setSelectedAssetForWithdraw(asset)
     setWithdrawModalOpen(true)
@@ -179,7 +187,14 @@ export default function ClientList() {
 
                 <div className={styles.divider} />
 
-                <div className={styles.sectionTitle}>📦 설치된 자산 목록</div>
+                {/* ✅ 자산 목록 헤더에 '기계 추가' 버튼 배치 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div className={styles.sectionTitle} style={{ marginBottom: 0 }}>📦 설치된 자산 목록</div>
+                  <Button variant="outline" size="sm" onClick={() => handleAddMachineClick(client)}>
+                    + 기계 추가
+                  </Button>
+                </div>
+
                 {assets.length === 0 ? (
                   <div className={styles.assetEmpty}>설치된 기기가 없습니다.</div>
                 ) : (
@@ -218,9 +233,14 @@ export default function ClientList() {
                                 setSelectedAssetForPlan({ id: asset.id, clientId: client.id }); 
                                 setPlanModalOpen(true); 
                               }}>요금제</Button>
-                              <Button variant="outline" size="sm" onClick={() => handleReplaceClick(asset)}>교체</Button>
-                              {/* 🔴 철수 버튼 추가 */}
-                              <Button variant="danger" size="sm" onClick={() => handleWithdrawClick(asset)} style={{ border: '1px solid #ff4d4f', background: 'transparent' }}>철수</Button>
+                              
+                              {/* 아래 컴포넌트들이 실제로 존재한다면 사용, 없다면 주석 처리 */}
+                              {typeof MachineReplaceModal !== 'undefined' && 
+                                <Button variant="outline" size="sm" onClick={() => handleReplaceClick(asset)}>교체</Button>
+                              }
+                              {typeof MachineWithdrawModal !== 'undefined' && 
+                                <Button variant="danger" size="sm" onClick={() => handleWithdrawClick(asset)} style={{ border: '1px solid #ff4d4f', background: 'transparent' }}>철수</Button>
+                              }
                             </div>
                           </td>
                         </tr>
@@ -245,7 +265,22 @@ export default function ClientList() {
         />
       )}
 
-      {replaceModalOpen && selectedAssetForReplace && (
+      {/* ✅ [추가] 기계 추가 모달 렌더링 */}
+      {addMachineModalOpen && clientForMachineAdd && (
+        <InventoryForm 
+          isOpen={addMachineModalOpen}
+          onClose={() => { setAddMachineModalOpen(false); setClientForMachineAdd(null) }}
+          onSuccess={fetchClients}
+          // ✨ 자동으로 해당 거래처에 '설치' 상태로 추가되도록 초기값 설정
+          editData={{
+            status: '설치',
+            client_id: clientForMachineAdd.id
+          }}
+        />
+      )}
+
+      {/* 아래 컴포넌트들이 실제로 존재한다면 사용 */}
+      {replaceModalOpen && selectedAssetForReplace && typeof MachineReplaceModal !== 'undefined' && (
         <MachineReplaceModal 
           oldAsset={selectedAssetForReplace} 
           clientId={selectedAssetForReplace.client_id} 
@@ -254,8 +289,7 @@ export default function ClientList() {
         />
       )}
 
-      {/* 🔴 철수 모달 추가 */}
-      {withdrawModalOpen && selectedAssetForWithdraw && (
+      {withdrawModalOpen && selectedAssetForWithdraw && typeof MachineWithdrawModal !== 'undefined' && (
         <MachineWithdrawModal 
           asset={selectedAssetForWithdraw} 
           clientId={selectedAssetForWithdraw.client_id} 

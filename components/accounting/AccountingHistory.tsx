@@ -15,11 +15,19 @@ interface Props {
   monthMachineHistory: any[] 
   handleDeleteDetail: (settlementId: string, detailId: string, inventoryId: string, amount: number, isReplacement: boolean) => void 
   handleDetailRebill: (settlementId: string, detailId: string, inventoryId: string, isReplacement: boolean, clientId: string) => void
+  handleRebillHistory: (id: string) => void
+  targetDay: string
+  setTargetDay: (day: string) => void
+  searchTerm: string
+  setSearchTerm: (term: string) => void
+  onSearch: () => void
 }
 
 export default function AccountingHistory({
   isHistOpen, setIsHistOpen, histYear, setHistYear, histMonth, setHistMonth, historyList, 
-  handleDeleteHistory, monthMachineHistory, handleDeleteDetail, handleDetailRebill
+  handleDeleteHistory, monthMachineHistory, handleDeleteDetail, handleDetailRebill,
+  handleRebillHistory,
+  targetDay, setTargetDay, searchTerm, setSearchTerm, onSearch
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -30,8 +38,10 @@ export default function AccountingHistory({
   return (
     <div className={styles.section} style={{ marginTop: '30px' }}>
       <div onClick={() => setIsHistOpen(!isHistOpen)} className={styles.header}>
-        <span>📋 청구 내역 조회 및 관리</span>
-        <span>{isHistOpen ? '▲' : '▼'}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>{isHistOpen ? '▼' : '▶'}</span>
+          <span>📋 청구 내역 조회 및 관리</span>
+        </span>
       </div>
       
       {isHistOpen && (
@@ -43,7 +53,7 @@ export default function AccountingHistory({
                 value={histYear} 
                 onChange={e => setHistYear(Number(e.target.value))} 
                 className={styles.input} 
-                style={{ width: '80px' }} 
+                style={{ width: '70px', textAlign: 'center' }} 
               />
               <span>년</span>
               <input 
@@ -51,27 +61,41 @@ export default function AccountingHistory({
                 value={histMonth} 
                 onChange={e => setHistMonth(Number(e.target.value))} 
                 className={styles.input} 
-                style={{ width: '60px' }} 
+                style={{ width: '50px', textAlign: 'center' }} 
               />
-              <span>월 내역 조회</span>
+              <span>월 조회</span>
             </div>
+
+            <div className={styles.controlItem}>
+              <select value={targetDay} onChange={e => setTargetDay(e.target.value)} className={styles.input} style={{ width: '100px' }}>
+                <option value="all">전체 납기일</option>
+                <option value="말일">말일</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (<option key={d} value={String(d)}>{d}일</option>))}
+              </select>
+            </div>
+
+            <div className={styles.controlItem} style={{ flex: 1 }}>
+              <input placeholder="거래처명, 모델명 검색..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className={styles.input} style={{ width: '100%' }} />
+            </div>
+
+            <button onClick={onSearch} className={styles.saveBtn}>조회</button>
           </div>
 
           <div className={styles.tableContainer}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.th}>거래처명</th>
-                  <th className={styles.th}>정산 기기수</th>
-                  <th className={styles.th}>총 청구액</th>
-                  <th className={styles.th}>입금상태</th>
-                  <th className={styles.th}>관리</th>
+                  <th className={styles.th} style={{width:'300px'}}>거래처명</th>
+                  <th className={styles.th} style={{width:'100px'}}>기기수</th>
+                  <th className={styles.th} style={{width:'150px'}}>총 청구액</th>
+                  <th className={styles.th} style={{width:'100px'}}>입금상태</th>
+                  <th className={styles.th} style={{width:'160px'}}>관리</th>
                 </tr>
               </thead>
               <tbody>
                 {historyList.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className={styles.td} style={{ color: '#999', padding: '30px' }}>
+                    <td colSpan={5} className={styles.td} style={{ color: 'var(--notion-sub-text)', padding: '40px' }}>
                       조회된 내역이 없습니다.
                     </td>
                   </tr>
@@ -79,40 +103,52 @@ export default function AccountingHistory({
                   <React.Fragment key={hist.id}>
                     <tr 
                       onClick={() => toggleExpand(hist.id)} 
-                      style={{ cursor: 'pointer', backgroundColor: expandedId === hist.id ? '#f0f7ff' : 'transparent' }}
+                      style={{ cursor: 'pointer', backgroundColor: expandedId === hist.id ? 'var(--notion-soft-bg)' : 'transparent' }}
                     >
-                      <td className={styles.td} style={{ fontWeight: 'bold', textAlign: 'left', paddingLeft: '20px' }}>
-                        <span style={{ marginRight: '8px' }}>{expandedId === hist.id ? '▼' : '▶'}</span>
+                      <td className={styles.td} style={{ textAlign: 'left', padding: '16px 16px 16px 24px', fontWeight: '500' }}>
+                        <span style={{ marginRight: '8px', fontSize:'0.7rem', color:'#aaa' }}>{expandedId === hist.id ? '▼' : '▶'}</span>
                         {hist.client?.name}
                       </td>
-                      <td className={styles.td}>{hist.details?.length || 0}대</td>
-                      <td className={styles.td} style={{ color: '#0070f3', fontWeight: 'bold' }}>
+                      <td className={styles.td} style={{ padding: '16px' }}>{hist.details?.length || 0}대</td>
+                      <td className={styles.td} style={{ padding: '16px', color: 'var(--notion-blue)', fontWeight: '600' }}>
                         {hist.total_amount?.toLocaleString()}원
                       </td>
-                      <td className={styles.td}>
+                      <td className={styles.td} style={{ padding: '16px' }}>
                         <span style={{ 
                           fontSize: '0.75rem', 
-                          padding: '2px 6px', 
+                          padding: '4px 8px', 
                           borderRadius: '4px', 
-                          backgroundColor: hist.is_paid ? '#e6ffed' : '#fff1f0', 
-                          color: hist.is_paid ? '#52c41a' : '#f5222d',
-                          border: `1px solid ${hist.is_paid ? '#b7eb8f' : '#ffa39e'}`
+                          backgroundColor: hist.is_paid ? '#dbeddb' : '#ffe2dd', 
+                          color: hist.is_paid ? '#2eaadc' : '#d93025'
                         }}>
                           {hist.is_paid ? '입금완료' : '미입금'}
                         </span>
                       </td>
-                      <td className={styles.td}>
+                      <td className={styles.td} style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRebillHistory(hist.id);
+                            }} 
+                            style={{ 
+                              color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', 
+                              cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' 
+                            }}
+                            title="전체 재청구"
+                          >
+                            전체 재청구
+                          </button>
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteHistory(hist.id);
                             }} 
                             style={{ 
-                              color: '#d93025', border: '1px solid #ffccc7', background: 'white', 
+                              color: '#d93025', border: '1px solid #ffe2dd', background: 'white', 
                               cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' 
                             }}
-                            title="청구 이력을 삭제합니다."
+                            title="전체 삭제"
                           >
                             전체 삭제
                           </button>
@@ -121,29 +157,30 @@ export default function AccountingHistory({
                     </tr>
 
                     {expandedId === hist.id && (
-                      <tr style={{ backgroundColor: '#fafafa' }}>
-                        <td colSpan={5} style={{ padding: '20px' }}>
-                          <div style={{ backgroundColor: '#fff', border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                              <thead style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee' }}>
+                      <tr>
+                        <td colSpan={5} style={{ padding: '0', backgroundColor: '#fff' }}>
+                          <div style={{ borderTop: '1px solid var(--notion-border)', borderBottom: '1px solid var(--notion-border)' }}>
+                            <table className={styles.table} style={{ backgroundColor: '#fafafa' }}>
+                              <thead>
                                 <tr>
-                                  <th style={{ padding: '10px', color: '#666', width: '25%' }}>기계 모델 (S/N)</th>
-                                  <th style={{ padding: '10px', color: '#666', textAlign: 'center' }}>카운터 (전월 → 당월)</th>
-                                  <th style={{ padding: '10px', color: '#666', textAlign: 'center' }}>실사용량</th>
-                                  <th style={{ padding: '10px', color: '#666', textAlign: 'center' }}>청구 금액</th>
-                                  <th style={{ padding: '10px', color: '#666', textAlign: 'center', width: '140px' }}>관리</th>
+                                  <th className={styles.th} style={{ width: '20%' }}>기계 모델 (S/N)</th>
+                                  <th className={styles.th} style={{ width: '60px' }}>구분</th>
+                                  <th className={styles.th} style={{ width: '100px' }}>전월</th>
+                                  <th className={styles.th} style={{ width: '100px' }}>당월</th>
+                                  <th className={styles.th} style={{ width: '160px' }}>실사용량 (가중치)</th>
+                                  <th className={styles.th} style={{ width: '120px' }}>청구 금액</th>
+                                  <th className={styles.th} style={{ width: '100px' }}>관리</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {hist.details?.map((detail: any) => {
-                                  // 기계 상태 뱃지
                                   let badgeLabel = detail.inventory?.status || '설치';
-                                  let badgeStyle = { backgroundColor: '#f5f5f5', color: '#666', border: '1px solid #d9d9d9' };
-                                  let isComplexCase = false; // 교체/철수 케이스 여부
+                                  let badgeStyle = { backgroundColor: '#f1f1f0', color: '#37352f' };
+                                  let isComplexCase = false;
 
                                   if (detail.is_replacement_record) {
                                     badgeLabel = "교체(철수)";
-                                    badgeStyle = { backgroundColor: '#fff1f0', color: '#cf1322', border: '1px solid #ffa39e' };
+                                    badgeStyle = { backgroundColor: '#ffe2dd', color: '#d93025' };
                                     isComplexCase = true;
                                   } else {
                                     const isInstalledThisMonth = monthMachineHistory?.some(mh => 
@@ -151,75 +188,99 @@ export default function AccountingHistory({
                                     );
                                     if (isInstalledThisMonth) {
                                       badgeLabel = "교체(설치)";
-                                      badgeStyle = { backgroundColor: '#e6f7ff', color: '#096dd9', border: '1px solid #91d5ff' };
+                                      badgeStyle = { backgroundColor: '#d3e5ef', color: '#0070f3' };
                                       isComplexCase = true;
-                                    } else {
-                                      badgeLabel = "설치";
-                                      badgeStyle = { backgroundColor: '#f6ffed', color: '#389e0d', border: '1px solid #b7eb8f' };
                                     }
                                   }
 
+                                  const usageBW = detail.curr_count_bw - detail.prev_count_bw;
+                                  const usageCol = detail.curr_count_col - detail.prev_count_col;
+
                                   return (
-                                    <tr key={detail.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                      <td style={{ padding: '12px', textAlign: 'left' }}>
+                                    <tr key={detail.id} style={{ backgroundColor: '#fff' }}>
+                                      {/* ✅ 기계 정보 표시 수정: 상태 -> 모델명 -> S/N -> 청구일 */}
+                                      <td className={styles.td} style={{ textAlign: 'left', padding: '12px' }}>
                                         <div style={{ marginBottom: '4px' }}>
-                                          <span style={{
-                                            ...badgeStyle,
-                                            fontSize: '0.7rem',
-                                            padding: '2px 6px',
-                                            borderRadius: '4px',
-                                            fontWeight: '600'
-                                          }}>
+                                          <span style={{ ...badgeStyle, fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: '500' }}>
                                             {badgeLabel}
                                           </span>
                                         </div>
-                                        <div style={{ fontWeight: '600' }}>{detail.inventory?.model_name}</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#999' }}>{detail.inventory?.serial_number}</div>
+                                        <div style={{ fontWeight: '600', marginBottom: '2px' }}>{detail.inventory?.model_name}</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px' }}>{detail.inventory?.serial_number}</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#666' }}>청구일: {detail.inventory?.billing_date || '-'}</div>
                                       </td>
-                                      <td style={{ padding: '8px', verticalAlign: 'middle' }}>
-                                        <div className={styles.splitCellContainer} style={{ minHeight: 'auto', border: '1px solid #eee', borderRadius: '4px' }}>
-                                          <div style={{ display: 'flex', borderBottom: '1px solid #eee' }}>
-                                            <div style={{ flex: 1, padding: '4px', textAlign: 'center', backgroundColor: '#fafafa', color: '#666', borderRight: '1px solid #eee' }}>{detail.prev_count_bw}</div>
-                                            <div style={{ flex: 1, padding: '4px', textAlign: 'center', backgroundColor: 'rgba(0,112,243,0.05)', color: '#0070f3' }}>{detail.prev_count_col}</div>
-                                          </div>
-                                          <div style={{ display: 'flex' }}>
-                                            <div style={{ flex: 1, padding: '4px', textAlign: 'center', backgroundColor: '#fafafa', color: '#666', fontWeight:'bold', borderRight: '1px solid #eee' }}>{detail.curr_count_bw}</div>
-                                            <div style={{ flex: 1, padding: '4px', textAlign: 'center', backgroundColor: 'rgba(0,112,243,0.05)', color: '#0070f3', fontWeight:'bold' }}>{detail.curr_count_col}</div>
-                                          </div>
+                                      
+                                      <td className={styles.td} style={{ padding: '0' }}>
+                                        <div className={styles.splitCellContainer}>
+                                          <div className={styles.rowGray}>흑백</div>
+                                          <div className={styles.rowBlue}>칼라</div>
+                                          <div className={styles.rowGray}>흑백(A3)</div>
+                                          <div className={`${styles.rowBlue} ${styles.rowLast}`}>칼라(A3)</div>
                                         </div>
                                       </td>
-                                      <td style={{ padding: '12px', textAlign: 'center', verticalAlign: 'middle' }}>
-                                        <div style={{ fontSize: '0.85rem' }}>
-                                          <div>흑: <strong>{(detail.curr_count_bw - detail.prev_count_bw).toLocaleString()}</strong></div>
-                                          <div>칼: <strong style={{color:'#0070f3'}}>{(detail.curr_count_col - detail.prev_count_col).toLocaleString()}</strong></div>
+
+                                      <td className={styles.td} style={{ padding: '0' }}>
+                                        <div className={styles.splitCellContainer}>
+                                          <div className={styles.rowGray}>{detail.prev_count_bw.toLocaleString()}</div>
+                                          <div className={styles.rowBlue}>{detail.prev_count_col.toLocaleString()}</div>
+                                          <div className={styles.rowGray}>{detail.prev_count_bw_a3?.toLocaleString() || 0}</div>
+                                          <div className={`${styles.rowBlue} ${styles.rowLast}`}>{detail.prev_count_col_a3?.toLocaleString() || 0}</div>
                                         </div>
                                       </td>
-                                      <td style={{ padding: '12px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', color: '#333' }}>
+
+                                      <td className={styles.td} style={{ padding: '0' }}>
+                                        <div className={styles.splitCellContainer}>
+                                          <div className={styles.rowGray} style={{ fontWeight:'bold' }}>{detail.curr_count_bw.toLocaleString()}</div>
+                                          <div className={styles.rowBlue} style={{ fontWeight:'bold' }}>{detail.curr_count_col.toLocaleString()}</div>
+                                          <div className={styles.rowGray} style={{ fontWeight:'bold' }}>{detail.curr_count_bw_a3?.toLocaleString() || 0}</div>
+                                          <div className={`${styles.rowBlue} ${styles.rowLast}`} style={{ fontWeight:'bold' }}>{detail.curr_count_col_a3?.toLocaleString() || 0}</div>
+                                        </div>
+                                      </td>
+
+                                      <td className={styles.td} style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', lineHeight: '1.6', verticalAlign: 'top' }}>
+                                        <div style={{ fontWeight: '600', color: '#555', marginBottom: '2px' }}>기본매수</div>
+                                        <div style={{ display:'flex', justifyContent:'space-between', color: '#666', marginBottom:'2px' }}>
+                                          <span>흑백:</span> <span>0</span>
+                                        </div>
+                                        <div style={{ display:'flex', justifyContent:'space-between', color: '#0070f3', marginBottom:'4px' }}>
+                                          <span>칼라:</span> <span>0</span>
+                                        </div>
+                                        
+                                        <div style={{ borderTop: '1px solid #eee', margin: '6px 0' }}></div>
+                                        
+                                        <div style={{ fontWeight: '600', color: '#d93025', marginBottom: '2px' }}>추가매수</div>
+                                        <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025', marginBottom:'2px' }}>
+                                          <span>흑백:</span> <span>0</span>
+                                        </div>
+                                        <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025' }}>
+                                          <span>칼라:</span> <span>0</span>
+                                        </div>
+                                      </td>
+
+                                      <td className={styles.td} style={{ padding: '12px', verticalAlign: 'middle', fontWeight: 'bold' }}>
                                         {detail.calculated_amount?.toLocaleString()}원
                                       </td>
-                                      <td style={{ padding: '12px', textAlign: 'center', verticalAlign: 'middle' }}>
+                                      
+                                      <td className={styles.td} style={{ padding: '12px', verticalAlign: 'middle' }}>
                                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                          {/* ✅ 기계별 재청구 버튼 (모두 표시) */}
                                           <button 
                                             onClick={() => handleDetailRebill(hist.id, detail.id, detail.inventory_id, detail.is_replacement_record, hist.client_id)}
                                             style={{
-                                              color: '#0070f3', border: '1px solid #91d5ff', background: 'white',
+                                              color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white',
                                               cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem'
                                             }}
-                                            title="이 기계만 청구를 취소하고 [사용매수 등록]에 다시 표시합니다."
+                                            title="이 기계만 청구 취소"
                                           >
                                             재청구
                                           </button>
-                                          
-                                          {/* ✅ 개별 삭제 버튼: 일반 기계는 숨김, 복잡한 케이스(교체/철수)만 표시 */}
                                           {isComplexCase && (
                                             <button 
                                               onClick={() => handleDeleteDetail(hist.id, detail.id, detail.inventory_id, detail.calculated_amount, detail.is_replacement_record)}
                                               style={{
-                                                backgroundColor: '#fff', border: '1px solid #ffccc7', color: '#d93025',
+                                                backgroundColor: '#fff', border: '1px solid #ffe2dd', color: '#d93025',
                                                 cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem'
                                               }}
-                                              title="이 기계의 기록을 완전히 삭제하여 목록에서 제거합니다."
+                                              title="완전 삭제"
                                             >
                                               삭제
                                             </button>
@@ -232,7 +293,7 @@ export default function AccountingHistory({
                               </tbody>
                             </table>
                             {hist.memo && (
-                              <div style={{ padding: '10px 20px', borderTop: '1px solid #eee', fontSize: '0.8rem', color: '#666', backgroundColor: '#fffbe6' }}>
+                              <div style={{ marginTop: '10px', padding: '10px', border: '1px solid #f9f0ff', fontSize: '0.85rem', color: '#666', backgroundColor: '#fcfcfc', borderRadius: '6px', margin: '16px' }}>
                                 📌 비고: {hist.memo}
                               </div>
                             )}

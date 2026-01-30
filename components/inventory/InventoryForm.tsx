@@ -17,26 +17,41 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [clients, setClients] = useState<any[]>([])
+  
+  // S/N 중복 에러 상태 관리
+  const [snError, setSnError] = useState<string | null>(null)
 
-  // 폼 데이터 초기값 (요금제 필드 추가)
+  // 폼 데이터 초기값 (요청하신 종류/구분 기본값 반영)
   const initialData = {
-    type: '복합기', category: '컬러겸용', brand: '', model_name: '', serial_number: '',
-    product_condition: '새제품', status: '창고', client_id: '', purchase_date: '',
-    purchase_price: 0, initial_count_bw: 0, initial_count_col: 0,
-    initial_count_bw_a3: 0, initial_count_col_a3: 0, memo: '',
-    // ✅ [추가] 요금제 관련 필드
-    billing_date: '말일',
+    type: 'A3 레이저복합기', 
+    category: '컬러',
+    brand: '', 
+    model_name: '', 
+    serial_number: '',
+    product_condition: '새제품', 
+    status: '창고', 
+    client_id: '', 
+    purchase_date: '',
+    purchase_price: 0, 
+    initial_count_bw: 0, 
+    initial_count_col: 0,
+    initial_count_bw_a3: 0, 
+    initial_count_col_a3: 0, 
+    memo: '',
+    // 요금제 관련 필드
+    billing_date: '말',
     plan_basic_fee: 0,
-    plan_basic_cnt_bw: 0,
-    plan_basic_cnt_col: 0,
-    plan_price_bw: 0,
-    plan_price_col: 0,
+    plan_basic_cnt_bw: 1000,
+    plan_basic_cnt_col: 100,
+    plan_price_bw: 10,
+    plan_price_col: 100,
     plan_weight_a3_bw: 1,
-    plan_weight_a3_col: 1
+    plan_weight_a3_col: 2
   }
 
   const [formData, setFormData] = useState(initialData)
 
+  // 거래처 목록 불러오기
   useEffect(() => {
     const fetchClients = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -49,15 +64,16 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
     fetchClients()
   }, [])
 
+  // 폼 열릴 때 데이터 설정
   useEffect(() => {
     if (isOpen) {
+      setSnError(null) // 에러 초기화
       if (editData) {
         setFormData({
-          ...initialData, // 기본값 깔고 병합
+          ...initialData,
           ...editData,
           client_id: editData.client_id || '',
           purchase_date: editData.purchase_date || '',
-          // 요금제 데이터가 없으면 기본값(0 or 1) 유지
           billing_date: editData.billing_date || '말일',
           plan_basic_fee: editData.plan_basic_fee || 0,
           plan_basic_cnt_bw: editData.plan_basic_cnt_bw || 0,
@@ -73,11 +89,64 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
     }
   }, [isOpen, editData])
 
+  // ✨ S/N 중복 체크 함수 (boolean 반환 추가)
+  const checkSnDuplicate = async (sn: string) => {
+    if (!sn.trim()) {
+      setSnError(null)
+      return false
+    }
+
+    // 수정 모드일 경우 자기 자신은 제외하고 체크
+    let query = supabase
+      .from('inventory')
+      .select('id')
+      .eq('serial_number', sn)
+    
+    if (editData && editData.id) {
+      query = query.neq('id', editData.id)
+    }
+
+    const { data } = await query.maybeSingle()
+
+    if (data) {
+      setSnError('⚠️ 이미 등록된 S/N입니다.')
+      return true // 중복임
+    } else {
+      setSnError(null)
+      return false // 중복 아님
+    }
+  }
+
+  // ✨ 실시간 중복 체크 (useEffect 사용)
+  // 사용자가 타이핑할 때마다 검사 (0.3초 디바운스 적용하여 부하 방지)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formData.serial_number) {
+        checkSnDuplicate(formData.serial_number)
+      } else {
+        setSnError(null)
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [formData.serial_number])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // ✨ 필수값 검증 (브랜드, 모델명, S/N)
+    if (!formData.brand.trim()) return alert('브랜드를 입력해주세요.')
+    if (!formData.model_name.trim()) return alert('모델명을 입력해주세요.')
+    if (!formData.serial_number.trim()) return alert('Serial Number(S/N)를 입력해주세요.')
+    
+    // ✨ 저장 직전 최종 S/N 중복 체크 (타이핑 후 바로 엔터 치는 경우 대비)
+    const isDuplicate = await checkSnDuplicate(formData.serial_number)
+    if (isDuplicate) return alert('중복된 S/N입니다. 다른 번호를 입력해주세요.')
+
     if (formData.status === '설치' && !formData.client_id) return alert('설치 상태일 경우 거래처를 선택해야 합니다.')
     
-    if (editData) {
+    // 상태 변경 유효성 검사 (수정 모드일 때만)
+    if (editData && editData.id) {
       if ((editData.status === '교체전(철수)' || editData.status === '설치') && formData.status === '창고') {
         alert("거래처에 등록된 기계는 직접 '창고'로 변경할 수 없습니다. [거래처 관리]에서 '철수' 기능을 이용하시거나 정산을 완료해주세요.");
         return;
@@ -97,7 +166,6 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
         client_id: formData.client_id || null,
         purchase_date: formData.purchase_date || null,
         purchase_price: Number(formData.purchase_price) || 0,
-        // ✅ [추가] 요금제 숫자 변환 저장
         plan_basic_fee: Number(formData.plan_basic_fee),
         plan_basic_cnt_bw: Number(formData.plan_basic_cnt_bw),
         plan_basic_cnt_col: Number(formData.plan_basic_cnt_col),
@@ -108,7 +176,9 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
         last_status_updated_at: new Date().toISOString()
       }
 
-      const { error } = editData 
+      const isEditMode = editData && editData.id;
+
+      const { error } = isEditMode
         ? await supabase.from('inventory').update(payload).eq('id', editData.id) 
         : await supabase.from('inventory').insert(payload)
       
@@ -119,17 +189,28 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
 
   if (!isOpen) return null
 
+  const isEditMode = editData && editData.id;
+
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
-        <h2 className={styles.title}>{editData ? '✏️ 장비 수정' : '📦 신규 등록'}</h2>
+        <h2 className={styles.title}>{isEditMode ? '✏️ 장비 수정' : '📦 신규 등록'}</h2>
         <form onSubmit={handleSubmit}>
+          {/* ✨ 요청하신 종류 및 구분 옵션 업데이트 */}
           <div className={styles.grid3}>
             <InputField label="종류" as="select" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
-              <option value="복합기">복합기</option><option value="프린터">프린터</option>
+              <option value="A3 레이저복합기">A3 레이저복합기</option>
+              <option value="A4 레이저복합기">A4 레이저복합기</option>
+              <option value="A3 레이저프린터">A3 레이저프린터</option>
+              <option value="A4 레이저프린터">A4 레이저프린터</option>
+              <option value="A3 잉크젯복합기">A3 잉크젯복합기</option>
+              <option value="A4 잉크젯복합기">A4 잉크젯복합기</option>
+              <option value="A3 잉크젯프린터">A3 잉크젯프린터</option>
+              <option value="A4 잉크젯프린터">A4 잉크젯프린터</option>
             </InputField>
             <InputField label="구분" as="select" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
-              <option value="컬러겸용">컬러겸용</option><option value="흑백전용">흑백전용</option>
+              <option value="컬러">컬러</option>
+              <option value="흑백">흑백</option>
             </InputField>
             <InputField label="상태" as="select" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value, client_id: e.target.value === '설치' ? formData.client_id : '' })}>
               <option value="창고">창고</option><option value="설치">설치됨</option>
@@ -144,7 +225,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
               {clients.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </InputField>
 
-            {/* ✅ [추가] 상태가 '설치'일 때만 요금제 입력란 표시 */}
+            {/* 상태가 '설치'일 때만 요금제 입력란 표시 */}
             {formData.status === '설치' && (
               <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px dashed #0070f3' }}>
                 <div className={styles.sectionTitle} style={{ color: '#0070f3' }}>💰 요금제 설정</div>
@@ -184,10 +265,37 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
           </div>
 
           <div className={styles.grid2}>
-            <InputField label="브랜드" value={formData.brand} onChange={e => setFormData({ ...formData, brand: e.target.value })} />
-            <InputField required label="모델명 *" value={formData.model_name} onChange={e => setFormData({ ...formData, model_name: e.target.value })} />
+            {/* ✨ 필수값 명시 */}
+            <InputField 
+              label="브랜드 *" 
+              required
+              value={formData.brand} 
+              onChange={e => setFormData({ ...formData, brand: e.target.value })} 
+            />
+            <InputField 
+              label="모델명 *" 
+              required
+              value={formData.model_name} 
+              onChange={e => setFormData({ ...formData, model_name: e.target.value })} 
+            />
           </div>
-          <InputField required label="S/N *" value={formData.serial_number} onChange={e => setFormData({ ...formData, serial_number: e.target.value })} />
+
+          {/* ✨ S/N 실시간 중복 체크 및 경고 표시 */}
+          <div style={{ marginBottom: '16px' }}>
+            <InputField 
+              label="S/N *" 
+              required
+              value={formData.serial_number} 
+              style={{ marginBottom: snError ? '4px' : '0' }}
+              onChange={e => setFormData({ ...formData, serial_number: e.target.value })}
+            />
+            {snError && (
+              <div style={{ color: '#d93025', fontSize: '0.8rem', fontWeight: '500', paddingLeft: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {snError}
+              </div>
+            )}
+          </div>
+
           <div className={styles.highlightBox}>
             <div className={styles.sectionTitle}>🔢 초기 카운터</div>
             <div className={styles.grid2}>
