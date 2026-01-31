@@ -46,7 +46,7 @@ export default function Header() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '0 24px', // 여백 조정
+      padding: '0 40px', // 여백 조정
       position: 'sticky',
       top: 0,
       zIndex: 90

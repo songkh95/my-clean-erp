@@ -1,20 +1,45 @@
 // utils/billingCalculator.ts
+import { Inventory, Client } from '@/app/types';// ✅ 방금 만든 타입 가져오기
+
+// 계산된 결과의 상세 타입 정의
+export interface CalculatedAsset extends Inventory {
+  // Inventory 타입을 상속받고, 계산에 필요한 필드 추가
+  inv: any; // (기존 코드 호환성을 위해 잠시 유지, 추후 제거 목표)
+  inventory_id: string;
+  prev: { bw: number; col: number; bw_a3: number; col_a3: number };
+  curr: { bw: number; col: number; bw_a3: number; col_a3: number };
+  usage: { bw: number; col: number; bw_a3: number; col_a3: number };
+  converted: { bw: number; col: number };
+  usageBreakdown: { basicBW: number; extraBW: number; basicCol: number; extraCol: number };
+  plan: {
+    basic_fee: number;
+    free_bw: number;
+    free_col: number;
+    price_bw: number;
+    price_col: number;
+  };
+  rowCost: { basic: number; extra: number; total: number };
+  isGroupLeader: boolean;
+  groupSpan: number;
+  
+  // 철수/교체 관련 플래그
+  is_replacement_before?: boolean;
+  is_replacement_after?: boolean;
+  is_withdrawal?: boolean;
+  final_counts?: any;
+}
 
 export interface BillCalculationResult {
-  details: any[];
+  details: CalculatedAsset[];
   totalAmount: number;
 }
 
 /**
  * 특정 거래처의 기계 목록에 대한 청구 금액을 계산하는 핵심 함수
- * @param client 거래처 객체
- * @param assets 해당 거래처에 설치된 기계 리스트 (inventoryMap[client.id])
- * @param prevData 전월 카운터 데이터 객체
- * @param inputData 당월 입력 카운터 데이터 객체
  */
 export const calculateClientBill = (
-  client: any,
-  assets: any[],
+  client: Client, // ✅ any -> Client
+  assets: any[], // (여기는 로직상 가공된 객체가 들어와서 일단 any 유지, 추후 Inventory[] & 확장타입으로 변경)
   prevData: { [key: string]: any },
   inputData: { [key: string]: any }
 ): BillCalculationResult => {
@@ -23,7 +48,10 @@ export const calculateClientBill = (
   }
 
   // 1. 각 기계별 사용량 계산 (1차 가공)
-  let tempCalculations: any[] = assets.map(inv => {
+  let tempCalculations: CalculatedAsset[] = assets.map(inv => {
+    // 전월 데이터 안전하게 가져오기 (없으면 0)
+    // 💡 [개선] 최초 설치의 경우 prevData가 없으므로 초기 카운터(initial_count)를 사용하도록 로직 보완 필요
+    // 현재는 0으로 처리 중
     const p = prevData[inv.id] || { bw: 0, col: 0, bw_a3: 0, col_a3: 0 };
     
     // 철수/교체 전 기계는 final_counts 사용, 그 외는 inputData 사용
@@ -43,7 +71,8 @@ export const calculateClientBill = (
     const convertedCol = usageRawCol + (usageRawCol_A3 * weightCol);
 
     return {
-      inv,
+      ...inv, // 기존 asset 속성 복사
+      inv,    // 원본 참조 (레거시 호환용)
       inventory_id: inv.id,
       model_name: inv.model_name,
       serial_number: inv.serial_number,
@@ -67,7 +96,7 @@ export const calculateClientBill = (
   });
 
   // 2. 청구 그룹별로 묶기 (합산 청구 로직)
-  const groups: { [key: string]: any[] } = {};
+  const groups: { [key: string]: CalculatedAsset[] } = {};
   tempCalculations.forEach(calc => {
     // 그룹 ID가 없으면 기계 ID를 사용하여 개별 그룹으로 취급
     const groupKey = calc.billing_group_id || `INDIVIDUAL_${calc.inventory_id}`;

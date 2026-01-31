@@ -4,10 +4,9 @@ import styles from './accounting.module.css'
 import AccountingRegistration from '@/components/accounting/AccountingRegistration'
 import AccountingHistory from '@/components/accounting/AccountingHistory'
 import SettlementConfirmModal from '@/components/accounting/SettlementConfirmModal'
-import { useAccounting } from './hooks/useAccounting' // 👈 경로 수정됨
+import { useAccounting } from './hooks/useAccounting'
 
 export default function AccountingPage() {
-  // 훅에서 모든 데이터와 함수를 가져옵니다.
   const {
     loading, isModalOpen, setIsModalOpen,
     regYear, setRegYear, regMonth, setRegMonth, targetDay, setTargetDay, searchTerm, setSearchTerm,
@@ -19,7 +18,9 @@ export default function AccountingPage() {
     
     handleSearch, handleHistSearch, handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk,
     calculateClientBillFiltered, calculateSelectedTotal, handlePreSave, handleFinalSave,
-    handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset
+    
+    handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset, 
+    togglePaymentStatus, toggleDetailPaymentStatus // ✅ 함수 가져오기
   } = useAccounting()
 
   return (
@@ -58,6 +59,8 @@ export default function AccountingPage() {
         targetDay={histTargetDay} setTargetDay={setHistTargetDay}
         searchTerm={histSearchTerm} setSearchTerm={setHistSearchTerm}
         onSearch={handleHistSearch}
+        togglePaymentStatus={togglePaymentStatus}
+        toggleDetailPaymentStatus={toggleDetailPaymentStatus} // ✅ Props 전달
       />
       
       {isModalOpen && (

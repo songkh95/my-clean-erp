@@ -1,7 +1,9 @@
-// hooks/useAccounting.ts
+// app/accounting/hooks/useAccounting.ts
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/utils/supabase'
 import { calculateClientBill } from '@/utils/billingCalculator'
+// ✅ [수정 1] 경로 수정: app 폴더 밖이므로 '@/types'가 맞습니다.
+import { Client, Inventory, Settlement, MachineHistory } from '@/app/types'
 
 export function useAccounting() {
   const supabase = createClient()
@@ -22,7 +24,9 @@ export function useAccounting() {
   })
 
   const [isRegOpen, setIsRegOpen] = useState(true)
-  const [clients, setClients] = useState<any[]>([])
+  
+  // 타입 적용
+  const [clients, setClients] = useState<Client[]>([])
   const [inventoryMap, setInventoryMap] = useState<{[key: string]: any[]}>({}) 
   const [inputData, setInputData] = useState<{[key: string]: any}>({}) 
   const [prevData, setPrevData] = useState<{[key: string]: any}>({})
@@ -31,7 +35,10 @@ export function useAccounting() {
 
   // 2. 이력 탭 상태
   const [isHistOpen, setIsHistOpen] = useState(true)
-  const [historyList, setHistoryList] = useState<any[]>([])
+  
+  // 타입 적용
+  const [historyList, setHistoryList] = useState<Settlement[]>([])
+  
   const [histYear, setHistYear] = useState(new Date().getFullYear())
   const [histMonth, setHistMonth] = useState(new Date().getMonth() + 1)
   const [histTargetDay, setHistTargetDay] = useState('all')
@@ -42,7 +49,9 @@ export function useAccounting() {
     day: 'all',
     term: ''
   })
-  const [monthMachineHistory, setMonthMachineHistory] = useState<any[]>([])
+  
+  // 타입 적용
+  const [monthMachineHistory, setMonthMachineHistory] = useState<MachineHistory[]>([])
 
   // 데이터 조회 함수들
   const fetchRegistrationData = useCallback(async () => {
@@ -128,7 +137,7 @@ export function useAccounting() {
 
     let query = supabase
       .from('settlements')
-      .select(`*, client:client_id(name), details:settlement_details(*, inventory:inventory_id(model_name, serial_number, status, billing_date))`)
+      .select(`*, client:client_id(name, business_number, representative_name, email, address), details:settlement_details(*, inventory:inventory_id(model_name, serial_number, status, billing_date))`)
       .eq('organization_id', orgId)
       .eq('billing_year', histFilterConfig.year)
       .eq('billing_month', histFilterConfig.month)
@@ -159,9 +168,11 @@ export function useAccounting() {
     const startDate = new Date(histFilterConfig.year, histFilterConfig.month - 1, 1).toISOString()
     const endDate = new Date(histFilterConfig.year, histFilterConfig.month, 0, 23, 59, 59).toISOString()
 
+    // ✅ [수정 2] MachineHistory 타입에 맞게 모든 필드('*')를 가져오도록 수정
+    // 기존에는 일부 필드만 가져와서 타입 에러가 났었습니다.
     const { data: mHistory } = await supabase
       .from('machine_history')
-      .select('inventory_id, action_type, memo')
+      .select('*') 
       .eq('organization_id', orgId)
       .gte('recorded_at', startDate)
       .lte('recorded_at', endDate)
@@ -327,7 +338,8 @@ export function useAccounting() {
           prev_count_bw: d.prev.bw, curr_count_bw: d.curr.bw, prev_count_col: d.prev.col, curr_count_col: d.curr.col,
           prev_count_bw_a3: d.prev.bw_a3, curr_count_bw_a3: d.curr.bw_a3, prev_count_col_a3: d.prev.col_a3, curr_count_col_a3: d.curr.col_a3,
           calculated_amount: finalAmount,
-          is_replacement_record: (d.inv.is_replacement_before || d.inv.is_withdrawal) ? true : false
+          is_replacement_record: (d.inv.is_replacement_before || d.inv.is_withdrawal) ? true : false,
+          is_paid: false // 기본값
         }
       })
       await supabase.from('settlement_details').insert(detailsPayload)
@@ -442,7 +454,8 @@ export function useAccounting() {
       }
 
       await supabase.from('settlement_details').insert({
-        settlement_id: settlementId, inventory_id: asset.inventory_id, prev_count_bw: asset.prev.bw, curr_count_bw: asset.prev.bw, prev_count_col: asset.prev.col, curr_count_col: asset.prev.col, prev_count_bw_a3: asset.prev.bw_a3, curr_count_bw_a3: asset.prev.bw_a3, prev_count_col_a3: asset.prev.col_a3, curr_count_col_a3: asset.prev.col_a3, calculated_amount: 0, is_replacement_record: (asset.inv.is_replacement_before || asset.inv.is_withdrawal) ? true : false
+        settlement_id: settlementId, inventory_id: asset.inventory_id, prev_count_bw: asset.prev.bw, curr_count_bw: asset.prev.bw, prev_count_col: asset.prev.col, curr_count_col: asset.prev.col, prev_count_bw_a3: asset.prev.bw_a3, curr_count_bw_a3: asset.prev.bw_a3, prev_count_col_a3: asset.prev.col_a3, curr_count_col_a3: asset.prev.col_a3, calculated_amount: 0, is_replacement_record: (asset.inv.is_replacement_before || asset.inv.is_withdrawal) ? true : false,
+        is_paid: false
       });
 
       if (asset.inv.is_replacement_before || asset.inv.is_withdrawal) {
@@ -453,8 +466,40 @@ export function useAccounting() {
     } catch (e: any) { alert('처리 중 오류 발생: ' + e.message); } finally { setLoading(false); }
   }
 
+  const togglePaymentStatus = async (id: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
+    const { error: hErr } = await supabase.from('settlements').update({ is_paid: newStatus }).eq('id', id);
+    if (hErr) return alert('상태 변경 실패: ' + hErr.message);
+    await supabase.from('settlement_details').update({ is_paid: newStatus }).eq('settlement_id', id);
+    setHistoryList(prev => prev.map(item => {
+      if (item.id === id) {
+        // ✅ [수정 3] details가 없거나 undefined일 수 있으므로 안전하게 처리
+        const updatedDetails = item.details 
+          ? item.details.map((d: any) => ({ ...d, is_paid: newStatus })) 
+          : [];
+        return { ...item, is_paid: newStatus, details: updatedDetails };
+      }
+      return item;
+    }));
+  }
+
+  const toggleDetailPaymentStatus = async (settlementId: string, detailId: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
+    const { error } = await supabase.from('settlement_details').update({ is_paid: newStatus }).eq('id', detailId);
+    if (error) return alert('상태 변경 실패: ' + error.message);
+    setHistoryList(prev => prev.map(item => {
+      if (item.id === settlementId) {
+        // ✅ [수정 3] details 안전 처리
+        const updatedDetails = item.details 
+          ? item.details.map((d: any) => d.id === detailId ? { ...d, is_paid: newStatus } : d) 
+          : [];
+        return { ...item, details: updatedDetails };
+      }
+      return item;
+    }));
+  }
+
   return {
-    // State
     loading, isModalOpen, setIsModalOpen,
     regYear, setRegYear, regMonth, setRegMonth, targetDay, setTargetDay, searchTerm, setSearchTerm,
     isRegOpen, setIsRegOpen,
@@ -463,9 +508,10 @@ export function useAccounting() {
     histYear, setHistYear, histMonth, setHistMonth, histTargetDay, setHistTargetDay, histSearchTerm, setHistSearchTerm,
     monthMachineHistory, clients,
     
-    // Actions
     handleSearch, handleHistSearch, handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk,
     calculateClientBillFiltered, calculateSelectedTotal, handlePreSave, handleFinalSave,
-    handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset
+    
+    handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset, 
+    togglePaymentStatus, toggleDetailPaymentStatus 
   }
 }

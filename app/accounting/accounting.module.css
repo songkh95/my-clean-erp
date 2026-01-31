@@ -107,6 +107,7 @@
   background-color: #fafafa;
   border: 1px solid #e5e5e5;
   white-space: nowrap;
+  position: relative; /* ✨ 추가됨: 리사이저 위치 잡기 위해 필수 */
 }
 
 .td {
@@ -238,6 +239,28 @@
 
 .saveBtn:hover { opacity: 0.9; }
 .saveBtn:disabled { background-color: #e5e5e5; color: #a0a0a0; cursor: not-allowed; }
+/* 리사이저 핸들 (드래그 가능한 세로선) */
+.resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px; /* 잡을 수 있는 영역 너비 */
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+  z-index: 10;
+  /* 평소에는 투명하다가 호버 시 살짝 보임 */
+  background-color: transparent; 
+  transition: background-color 0.2s;
+}
+
+/* 마우스를 올리거나 드래그 중일 때 색상 표시 */
+.resizer:hover,
+.resizerActive {
+  background-color: var(--notion-blue); /* 파란색 강조 */
+  opacity: 0.5;
+}
 
 /* 모달 스타일 */
 .modalOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.4); display: flex; justify-content: center; align-items: center; z-index: 1000; }
