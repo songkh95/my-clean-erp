@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react' // ✅ Suspense 추가
 import { createClient } from '@/utils/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function LoginPage() {
-
+// ✅ 1. useSearchParams를 사용하는 로직을 별도 컴포넌트로 분리
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
@@ -34,32 +34,41 @@ export default function LoginPage() {
     } else {
       alert('로그인 성공!')
       router.push('/')
-      router.refresh() // 메인 화면 정보를 새로고침하기 위해 추가
+      router.refresh()
     }
   }
 
   return (
+    <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <input 
+        type="email" 
+        placeholder="이메일 입력" 
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required 
+      />
+      <input 
+        type="password" 
+        placeholder="비밀번호 입력" 
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required 
+      />
+      <button type="submit" style={{ backgroundColor: 'blue', color: 'white', cursor: 'pointer', padding: '10px' }}>
+        로그인하기
+      </button>
+    </form>
+  )
+}
+
+// ✅ 2. 메인 페이지 컴포넌트에서 Suspense로 감싸기
+export default function LoginPage() {
+  return (
     <div style={{ padding: '40px', maxWidth: '400px', margin: '0 auto' }}>
       <h1>ERP 로그인</h1>
-      <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <input 
-          type="email" 
-          placeholder="이메일 입력" 
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required 
-        />
-        <input 
-          type="password" 
-          placeholder="비밀번호 입력" 
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required 
-        />
-        <button type="submit" style={{ backgroundColor: 'blue', color: 'white', cursor: 'pointer', padding: '10px' }}>
-          로그인하기
-        </button>
-      </form>
+      <Suspense fallback={<div>로딩 중...</div>}>
+        <LoginForm />
+      </Suspense>
     </div>
   )
 }
