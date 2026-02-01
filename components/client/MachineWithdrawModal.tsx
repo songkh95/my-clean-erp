@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase'
-import Button from './../ui/Button'
-import InputField from './../ui/Input'
+import Button from '@/components/ui/Button'
+import InputField from '@/components/ui/Input'
+import { Inventory } from '@/app/types'
 
 interface Props {
-  asset: any
+  asset: Inventory // ✅ any 제거
   clientId: string
   onClose: () => void
   onSuccess: () => void
@@ -48,7 +49,6 @@ export default function MachineWithdrawModal({ asset, clientId, onClose, onSucce
       const { error } = await supabase.from('inventory').update({
         status: '창고',
         client_id: null,
-        last_status_updated_at: new Date().toISOString()
       }).eq('id', asset.id)
 
       if (error) throw error

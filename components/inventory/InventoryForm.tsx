@@ -5,24 +5,49 @@ import { createClient } from '@/utils/supabase'
 import Button from './../ui/Button'
 import InputField from './../ui/Input'
 import styles from './InventoryForm.module.css'
+import { Inventory, Client } from '@/app/types'
 
 interface Props {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  editData?: any
+  editData?: Inventory | null | Partial<Inventory>
+}
+
+interface InventoryFormState {
+  type: string
+  category: string
+  brand: string
+  model_name: string
+  serial_number: string
+  product_condition: string
+  status: string
+  client_id: string
+  purchase_date: string
+  purchase_price: number
+  initial_count_bw: number
+  initial_count_col: number
+  initial_count_bw_a3: number;
+  initial_count_col_a3: number;
+  memo: string
+  billing_date: string
+  plan_basic_fee: number
+  plan_basic_cnt_bw: number
+  plan_basic_cnt_col: number
+  plan_price_bw: number
+  plan_price_col: number
+  plan_weight_a3_bw: number;
+  plan_weight_a3_col: number;
 }
 
 export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: Props) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
-  const [clients, setClients] = useState<any[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   
-  // S/N 중복 에러 상태 관리
   const [snError, setSnError] = useState<string | null>(null)
 
-  // 폼 데이터 초기값 (요청하신 종류/구분 기본값 반영)
-  const initialData = {
+  const initialData: InventoryFormState = {
     type: 'A3 레이저복합기', 
     category: '컬러',
     brand: '', 
@@ -38,8 +63,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
     initial_count_bw_a3: 0, 
     initial_count_col_a3: 0, 
     memo: '',
-    // 요금제 관련 필드
-    billing_date: '말',
+    billing_date: '말일',
     plan_basic_fee: 0,
     plan_basic_cnt_bw: 1000,
     plan_basic_cnt_col: 100,
@@ -49,29 +73,30 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
     plan_weight_a3_col: 2
   }
 
-  const [formData, setFormData] = useState(initialData)
+  const [formData, setFormData] = useState<InventoryFormState>(initialData)
 
-  // 거래처 목록 불러오기
   useEffect(() => {
     const fetchClients = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
       if (profile?.organization_id) {
-        const { data } = await supabase.from('clients').select('id, name').eq('organization_id', profile.organization_id).eq('is_deleted', false).order('name')
-        if (data) setClients(data)
+        const { data } = await supabase.from('clients').select('id, name, organization_id').eq('organization_id', profile.organization_id).eq('is_deleted', false).order('name')
+        if (data) setClients(data as Client[])
       }
     }
     fetchClients()
   }, [])
 
-  // 폼 열릴 때 데이터 설정
   useEffect(() => {
     if (isOpen) {
-      setSnError(null) // 에러 초기화
+      setSnError(null)
       if (editData) {
+        // ✅ [수정 핵심] client 객체와 불필요한 필드를 구조 분해 할당으로 제거 (created_at 등)
+        const { client, created_at, ...restData } = editData as any;
+
         setFormData({
           ...initialData,
-          ...editData,
+          ...restData, // client가 제거된 데이터만 병합
           client_id: editData.client_id || '',
           purchase_date: editData.purchase_date || '',
           billing_date: editData.billing_date || '말일',
@@ -89,18 +114,13 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
     }
   }, [isOpen, editData])
 
-  // ✨ S/N 중복 체크 함수 (boolean 반환 추가)
   const checkSnDuplicate = async (sn: string) => {
     if (!sn.trim()) {
       setSnError(null)
       return false
     }
 
-    // 수정 모드일 경우 자기 자신은 제외하고 체크
-    let query = supabase
-      .from('inventory')
-      .select('id')
-      .eq('serial_number', sn)
+    let query = supabase.from('inventory').select('id').eq('serial_number', sn)
     
     if (editData && editData.id) {
       query = query.neq('id', editData.id)
@@ -110,15 +130,13 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
 
     if (data) {
       setSnError('⚠️ 이미 등록된 S/N입니다.')
-      return true // 중복임
+      return true
     } else {
       setSnError(null)
-      return false // 중복 아님
+      return false
     }
   }
 
-  // ✨ 실시간 중복 체크 (useEffect 사용)
-  // 사용자가 타이핑할 때마다 검사 (0.3초 디바운스 적용하여 부하 방지)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (formData.serial_number) {
@@ -134,18 +152,15 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // ✨ 필수값 검증 (브랜드, 모델명, S/N)
     if (!formData.brand.trim()) return alert('브랜드를 입력해주세요.')
     if (!formData.model_name.trim()) return alert('모델명을 입력해주세요.')
     if (!formData.serial_number.trim()) return alert('Serial Number(S/N)를 입력해주세요.')
     
-    // ✨ 저장 직전 최종 S/N 중복 체크 (타이핑 후 바로 엔터 치는 경우 대비)
     const isDuplicate = await checkSnDuplicate(formData.serial_number)
     if (isDuplicate) return alert('중복된 S/N입니다. 다른 번호를 입력해주세요.')
 
     if (formData.status === '설치' && !formData.client_id) return alert('설치 상태일 경우 거래처를 선택해야 합니다.')
     
-    // 상태 변경 유효성 검사 (수정 모드일 때만)
     if (editData && editData.id) {
       if ((editData.status === '교체전(철수)' || editData.status === '설치') && formData.status === '창고') {
         alert("거래처에 등록된 기계는 직접 '창고'로 변경할 수 없습니다. [거래처 관리]에서 '철수' 기능을 이용하시거나 정산을 완료해주세요.");
@@ -158,10 +173,11 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
       
-      const { client, id, created_at, updated_at, ...pureData } = formData as any;
+      // ✅ [안전장치] 혹시라도 formData에 들어있을 수 있는 client 객체를 payload 생성 시 확실히 제외
+      const { client, ...cleanFormData } = formData as any;
 
       const payload = { 
-        ...pureData, 
+        ...cleanFormData, 
         organization_id: profile?.organization_id, 
         client_id: formData.client_id || null,
         purchase_date: formData.purchase_date || null,
@@ -173,7 +189,6 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
         plan_price_col: Number(formData.plan_price_col),
         plan_weight_a3_bw: Number(formData.plan_weight_a3_bw),
         plan_weight_a3_col: Number(formData.plan_weight_a3_col),
-        last_status_updated_at: new Date().toISOString()
       }
 
       const isEditMode = editData && editData.id;
@@ -189,14 +204,13 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
 
   if (!isOpen) return null
 
-  const isEditMode = editData && editData.id;
+  const isEditMode = !!(editData && editData.id);
 
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
         <h2 className={styles.title}>{isEditMode ? '✏️ 장비 수정' : '📦 신규 등록'}</h2>
         <form onSubmit={handleSubmit}>
-          {/* ✨ 요청하신 종류 및 구분 옵션 업데이트 */}
           <div className={styles.grid3}>
             <InputField label="종류" as="select" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
               <option value="A3 레이저복합기">A3 레이저복합기</option>
@@ -225,7 +239,6 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
               {clients.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </InputField>
 
-            {/* 상태가 '설치'일 때만 요금제 입력란 표시 */}
             {formData.status === '설치' && (
               <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px dashed #0070f3' }}>
                 <div className={styles.sectionTitle} style={{ color: '#0070f3' }}>💰 요금제 설정</div>
@@ -265,7 +278,6 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
           </div>
 
           <div className={styles.grid2}>
-            {/* ✨ 필수값 명시 */}
             <InputField 
               label="브랜드 *" 
               required
@@ -280,7 +292,6 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
             />
           </div>
 
-          {/* ✨ S/N 실시간 중복 체크 및 경고 표시 */}
           <div style={{ marginBottom: '16px' }}>
             <InputField 
               label="S/N *" 

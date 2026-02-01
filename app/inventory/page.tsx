@@ -4,17 +4,18 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
 import InventoryForm from '@/components/inventory/InventoryForm'
 import styles from './inventory.module.css'
+import { Inventory } from '@/app/types'
 
 export default function InventoryPage() {
   const supabase = createClient()
   
   const [loading, setLoading] = useState(false)
-  const [items, setItems] = useState<any[]>([])
+  const [items, setItems] = useState<Inventory[]>([]) // ✅ Inventory 타입 적용
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [selectedItem, setSelectedItem] = useState<Inventory | null>(null) // ✅ Inventory 타입 적용
   
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
@@ -25,7 +26,9 @@ export default function InventoryPage() {
   const fetchInventory = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
+    if (!user) return
+
+    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
     
     if (profile?.organization_id) {
       const { data } = await supabase
@@ -34,7 +37,7 @@ export default function InventoryPage() {
         .eq('organization_id', profile.organization_id)
         .order('created_at', { ascending: false })
       
-      if (data) setItems(data)
+      if (data) setItems(data as Inventory[])
     }
     setLoading(false)
   }
@@ -46,7 +49,7 @@ export default function InventoryPage() {
     setExpandedRows(newSet)
   }
 
-  const handleEdit = (e: React.MouseEvent, item: any) => {
+  const handleEdit = (e: React.MouseEvent, item: Inventory) => {
     e.stopPropagation() 
     setSelectedItem(item) 
     setIsModalOpen(true) 
@@ -69,7 +72,7 @@ export default function InventoryPage() {
     const matchesSearch = 
       item.model_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.serial_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.client?.name && item.client.name.includes(searchTerm))
+      (item.client?.name && item.client.name.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesStatus = statusFilter === 'all' ? true : item.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -79,6 +82,7 @@ export default function InventoryPage() {
       
       <div style={{ marginTop: '30px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 className={styles.title}>📦 자산 및 재고 목록</h2>
           
           <div className={styles.controls}>
             <select 
@@ -144,7 +148,6 @@ export default function InventoryPage() {
                       </td>
                       <td className={styles.td} style={{ color: '#666666' }}>{item.serial_number}</td>
                       <td className={styles.td} style={{ textAlign: 'center' }}>
-                        {/* 상태 뱃지는 기능적 색상 유지하되 톤 다운 */}
                         <span style={{
                           padding: '4px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600',
                           backgroundColor: item.status === '설치' ? 'rgba(0, 112, 243, 0.1)' : (item.status === '창고' ? '#FFF8E1' : '#FFF1F0'),
@@ -175,7 +178,7 @@ export default function InventoryPage() {
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '20px' }}>
                             <div>
                               <div className={styles.label}>제품 상태</div>
-                              <div className={styles.value}>{item.product_condition}</div>
+                              <div className={styles.value}>{(item as any).product_condition || '-'}</div>
                             </div>
                             <div>
                               <div className={styles.label}>매입일</div>
@@ -191,7 +194,6 @@ export default function InventoryPage() {
                             </div>
                           </div>
 
-                          {/* 초기 카운터 정보 박스 */}
                           <div className={styles.detailBox} style={{marginBottom: '20px'}}>
                             <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#171717', marginBottom: '15px', paddingBottom:'10px', borderBottom:'1px solid #E5E5E5', display:'flex', alignItems:'center', gap:'8px' }}>
                               <span style={{color:'#0070f3'}}>🔢</span> 초기 카운터 (Meter Reading)
@@ -216,7 +218,6 @@ export default function InventoryPage() {
                             </div>
                           </div>
 
-                          {/* 메모 박스 */}
                           <div className={styles.detailBox}>
                             <div className={styles.label}>📝 비고 (특이사항)</div>
                             <div style={{ fontSize: '0.95rem', whiteSpace: 'pre-wrap', color: '#171717', lineHeight:'1.5' }}>

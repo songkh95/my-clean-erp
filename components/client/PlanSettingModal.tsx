@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
 import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/Input'
+import { Inventory } from '@/app/types'
 
 interface Props {
   inventoryId: string
@@ -29,8 +30,9 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     billing_date: '말일'
   })
 
-  const [siblings, setSiblings] = useState<any[]>([])
-  const [currentItem, setCurrentItem] = useState<any>(null)
+  // ✅ any 제거: Inventory 타입 적용
+  const [siblings, setSiblings] = useState<Inventory[]>([])
+  const [currentItem, setCurrentItem] = useState<Inventory | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -45,7 +47,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       .single()
     
     if (current) {
-      setCurrentItem(current)
+      setCurrentItem(current as Inventory)
       setFormData({
         plan_basic_fee: current.plan_basic_fee || 0,
         plan_basic_cnt_bw: current.plan_basic_cnt_bw || 0,
@@ -59,26 +61,26 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       })
     }
 
-    // 2. 같은 거래처의 다른 기기 조회 (요금제 정보 포함)
+    // 2. 같은 거래처의 다른 기기 조회 (합산 대상 후보)
     const { data: sibs } = await supabase
       .from('inventory')
-      .select('id, model_name, serial_number, billing_group_id, plan_price_bw, plan_price_col, plan_weight_a3_bw, plan_weight_a3_col')
+      .select('*')
       .eq('client_id', clientId)
       .neq('id', inventoryId)
       .not('status', 'in', '("창고","폐기")') 
 
-    if (sibs) setSiblings(sibs)
+    if (sibs) setSiblings(sibs as Inventory[])
   }
 
-  // ✅ [추가됨] 단가 통일 및 그룹 선택 로직
-  const handleGroupSelect = (targetAsset: any) => {
-    // 1. 이미 선택된 그룹을 다시 클릭하면 해제 (단독 청구로 변경)
+  // 합산 청구 그룹 선택 핸들러
+  const handleGroupSelect = (targetAsset: Inventory) => {
+    // 이미 같은 그룹이면 해제
     if (formData.billing_group_id === targetAsset.billing_group_id && targetAsset.billing_group_id !== null) {
       setFormData({ ...formData, billing_group_id: null });
       return;
     }
 
-    // 2. 단가 비교 (현재 입력값 vs 대상 기계의 DB값)
+    // 합산 시 단가/가중치가 다르면 경고 및 동기화 제안
     const isPriceDifferent = 
       formData.plan_price_bw !== targetAsset.plan_price_bw ||
       formData.plan_price_col !== targetAsset.plan_price_col ||
@@ -86,7 +88,6 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       formData.plan_weight_a3_col !== targetAsset.plan_weight_a3_col;
 
     if (isPriceDifferent) {
-      // 단가가 다를 경우 사용자에게 확인
       const confirmSync = confirm(
         `⚠️ 선택한 기계 [${targetAsset.model_name}]와 초과 단가 또는 가중치가 다릅니다.\n\n` +
         `합산 청구를 하려면 단가가 동일해야 합니다.\n` +
@@ -96,7 +97,6 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       );
 
       if (confirmSync) {
-        // '확인' 시 단가를 덮어쓰고 그룹 지정
         setFormData({
           ...formData,
           plan_price_bw: targetAsset.plan_price_bw,
@@ -105,12 +105,8 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
           plan_weight_a3_col: targetAsset.plan_weight_a3_col,
           billing_group_id: targetAsset.billing_group_id || 'NEW_GROUP_WITH_' + targetAsset.id
         });
-      } else {
-        // '취소' 시 아무 작업 안 함
-        return; 
       }
     } else {
-      // 단가가 같으면 바로 그룹 지정
       setFormData({ 
         ...formData, 
         billing_group_id: targetAsset.billing_group_id || 'NEW_GROUP_WITH_' + targetAsset.id 
@@ -123,17 +119,16 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     try {
       let finalGroupId = formData.billing_group_id
 
-      // 신규 그룹 생성 처리
+      // 새 그룹 생성 로직 (임시 ID인 경우)
       if (finalGroupId && finalGroupId.startsWith('NEW_GROUP_WITH_')) {
         const targetId = finalGroupId.replace('NEW_GROUP_WITH_', '')
         const newGroupUUID = crypto.randomUUID()
         
-        // 대상 기계의 그룹 ID 업데이트
+        // 대상 기계에도 새 그룹 ID 부여
         await supabase.from('inventory').update({ billing_group_id: newGroupUUID }).eq('id', targetId)
         finalGroupId = newGroupUUID
       }
 
-      // 현재 기기 업데이트
       const { error } = await supabase
         .from('inventory')
         .update({
@@ -239,7 +234,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
                       type="radio" 
                       name="grouping" 
                       checked={!!(isLinked || isTempLinked)} 
-                      onChange={() => handleGroupSelect(sib)} // ✅ 수정된 핸들러 사용
+                      onChange={() => handleGroupSelect(sib)} 
                     />
                     <span>{sib.model_name} ({sib.serial_number})</span>
                   </label>

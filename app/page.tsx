@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Inventory, Settlement } from '@/app/types'
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true)
@@ -42,10 +43,11 @@ export default function HomePage() {
         if (profile) {
           setUserName(profile.name || '사용자')
           
-          // 🔴 수정된 부분: 배열인지 확인하고 첫 번째 요소 가져오기
-          // Supabase 관계 설정에 따라 배열([])로 들어올 수 있으므로 안전하게 처리합니다.
-          const orgData = profile.organizations as any
-          const org = Array.isArray(orgData) ? orgData[0] : orgData
+          // 조직 정보 타입 안전하게 처리
+          // Supabase 관계 쿼리 결과는 배열일 수도 있고 단일 객체일 수도 있음
+          const orgData = profile.organizations
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const org = Array.isArray(orgData) ? orgData[0] : (orgData as any)
 
           setOrgName(org?.name || '소속 없음')
           const orgId = org?.id
@@ -74,11 +76,14 @@ export default function HomePage() {
             ])
 
             // 3. 통계 계산
-            const invData = inventoryRes.data || []
-            const installedCount = invData.filter((i: any) => i.status === '설치').length
-            const warehouseCount = invData.filter((i: any) => i.status === '창고').length
+            // Inventory 타입을 사용하여 필터링
+            const invData = (inventoryRes.data as unknown as Pick<Inventory, 'status'>[]) || []
+            const installedCount = invData.filter(i => i.status === '설치').length
+            const warehouseCount = invData.filter(i => i.status === '창고').length
             
-            const totalAmount = settlementRes.data?.reduce((sum: number, row: any) => sum + (row.total_amount || 0), 0) || 0
+            // Settlement 타입을 사용하여 합계 계산
+            const settlementData = (settlementRes.data as unknown as Pick<Settlement, 'total_amount'>[]) || []
+            const totalAmount = settlementData.reduce((sum, row) => sum + (row.total_amount || 0), 0)
 
             setMetrics({
               clientCount: clientsRes.count || 0,

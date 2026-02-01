@@ -1,43 +1,87 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/utils/supabase'
 import Button from './../ui/Button'
 import InputField from './../ui/Input'
+import { Client } from '@/app/types'
 
 interface Props {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  editData?: any
+  editData?: Client | null 
+}
+
+interface ClientFormState {
+  name: string
+  business_number: string
+  representative_name: string
+  contact_person: string
+  phone: string
+  office_phone: string
+  email: string
+  address: string
+  memo: string
+  parent_id: string
+  status: string
 }
 
 export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Props) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
-  const [potentialParents, setPotentialParents] = useState<any[]>([])
+  const [potentialParents, setPotentialParents] = useState<Client[]>([])
 
-const [formData, setFormData] = useState({
-  name: '', business_number: '', representative_name: '', contact_person: '',
-  phone: '', office_phone: '', email: '', address: '', memo: '', parent_id: '', status: 'active'
-})
-
-useEffect(() => {
-  if (isOpen) {
-    fetchPotentialParents()
-    if (editData) setFormData({ ...editData, parent_id: editData.parent_id || '' })
-    else setFormData({ name: '', business_number: '', representative_name: '', contact_person: '', phone: '', office_phone: '', email: '', address: '', memo: '', parent_id: '', status: 'active' })
+  const initialData: ClientFormState = {
+    name: '', business_number: '', representative_name: '', contact_person: '',
+    phone: '', office_phone: '', email: '', address: '', memo: '', parent_id: '', status: 'active'
   }
-}, [editData, isOpen])
 
-  const fetchPotentialParents = async () => {
+  const [formData, setFormData] = useState<ClientFormState>(initialData)
+
+  // ✅ [수정] 함수 정의를 useEffect 위로 올리고 useCallback 적용
+  const fetchPotentialParents = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
-    let query = supabase.from('clients').select('id, name').eq('organization_id', profile?.organization_id).eq('is_deleted', false)
-    if (editData) query = query.neq('id', editData.id)
-    const { data } = await query
-    if (data) setPotentialParents(data)
-  }
+    if (!user) return
+
+    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+    if (profile?.organization_id) {
+      let query = supabase.from('clients')
+        .select('id, name, organization_id')
+        .eq('organization_id', profile.organization_id)
+        .eq('is_deleted', false)
+      
+      if (editData && editData.id) {
+        query = query.neq('id', editData.id)
+      }
+      
+      const { data } = await query
+      if (data) setPotentialParents(data as Client[])
+    }
+  }, [editData, supabase]) 
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchPotentialParents() // ✅ 이제 안전하게 호출됨
+      if (editData) {
+        setFormData({
+          name: editData.name || '',
+          business_number: editData.business_number || '',
+          representative_name: editData.representative_name || '',
+          contact_person: editData.contact_person || '',
+          phone: editData.phone || '',
+          office_phone: editData.office_phone || '', 
+          email: editData.email || '',
+          address: editData.address || '',
+          memo: editData.memo || '',
+          parent_id: editData.parent_id || '',
+          status: editData.status || 'active'
+        })
+      } else {
+        setFormData(initialData)
+      }
+    }
+  }, [editData, isOpen, fetchPotentialParents])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,16 +89,24 @@ useEffect(() => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
-      const { id, created_at, updated_at, ...pureData } = formData as any;
-      const payload = { ...pureData, parent_id: pureData.parent_id === '' ? null : pureData.parent_id, organization_id: profile?.organization_id }
+      
+      const payload = {
+        ...formData,
+        parent_id: formData.parent_id === '' ? null : formData.parent_id,
+        organization_id: profile?.organization_id
+      }
 
-      const { error } = editData 
+      const { error } = editData && editData.id
         ? await supabase.from('clients').update(payload).eq('id', editData.id)
         : await supabase.from('clients').insert(payload)
 
       if (error) throw error
       onSuccess(); onClose()
-    } catch (error: any) { alert('저장 오류: ' + error.message) } finally { setLoading(false) }
+    } catch (error: any) { 
+      alert('저장 오류: ' + error.message) 
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   if (!isOpen) return null

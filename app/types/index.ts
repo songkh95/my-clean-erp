@@ -1,4 +1,4 @@
-// types/index.ts
+// app/types/index.ts
 
 // 1. 거래처 (Clients)
 export interface Client {
@@ -9,15 +9,25 @@ export interface Client {
   representative_name?: string;
   contact_person?: string;
   phone?: string;
+  office_phone?: string;
   email?: string;
   address?: string;
   parent_id?: string | null;
   status?: string;
   created_at?: string;
   is_deleted?: boolean;
+  memo?: string; // ✅ 에러 해결: memo 추가
 }
 
-// 2. 자산/기계 (Inventory)
+// 2. 카운터 데이터 (CounterData)
+export interface CounterData {
+  bw: number;
+  col: number;
+  bw_a3: number;
+  col_a3: number;
+}
+
+// 3. 자산/기계 (Inventory)
 export interface Inventory {
   id: string;
   organization_id: string;
@@ -27,17 +37,16 @@ export interface Inventory {
   brand: string;
   model_name: string;
   serial_number: string;
-  status: '창고' | '설치' | '수리중' | '폐기' | '교체전(철수)' | string; // string은 유연성을 위해 추가
+  status: string;
   purchase_date?: string;
   purchase_price?: number;
+  created_at?: string; // ✅ 에러 해결: created_at 추가
   
-  // 초기 카운터
   initial_count_bw: number;
   initial_count_col: number;
   initial_count_bw_a3: number;
   initial_count_col_a3: number;
 
-  // 요금제 설정
   plan_basic_fee: number;
   plan_basic_cnt_bw: number;
   plan_basic_cnt_col: number;
@@ -50,14 +59,48 @@ export interface Inventory {
   billing_date?: string;
   memo?: string;
   
-  // Join된 데이터 (선택적)
   client?: Client;
+
+  // UI 확장 필드
+  is_active?: boolean;
+  is_replacement_before?: boolean;
+  is_replacement_after?: boolean;
+  is_withdrawal?: boolean;
+  final_counts?: CounterData;
 }
 
-// 3. 기계 이력 (Machine History) - 교체/철수/설치 기록
+// 4. 계산된 자산 정보 (CalculatedAsset)
+export interface CalculatedAsset extends Inventory {
+  inventory_id: string;
+  prev: CounterData;
+  curr: CounterData;
+  usage: CounterData;
+  converted: { bw: number; col: number };
+  usageBreakdown: { basicBW: number; extraBW: number; basicCol: number; extraCol: number };
+  plan: {
+    basic_fee: number;
+    free_bw: number;
+    free_col: number;
+    price_bw: number;
+    price_col: number;
+  };
+  rowCost: { basic: number; extra: number; total: number };
+  isGroupLeader: boolean;
+  groupSpan: number;
+}
+
+// 5. 정산 계산 결과
+export interface BillCalculationResult {
+  details: CalculatedAsset[];
+  totalAmount: number;
+}
+
+// 6. 기계 이력
 export interface MachineHistory {
   id: string;
   inventory_id: string;
+  client_id: string;
+  organization_id: string;
   action_type: 'INSTALL' | 'WITHDRAW' | 'AS';
   recorded_at: string;
   memo?: string;
@@ -65,12 +108,10 @@ export interface MachineHistory {
   col_count: number;
   bw_a3_count: number;
   col_a3_count: number;
-  
-  // Join
   inventory?: Inventory;
 }
 
-// 4. 정산 메인 (Settlements) - 청구서 1장 개념
+// 7. 정산 메인 (Settlement)
 export interface Settlement {
   id: string;
   client_id: string;
@@ -80,13 +121,12 @@ export interface Settlement {
   total_amount: number;
   is_paid: boolean;
   created_at: string;
-  
-  // Join
   client?: Client;
-  details?: SettlementDetail[];
+  details?: SettlementDetail[]; // ✅ 에러 해결: 선택적(?) 속성으로 변경
+  memo?: string;
 }
 
-// 5. 정산 상세 (Settlement Details) - 청구서 내 기계별 상세 라인
+// 8. 정산 상세
 export interface SettlementDetail {
   id: string;
   settlement_id: string;
@@ -96,17 +136,14 @@ export interface SettlementDetail {
   curr_count_bw: number;
   prev_count_col: number;
   curr_count_col: number;
-  // ... A3 카운터 등 필요시 추가
+  prev_count_bw_a3?: number;
+  curr_count_bw_a3?: number;
+  prev_count_col_a3?: number;
+  curr_count_col_a3?: number;
   
   calculated_amount: number;
   is_replacement_record: boolean;
-  is_paid?: boolean; // 최근에 추가한 필드
+  is_paid: boolean;
 
-  // Join
   inventory?: Inventory;
-  
-  // 계산 로직에서 쓰이는 확장 필드들 (DB에는 없지만 프론트에서 계산 후 붙이는 것들)
-  usage?: { bw: number; col: number; bw_a3: number; col_a3: number };
-  converted?: { bw: number; col: number };
-  rowCost?: { basic: number; extra: number; total: number };
 }

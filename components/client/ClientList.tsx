@@ -4,67 +4,74 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
 import ClientForm from './ClientForm'
 import PlanSettingModal from './PlanSettingModal'
-import MachineReplaceModal from './MachineReplaceModal' // (파일이 있다면 유지)
-import MachineWithdrawModal from './MachineWithdrawModal' // (파일이 있다면 유지)
-import InventoryForm from '../inventory/InventoryForm' // ✅ 자산 등록 폼 import
+import MachineReplaceModal from './MachineReplaceModal'
+import MachineWithdrawModal from './MachineWithdrawModal'
+import InventoryForm from '../inventory/InventoryForm'
 import Button from '@/components/ui/Button' 
 import styles from './ClientList.module.css'
+import { Client, Inventory } from '@/app/types'
 
 export default function ClientList() {
   const supabase = createClient()
 
-  // 상태 관리 로직
-  const [clients, setClients] = useState<any[]>([])
-  const [assetsMap, setAssetsMap] = useState<{[key: string]: any[]}>({})
+  // 상태 관리 로직 (타입 적용)
+  const [clients, setClients] = useState<Client[]>([])
+  const [assetsMap, setAssetsMap] = useState<{[key: string]: Inventory[]}>({})
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   
   // 모달 제어 상태
   const [isRegModalOpen, setIsRegModalOpen] = useState(false)
-  const [selectedClient, setSelectedClient] = useState<any>(null)
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [planModalOpen, setPlanModalOpen] = useState(false)
   const [selectedAssetForPlan, setSelectedAssetForPlan] = useState<{id: string, clientId: string} | null>(null)
   
-  // ✅ [추가] 기계 추가 모달 상태
+  // 기계 추가 모달 상태
   const [addMachineModalOpen, setAddMachineModalOpen] = useState(false)
-  const [clientForMachineAdd, setClientForMachineAdd] = useState<any>(null)
+  const [clientForMachineAdd, setClientForMachineAdd] = useState<Client | null>(null)
 
-  // 기계 교체/철수 모달 관련 (기존 코드 유지)
-  const [replaceModalOpen, setReplaceModalOpen] = useState(false) // 만약 컴포넌트가 없다면 이 줄 제거
-  const [selectedAssetForReplace, setSelectedAssetForReplace] = useState<any>(null) // 만약 컴포넌트가 없다면 이 줄 제거
-  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false) // 만약 컴포넌트가 없다면 이 줄 제거
-  const [selectedAssetForWithdraw, setSelectedAssetForWithdraw] = useState<any>(null) // 만약 컴포넌트가 없다면 이 줄 제거
+  // 기계 교체/철수 모달 관련
+  const [replaceModalOpen, setReplaceModalOpen] = useState(false)
+  const [selectedAssetForReplace, setSelectedAssetForReplace] = useState<Inventory | null>(null)
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
+  const [selectedAssetForWithdraw, setSelectedAssetForWithdraw] = useState<Inventory | null>(null)
 
   useEffect(() => { fetchClients() }, [])
 
   const fetchClients = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
-    
-    if (profile?.organization_id) {
-      const { data: clientData } = await supabase.from('clients')
-        .select('*')
-        .eq('organization_id', profile.organization_id)
-        .order('created_at', { ascending: false })
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
       
-      if (clientData) setClients(clientData)
+      if (profile?.organization_id) {
+        const { data: clientData } = await supabase.from('clients')
+          .select('*')
+          .eq('organization_id', profile.organization_id)
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false })
+        
+        if (clientData) setClients(clientData as Client[])
 
-      const { data: assetData } = await supabase.from('inventory')
-        .select('*')
-        .eq('organization_id', profile.organization_id)
-        .not('client_id', 'is', null)
-        .order('created_at', { ascending: true })
-      
-      const map: {[key: string]: any[]} = {}
-      if (assetData) {
-        assetData.forEach((asset: any) => {
-          if (!map[asset.client_id]) map[asset.client_id] = []
-          map[asset.client_id].push(asset)
-        })
+        const { data: assetData } = await supabase.from('inventory')
+          .select('*')
+          .eq('organization_id', profile.organization_id)
+          .not('client_id', 'is', null)
+          .order('created_at', { ascending: true })
+        
+        const map: {[key: string]: Inventory[]} = {}
+        if (assetData) {
+          // ✅ any 제거: Inventory[]로 캐스팅
+          (assetData as Inventory[]).forEach((inv) => {
+            if (inv.client_id) {
+              if (!map[inv.client_id]) map[inv.client_id] = []
+              map[inv.client_id].push(inv)
+            }
+          })
+        }
+        setAssetsMap(map)
       }
-      setAssetsMap(map)
     }
     setLoading(false)
   }
@@ -72,7 +79,8 @@ export default function ClientList() {
   const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation()
     if (confirm(`'${name}' 거래처를 정말로 삭제하시겠습니까?`)) { 
-      const { error } = await supabase.from('clients').delete().eq('id', id);
+      // 실제 삭제 대신 is_deleted 플래그 업데이트 (ClientForm 로직 참조)
+      const { error } = await supabase.from('clients').update({ is_deleted: true }).eq('id', id);
       if (error) alert('삭제 실패: ' + error.message);
       else { alert('삭제되었습니다.'); fetchClients(); }
     }
@@ -85,23 +93,25 @@ export default function ClientList() {
     setExpandedRows(newSet)
   }
 
-  // ✅ [추가] 기계 추가 버튼 핸들러
-  const handleAddMachineClick = (client: any) => {
+const handleAddMachineClick = (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation()
     setClientForMachineAdd(client)
     setAddMachineModalOpen(true)
   }
 
-  // 기존 핸들러들 (교체/철수 기능이 있다면 유지, 없다면 제거하셔도 됩니다)
-  const handleReplaceClick = (asset: any) => {
+  // 교체 버튼 핸들러
+  const handleReplaceClick = (asset: Inventory) => {
     setSelectedAssetForReplace(asset)
     setReplaceModalOpen(true)
   }
-  const handleWithdrawClick = (asset: any) => {
+
+  // 철수 버튼 핸들러
+  const handleWithdrawClick = (asset: Inventory) => {
     setSelectedAssetForWithdraw(asset)
     setWithdrawModalOpen(true)
   }
 
-  const handleEdit = (e: React.MouseEvent, client: any) => {
+  const handleEdit = (e: React.MouseEvent, client: Client) => {
     e.stopPropagation()
     setSelectedClient(client)
     setIsRegModalOpen(true)
@@ -109,7 +119,7 @@ export default function ClientList() {
 
   const filteredClients = clients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.address?.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.address && c.address.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   return (
@@ -187,10 +197,9 @@ export default function ClientList() {
 
                 <div className={styles.divider} />
 
-                {/* ✅ 자산 목록 헤더에 '기계 추가' 버튼 배치 */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <div className={styles.sectionTitle} style={{ marginBottom: 0 }}>📦 설치된 자산 목록</div>
-                  <Button variant="outline" size="sm" onClick={() => handleAddMachineClick(client)}>
+                  <Button variant="outline" size="sm" onClick={(e) => handleAddMachineClick(e, client)}>
                     + 기계 추가
                   </Button>
                 </div>
@@ -217,7 +226,7 @@ export default function ClientList() {
                             <div style={{ fontSize: '0.75rem', color: 'var(--notion-sub-text)' }}>{asset.serial_number}</div>
                           </td>
                           <td className={styles.assetTd}>
-                            매월 {asset.billing_date || '-'}일
+                            {asset.billing_date ? `매월 ${asset.billing_date}일` : '-'}
                           </td>
                           <td className={styles.assetTd}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -230,17 +239,15 @@ export default function ClientList() {
                           <td className={styles.assetTd} style={{ textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: '4px' }}>
                               <Button variant="outline" size="sm" onClick={() => { 
-                                setSelectedAssetForPlan({ id: asset.id, clientId: client.id }); 
-                                setPlanModalOpen(true); 
+                                if (client.id) {
+                                  setSelectedAssetForPlan({ id: asset.id, clientId: client.id }); 
+                                  setPlanModalOpen(true); 
+                                }
                               }}>요금제</Button>
                               
-                              {/* 아래 컴포넌트들이 실제로 존재한다면 사용, 없다면 주석 처리 */}
-                              {typeof MachineReplaceModal !== 'undefined' && 
-                                <Button variant="outline" size="sm" onClick={() => handleReplaceClick(asset)}>교체</Button>
-                              }
-                              {typeof MachineWithdrawModal !== 'undefined' && 
-                                <Button variant="danger" size="sm" onClick={() => handleWithdrawClick(asset)} style={{ border: '1px solid #ff4d4f', background: 'transparent' }}>철수</Button>
-                              }
+                              <Button variant="outline" size="sm" onClick={() => handleReplaceClick(asset)}>교체</Button>
+                              
+                              <Button variant="danger" size="sm" onClick={() => handleWithdrawClick(asset)} style={{ border: '1px solid #ff4d4f', background: 'transparent' }}>철수</Button>
                             </div>
                           </td>
                         </tr>
@@ -254,7 +261,14 @@ export default function ClientList() {
         )
       })}
 
-      {isRegModalOpen && <ClientForm isOpen={isRegModalOpen} onClose={() => setIsRegModalOpen(false)} onSuccess={fetchClients} editData={selectedClient} />}
+      {isRegModalOpen && (
+        <ClientForm 
+          isOpen={isRegModalOpen} 
+          onClose={() => setIsRegModalOpen(false)} 
+          onSuccess={fetchClients} 
+          editData={selectedClient} 
+        />
+      )}
       
       {planModalOpen && selectedAssetForPlan && (
         <PlanSettingModal 
@@ -265,22 +279,20 @@ export default function ClientList() {
         />
       )}
 
-      {/* ✅ [추가] 기계 추가 모달 렌더링 */}
-      {addMachineModalOpen && clientForMachineAdd && (
+{addMachineModalOpen && clientForMachineAdd && (
         <InventoryForm 
           isOpen={addMachineModalOpen}
           onClose={() => { setAddMachineModalOpen(false); setClientForMachineAdd(null) }}
           onSuccess={fetchClients}
-          // ✨ 자동으로 해당 거래처에 '설치' 상태로 추가되도록 초기값 설정
+          // ✅ any 제거: Inventory 타입의 Partial 객체 전달
           editData={{
             status: '설치',
-            client_id: clientForMachineAdd.id
-          }}
+            client_id: clientForMachineAdd.id,
+          }} 
         />
       )}
 
-      {/* 아래 컴포넌트들이 실제로 존재한다면 사용 */}
-      {replaceModalOpen && selectedAssetForReplace && typeof MachineReplaceModal !== 'undefined' && (
+      {replaceModalOpen && selectedAssetForReplace && selectedAssetForReplace.client_id && (
         <MachineReplaceModal 
           oldAsset={selectedAssetForReplace} 
           clientId={selectedAssetForReplace.client_id} 
@@ -289,7 +301,7 @@ export default function ClientList() {
         />
       )}
 
-      {withdrawModalOpen && selectedAssetForWithdraw && typeof MachineWithdrawModal !== 'undefined' && (
+      {withdrawModalOpen && selectedAssetForWithdraw && selectedAssetForWithdraw.client_id && (
         <MachineWithdrawModal 
           asset={selectedAssetForWithdraw} 
           clientId={selectedAssetForWithdraw.client_id} 

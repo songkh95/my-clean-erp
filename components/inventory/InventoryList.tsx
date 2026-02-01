@@ -4,22 +4,34 @@ import React, { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
 import styles from './InventoryList.module.css'
 import Button from './../ui/Button'
+import { Inventory, Client } from '@/app/types'
 
 interface InventoryListProps {
   type: string
   refreshTrigger: number
 }
 
+// EditableField의 Props 타입 정의
+interface EditableFieldProps {
+  label: string
+  name: keyof Inventory // Inventory의 키만 허용하여 오타 방지
+  val: string | number | undefined | null
+  isEdit: boolean
+  editData: Inventory | null
+  setEditData: (data: Inventory) => void
+  type?: 'text' | 'number'
+}
+
 export default function InventoryList({ type, refreshTrigger }: InventoryListProps) {
-  const [items, setItems] = useState<any[]>([])
+  const [items, setItems] = useState<Inventory[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [isListOpen, setIsListOpen] = useState(true)
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editData, setEditData] = useState<any>(null)
-  const [clients, setClients] = useState<any[]>([])
+  const [editData, setEditData] = useState<Inventory | null>(null)
+  const [clients, setClients] = useState<Client[]>([])
 
   const [clientSearchTerm, setClientSearchTerm] = useState('')
   const [showClientList, setShowClientList] = useState(false)
@@ -38,10 +50,11 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
         .eq('type', type)
         .eq('organization_id', profile?.organization_id)
         .order('created_at', { ascending: false })
-      if (data) setItems(data)
+      
+      if (data) setItems(data as Inventory[])
 
-      const { data: cData } = await supabase.from('clients').select('id, name').eq('status', 'active')
-      if (cData) setClients(cData)
+      const { data: cData } = await supabase.from('clients').select('id, name, organization_id').eq('status', 'active')
+      if (cData) setClients(cData as Client[])
     }
     setLoading(false)
   }
@@ -56,15 +69,18 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
     }
   }
 
-  const startEditing = (item: any) => {
+  const startEditing = (item: Inventory) => {
     setEditingId(item.id)
     setEditData({ ...item })
     setClientSearchTerm(item.client?.name || '')
   }
 
   const handleUpdate = async () => {
+    if (!editData) return;
+
     // 🔴 중요: 'client' 객체와 불필요한 필드를 엄격하게 제거합니다.
-    const { client, id, created_at, organization_id, last_status_updated_at, ...updateFields } = editData
+    // Inventory 타입에서 제외할 필드들을 분리
+    const { client, id, created_at, organization_id, ...updateFields } = editData
     
     if (updateFields.status === '설치' && !updateFields.client_id) {
       alert("⚠️ 상태가 '설치'일 경우, 설치처를 반드시 입력(선택)해야 합니다.")
@@ -74,9 +90,9 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
     const payload = {
       ...updateFields,
       client_id: updateFields.client_id || null,
-      purchase_price: updateFields.purchase_price === "" ? null : Number(updateFields.purchase_price),
-      // 상태 변경 시 날짜 기록 추가
-      last_status_updated_at: new Date().toISOString()
+      purchase_price: updateFields.purchase_price === undefined || updateFields.purchase_price === null ? null : Number(updateFields.purchase_price),
+      // 상태 변경 시 날짜 기록 추가 (필요 시 로직 보완 가능)
+      // last_status_updated_at: new Date().toISOString() 
     }
 
     const { error } = await supabase.from('inventory').update(payload).eq('id', editingId)
@@ -180,7 +196,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                                 
                                 <div className={styles.editableItem}>
                                   <span className={styles.editableLabel}>설치처</span>
-                                  {isEditing ? (
+                                  {isEditing && editData ? (
                                     <div className={styles.dropdownContainer}>
                                       <input
                                         placeholder="거래처 검색..."
@@ -215,7 +231,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
 
                                 <div className={styles.editableItem}>
                                   <span className={styles.editableLabel}>상태</span>
-                                  {isEditing ? (
+                                  {isEditing && editData ? (
                                     <select 
                                       value={editData.status} 
                                       onChange={e => setEditData({ ...editData, status: e.target.value, client_id: e.target.value === '설치' ? editData.client_id : null })}
@@ -233,7 +249,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
 
                                 <div className={styles.fullWidthItem}>
                                   <span className={styles.editableLabel}>메모</span>
-                                  {isEditing ? (
+                                  {isEditing && editData ? (
                                     <input value={editData.memo || ''} onChange={e => setEditData({ ...editData, memo: e.target.value })} className={styles.formInput} />
                                   ) : (
                                     <span className={styles.editableValue}>{item.memo || '-'}</span>
@@ -270,19 +286,20 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
   )
 }
 
-function EditableField({ label, name, val, isEdit, editData, setEditData, type = "text" }: any) {
+function EditableField({ label, name, val, isEdit, editData, setEditData, type = "text" }: EditableFieldProps) {
   return (
     <div className={styles.editableItem}>
       <span className={styles.editableLabel}>{label}</span>
-      {isEdit ? (
+      {isEdit && editData ? (
         <input 
           type={type}
-          value={editData[name] || ''} 
+          // 값이 없으면 빈 문자열로 처리하여 controlled input 경고 방지
+          value={(editData[name] as string | number) ?? ''} 
           onChange={e => setEditData({ ...editData, [name]: type === "number" ? Number(e.target.value) : e.target.value })} 
           className={styles.formInput} 
         />
       ) : (
-        <span className={styles.editableValue}>{type === "number" ? val?.toLocaleString() + '원' : (val || '-')}</span>
+        <span className={styles.editableValue}>{type === "number" ? (val as number)?.toLocaleString() + '원' : (val || '-')}</span>
       )}
     </div>
   )
