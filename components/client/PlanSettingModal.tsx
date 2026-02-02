@@ -5,6 +5,9 @@ import { createClient } from '@/utils/supabase'
 import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/Input'
 import { Inventory } from '@/app/types'
+// 👇 타입 임포트 추가
+import { SupabaseClient } from '@supabase/supabase-js'
+import { Database } from '@/types/supabase'
 
 interface Props {
   inventoryId: string
@@ -14,7 +17,8 @@ interface Props {
 }
 
 export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpdate }: Props) {
-  const supabase = createClient()
+  // 👇 타입을 명시적으로 지정
+  const supabase: SupabaseClient<Database> = createClient()
   const [loading, setLoading] = useState(false)
   
   // 요금제 데이터
