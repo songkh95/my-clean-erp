@@ -11,7 +11,7 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  editData?: Inventory | null | Partial<Inventory>
+  editData?: Inventory | null
 }
 
 interface InventoryFormState {
@@ -27,8 +27,8 @@ interface InventoryFormState {
   purchase_price: number
   initial_count_bw: number
   initial_count_col: number
-  initial_count_bw_a3: number;
-  initial_count_col_a3: number;
+  initial_count_bw_a3: number
+  initial_count_col_a3: number
   memo: string
   billing_date: string
   plan_basic_fee: number
@@ -36,15 +36,14 @@ interface InventoryFormState {
   plan_basic_cnt_col: number
   plan_price_bw: number
   plan_price_col: number
-  plan_weight_a3_bw: number;
-  plan_weight_a3_col: number;
+  plan_weight_a3_bw: number
+  plan_weight_a3_col: number
 }
 
 export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: Props) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
-  
   const [snError, setSnError] = useState<string | null>(null)
 
   const initialData: InventoryFormState = {
@@ -80,7 +79,12 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
       if (profile?.organization_id) {
-        const { data } = await supabase.from('clients').select('id, name, organization_id').eq('organization_id', profile.organization_id).eq('is_deleted', false).order('name')
+        const { data } = await supabase
+          .from('clients')
+          .select('id, name, organization_id')
+          .eq('organization_id', profile.organization_id)
+          .eq('is_deleted', false)
+          .order('name')
         if (data) setClients(data as Client[])
       }
     }
@@ -91,22 +95,22 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
     if (isOpen) {
       setSnError(null)
       if (editData) {
-        // ✅ [수정 핵심] client 객체와 불필요한 필드를 구조 분해 할당으로 제거 (created_at 등)
-        const { client, created_at, ...restData } = editData as any;
+        const { client, created_at, ...restData } = editData;
 
         setFormData({
           ...initialData,
-          ...restData, // client가 제거된 데이터만 병합
+          ...restData,
           client_id: editData.client_id || '',
           purchase_date: editData.purchase_date || '',
           billing_date: editData.billing_date || '말일',
-          plan_basic_fee: editData.plan_basic_fee || 0,
-          plan_basic_cnt_bw: editData.plan_basic_cnt_bw || 0,
-          plan_basic_cnt_col: editData.plan_basic_cnt_col || 0,
-          plan_price_bw: editData.plan_price_bw || 0,
-          plan_price_col: editData.plan_price_col || 0,
-          plan_weight_a3_bw: editData.plan_weight_a3_bw || 1,
-          plan_weight_a3_col: editData.plan_weight_a3_col || 1
+          purchase_price: editData.purchase_price ?? 0,
+          plan_basic_fee: editData.plan_basic_fee ?? 0,
+          plan_basic_cnt_bw: editData.plan_basic_cnt_bw ?? 0,
+          plan_basic_cnt_col: editData.plan_basic_cnt_col ?? 0,
+          plan_price_bw: editData.plan_price_bw ?? 0,
+          plan_price_col: editData.plan_price_col ?? 0,
+          plan_weight_a3_bw: editData.plan_weight_a3_bw ?? 1,
+          plan_weight_a3_col: editData.plan_weight_a3_col ?? 1
         })
       } else {
         setFormData(initialData)
@@ -173,11 +177,8 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
       
-      // ✅ [안전장치] 혹시라도 formData에 들어있을 수 있는 client 객체를 payload 생성 시 확실히 제외
-      const { client, ...cleanFormData } = formData as any;
-
       const payload = { 
-        ...cleanFormData, 
+        ...formData, 
         organization_id: profile?.organization_id, 
         client_id: formData.client_id || null,
         purchase_date: formData.purchase_date || null,
@@ -199,7 +200,12 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
       
       if (error) throw error
       onSuccess(); onClose()
-    } catch (error: any) { alert('오류: ' + error.message) } finally { setLoading(false) }
+    } catch (error) { 
+      const message = error instanceof Error ? error.message : (error as { message?: string })?.message || String(error)
+      alert('오류: ' + message) 
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   if (!isOpen) return null

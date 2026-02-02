@@ -53,7 +53,8 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
       
       if (data) setItems(data as Inventory[])
 
-      const { data: cData } = await supabase.from('clients').select('id, name, organization_id').eq('status', 'active')
+      // 활성 상태인 거래처만 조회
+      const { data: cData } = await supabase.from('clients').select('*').eq('status', 'active')
       if (cData) setClients(cData as Client[])
     }
     setLoading(false)
@@ -78,24 +79,27 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
   const handleUpdate = async () => {
     if (!editData) return;
 
-    // 🔴 중요: 'client' 객체와 불필요한 필드를 엄격하게 제거합니다.
-    // Inventory 타입에서 제외할 필드들을 분리
-    const { client, id, created_at, organization_id, ...updateFields } = editData
+    // 객체 구조 분해 할당을 통해 client(객체)와 created_at(수정 불필요) 등을 제외
+    // 타입 단언 없이 안전하게 처리
+    const payload: Partial<Inventory> = { ...editData };
     
-    if (updateFields.status === '설치' && !updateFields.client_id) {
+    // DB 업데이트 시 불필요하거나 충돌날 수 있는 필드 제거
+    delete payload.client;
+    delete payload.created_at;
+    
+    if (payload.status === '설치' && !payload.client_id) {
       alert("⚠️ 상태가 '설치'일 경우, 설치처를 반드시 입력(선택)해야 합니다.")
       return
     }
 
-    const payload = {
-      ...updateFields,
-      client_id: updateFields.client_id || null,
-      purchase_price: updateFields.purchase_price === undefined || updateFields.purchase_price === null ? null : Number(updateFields.purchase_price),
-      // 상태 변경 시 날짜 기록 추가 (필요 시 로직 보완 가능)
-      // last_status_updated_at: new Date().toISOString() 
+    // 빈 문자열이나 undefined 값 처리
+    const updateData = {
+      ...payload,
+      client_id: payload.client_id || null,
+      purchase_price: payload.purchase_price === undefined || payload.purchase_price === null ? null : Number(payload.purchase_price),
     }
 
-    const { error } = await supabase.from('inventory').update(payload).eq('id', editingId)
+    const { error } = await supabase.from('inventory').update(updateData).eq('id', editingId)
 
     if (!error) {
       alert('수정 완료!')
@@ -293,7 +297,7 @@ function EditableField({ label, name, val, isEdit, editData, setEditData, type =
       {isEdit && editData ? (
         <input 
           type={type}
-          // 값이 없으면 빈 문자열로 처리하여 controlled input 경고 방지
+          // 값이 null/undefined일 경우 빈 문자열로 처리
           value={(editData[name] as string | number) ?? ''} 
           onChange={e => setEditData({ ...editData, [name]: type === "number" ? Number(e.target.value) : e.target.value })} 
           className={styles.formInput} 

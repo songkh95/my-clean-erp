@@ -7,7 +7,7 @@ import InputField from '@/components/ui/Input'
 import { Inventory } from '@/app/types'
 
 interface Props {
-  oldAsset: Inventory // ✅ any 제거: Inventory 타입 적용
+  oldAsset: Inventory
   clientId: string
   onClose: () => void
   onSuccess: () => void
@@ -16,7 +16,7 @@ interface Props {
 export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuccess }: Props) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
-  const [warehouseItems, setWarehouseItems] = useState<Inventory[]>([]) // ✅ any 제거
+  const [warehouseItems, setWarehouseItems] = useState<Inventory[]>([])
   
   // 폼 데이터 상태
   const [formData, setFormData] = useState({
@@ -100,8 +100,9 @@ export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuc
       alert('기계 교체 처리가 완료되었습니다.')
       onSuccess()
       onClose()
-    } catch (e: any) {
-      alert('오류 발생: ' + e.message)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : (e as { message?: string })?.message || String(e)
+      alert('오류 발생: ' + message)
     } finally {
       setLoading(false)
     }

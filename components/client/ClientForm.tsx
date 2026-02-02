@@ -39,7 +39,6 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
 
   const [formData, setFormData] = useState<ClientFormState>(initialData)
 
-  // ✅ [수정] 함수 정의를 useEffect 위로 올리고 useCallback 적용
   const fetchPotentialParents = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -62,7 +61,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
 
   useEffect(() => {
     if (isOpen) {
-      fetchPotentialParents() // ✅ 이제 안전하게 호출됨
+      fetchPotentialParents()
       if (editData) {
         setFormData({
           name: editData.name || '',
@@ -102,8 +101,9 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
 
       if (error) throw error
       onSuccess(); onClose()
-    } catch (error: any) { 
-      alert('저장 오류: ' + error.message) 
+    } catch (error) { 
+      const message = error instanceof Error ? error.message : (error as { message?: string })?.message || String(error)
+      alert('저장 오류: ' + message) 
     } finally { 
       setLoading(false) 
     }

@@ -30,7 +30,6 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     billing_date: '말일'
   })
 
-  // ✅ any 제거: Inventory 타입 적용
   const [siblings, setSiblings] = useState<Inventory[]>([])
   const [currentItem, setCurrentItem] = useState<Inventory | null>(null)
 
@@ -149,8 +148,9 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       alert('설정이 완료되었습니다.')
       onUpdate()
       onClose()
-    } catch (e: any) {
-      alert('저장 실패: ' + e.message)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : (e as { message?: string })?.message || String(e)
+      alert('저장 실패: ' + message)
     } finally {
       setLoading(false)
     }

@@ -7,7 +7,7 @@ import InputField from '@/components/ui/Input'
 import { Inventory } from '@/app/types'
 
 interface Props {
-  asset: Inventory // ✅ any 제거
+  asset: Inventory
   clientId: string
   onClose: () => void
   onSuccess: () => void
@@ -56,8 +56,9 @@ export default function MachineWithdrawModal({ asset, clientId, onClose, onSucce
       alert('철수 처리가 완료되었습니다.')
       onSuccess()
       onClose()
-    } catch (e: any) {
-      alert('오류 발생: ' + e.message)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : (e as { message?: string })?.message || String(e)
+      alert('오류 발생: ' + message)
     } finally {
       setLoading(false)
     }

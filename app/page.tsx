@@ -6,6 +6,17 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Inventory, Settlement } from '@/app/types'
 
+// Supabase 조인 쿼리 결과 처리를 위한 로컬 인터페이스 정의
+interface Organization {
+  id: string
+  name: string
+}
+
+interface ProfileResponse {
+  name: string
+  organizations: Organization | Organization[] | null
+}
+
 export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState('')
@@ -34,20 +45,27 @@ export default function HomePage() {
         }
 
         // 1. 프로필 및 조직 정보 가져오기
-        const { data: profile } = await supabase
+        const { data: rawProfile } = await supabase
           .from('profiles')
           .select(`name, organizations ( id, name )`)
           .eq('id', user.id)
           .single()
 
-        if (profile) {
+        if (rawProfile) {
+          // 타입 단언을 통해 구조 명시
+          const profile = rawProfile as unknown as ProfileResponse
+          
           setUserName(profile.name || '사용자')
           
-          // 조직 정보 타입 안전하게 처리
-          // Supabase 관계 쿼리 결과는 배열일 수도 있고 단일 객체일 수도 있음
+          // 조직 정보 타입 안전하게 처리 (any 제거)
           const orgData = profile.organizations
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const org = Array.isArray(orgData) ? orgData[0] : (orgData as any)
+          let org: Organization | null = null
+
+          if (Array.isArray(orgData)) {
+            org = orgData[0] || null
+          } else {
+            org = orgData
+          }
 
           setOrgName(org?.name || '소속 없음')
           const orgId = org?.id
