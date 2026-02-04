@@ -64,7 +64,6 @@ export default function AccountingHistory({
     setSelectedExportItems(newSet);
   };
 
-  // ✅ [수정] map 함수의 반환 타입을 명시하여 에러 해결
   const handleExcelDownload = () => {
     if (selectedExportItems.size === 0) {
       alert('엑셀로 다운로드할 항목을 선택해주세요.');
@@ -72,41 +71,44 @@ export default function AccountingHistory({
     }
 
     const exportData = historyList.map((hist): Settlement | null => {
-      // details가 없을 경우 빈 배열 처리
       const currentDetails = hist.details || [];
       const selectedDetails = currentDetails.filter((d: SettlementDetail) => selectedExportItems.has(d.id));
       
-      // 선택된 기계가 없으면 null 반환
       if (selectedDetails.length === 0) return null;
 
-      // Settlement 타입 구조에 맞춰 반환
       return {
         ...hist,
         details: selectedDetails
       };
-    }).filter((item): item is Settlement => item !== null); // 타입 가드 정상 작동
+    }).filter((item): item is Settlement => item !== null);
 
     exportHistoryToExcel(exportData);
   };
 
-  const handlePaymentClick = (e: React.MouseEvent, id: string, currentStatus: boolean) => {
+  const handlePaymentClick = (e: React.MouseEvent, id: string, currentStatus: boolean | null) => {
     e.stopPropagation(); 
-    const message = !currentStatus 
+    // 🔴 [수정] null일 경우 false로 처리
+    const safeStatus = currentStatus ?? false;
+    
+    const message = !safeStatus 
       ? "입금이 확인되었습니까?\n\n[확인]을 누르면 이 거래처의 모든 기계가 '입금완료' 처리됩니다."
       : "입금 완료 상태를 취소하시겠습니까?\n\n[확인]을 누르면 이 거래처의 모든 기계가 '미입금' 처리됩니다.";
 
     if (confirm(message)) {
-      togglePaymentStatus(id, currentStatus);
+      togglePaymentStatus(id, safeStatus);
     }
   };
 
-  const handleDetailPaymentClick = (settlementId: string, detailId: string, currentStatus: boolean) => {
-    const message = !currentStatus 
+  const handleDetailPaymentClick = (settlementId: string, detailId: string, currentStatus: boolean | null) => {
+    // 🔴 [수정] null일 경우 false로 처리
+    const safeStatus = currentStatus ?? false;
+
+    const message = !safeStatus 
       ? "이 기계의 입금이 확인되었습니까?"
       : "이 기계의 입금 상태를 취소하시겠습니까?";
       
     if (confirm(message)) {
-      toggleDetailPaymentStatus(settlementId, detailId, currentStatus);
+      toggleDetailPaymentStatus(settlementId, detailId, safeStatus);
     }
   }
 
@@ -254,8 +256,11 @@ export default function AccountingHistory({
                                           <div style={{ fontSize: '0.75rem', color: '#666' }}>청구일: {detail.inventory?.billing_date || '-'}</div>
                                         </td>
                                         <td className={styles.td} style={{ padding: '0' }}><div className={styles.splitCellContainer}><div className={styles.rowGray}>흑백</div><div className={styles.rowBlue}>칼라</div><div className={styles.rowGray}>흑백(A3)</div><div className={`${styles.rowBlue} ${styles.rowLast}`}>칼라(A3)</div></div></td>
-                                        <td className={styles.td} style={{ padding: '0' }}><div className={styles.splitCellContainer}><div className={styles.rowGray}>{detail.prev_count_bw.toLocaleString()}</div><div className={styles.rowBlue}>{detail.prev_count_col.toLocaleString()}</div><div className={styles.rowGray}>{detail.prev_count_bw_a3?.toLocaleString() || 0}</div><div className={`${styles.rowBlue} ${styles.rowLast}`}>{detail.prev_count_col_a3?.toLocaleString() || 0}</div></div></td>
-                                        <td className={styles.td} style={{ padding: '0' }}><div className={styles.splitCellContainer}><div className={styles.rowGray} style={{ fontWeight:'bold' }}>{detail.curr_count_bw.toLocaleString()}</div><div className={styles.rowBlue} style={{ fontWeight:'bold' }}>{detail.curr_count_col.toLocaleString()}</div><div className={styles.rowGray} style={{ fontWeight:'bold' }}>{detail.curr_count_bw_a3?.toLocaleString() || 0}</div><div className={`${styles.rowBlue} ${styles.rowLast}`} style={{ fontWeight:'bold' }}>{detail.curr_count_col_a3?.toLocaleString() || 0}</div></div></td>
+                                        
+                                        {/* 🔴 [수정] 숫자 필드들에 null 체크(?? 0) 및 toLocaleString() 적용 */}
+                                        <td className={styles.td} style={{ padding: '0' }}><div className={styles.splitCellContainer}><div className={styles.rowGray}>{(detail.prev_count_bw ?? 0).toLocaleString()}</div><div className={styles.rowBlue}>{(detail.prev_count_col ?? 0).toLocaleString()}</div><div className={styles.rowGray}>{(detail.prev_count_bw_a3 ?? 0).toLocaleString()}</div><div className={`${styles.rowBlue} ${styles.rowLast}`}>{(detail.prev_count_col_a3 ?? 0).toLocaleString()}</div></div></td>
+                                        <td className={styles.td} style={{ padding: '0' }}><div className={styles.splitCellContainer}><div className={styles.rowGray} style={{ fontWeight:'bold' }}>{(detail.curr_count_bw ?? 0).toLocaleString()}</div><div className={styles.rowBlue} style={{ fontWeight:'bold' }}>{(detail.curr_count_col ?? 0).toLocaleString()}</div><div className={styles.rowGray} style={{ fontWeight:'bold' }}>{(detail.curr_count_bw_a3 ?? 0).toLocaleString()}</div><div className={`${styles.rowBlue} ${styles.rowLast}`} style={{ fontWeight:'bold' }}>{(detail.curr_count_col_a3 ?? 0).toLocaleString()}</div></div></td>
+                                        
                                         <td className={styles.td} style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', lineHeight: '1.6', verticalAlign: 'top' }}>
                                           <div style={{ fontWeight: '600', color: '#555', marginBottom: '2px' }}>기본매수</div>
                                           <div style={{ display:'flex', justifyContent:'space-between', color: '#666', marginBottom:'2px' }}><span>흑백:</span> <span>0</span></div>
@@ -265,14 +270,17 @@ export default function AccountingHistory({
                                           <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025', marginBottom:'2px' }}><span>흑백:</span> <span>0</span></div>
                                           <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025' }}><span>칼라:</span> <span>0</span></div>
                                         </td>
-                                        <td className={styles.td} style={{ padding: '12px', verticalAlign: 'middle', fontWeight: 'bold' }}>{detail.calculated_amount?.toLocaleString()}원</td>
+                                        
+                                        {/* 🔴 [수정] 계산 금액 null 체크 */}
+                                        <td className={styles.td} style={{ padding: '12px', verticalAlign: 'middle', fontWeight: 'bold' }}>{(detail.calculated_amount ?? 0).toLocaleString()}원</td>
                                         <td className={styles.td} style={{ padding: '12px', verticalAlign: 'middle' }}>
                                           <span onClick={() => handleDetailPaymentClick(hist.id, detail.id, detail.is_paid)} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: detail.is_paid ? '#dbeddb' : '#ffe2dd', color: detail.is_paid ? '#2eaadc' : '#d93025', cursor: 'pointer' }}>{detail.is_paid ? '완료' : '미납'}</span>
                                         </td>
                                         <td className={styles.td} style={{ padding: '12px', verticalAlign: 'middle' }}>
                                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                            <button onClick={() => handleDetailRebill(hist.id, detail.id, detail.inventory_id, detail.is_replacement_record, hist.client_id)} style={{ color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>재청구</button>
-                                            {isComplexCase && <button onClick={() => handleDeleteDetail(hist.id, detail.id, detail.inventory_id, detail.calculated_amount, detail.is_replacement_record)} style={{ backgroundColor: '#fff', border: '1px solid #ffe2dd', color: '#d93025', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>삭제</button>}
+                                            {/* 🔴 [수정] inventory_id, is_replacement_record, client_id, calculated_amount 등 인자들의 null 체크 */}
+                                            <button onClick={() => handleDetailRebill(hist.id, detail.id, detail.inventory_id ?? '', detail.is_replacement_record ?? false, hist.client_id ?? '')} style={{ color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>재청구</button>
+                                            {isComplexCase && <button onClick={() => handleDeleteDetail(hist.id, detail.id, detail.inventory_id ?? '', detail.calculated_amount ?? 0, detail.is_replacement_record ?? false)} style={{ backgroundColor: '#fff', border: '1px solid #ffe2dd', color: '#d93025', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>삭제</button>}
                                           </div>
                                         </td>
                                       </tr>

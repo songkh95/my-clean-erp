@@ -6,12 +6,14 @@ import Button from './../ui/Button'
 import InputField from './../ui/Input'
 import styles from './InventoryForm.module.css'
 import { Inventory, Client } from '@/app/types'
+// ✅ Server Actions 임포트
+import { createInventoryAction, updateInventoryAction } from '@/app/actions/inventory'
 
 interface Props {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  editData?: Inventory | null
+  editData?: Partial<Inventory> | null
 }
 
 interface InventoryFormState {
@@ -46,6 +48,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
   const [clients, setClients] = useState<Client[]>([])
   const [snError, setSnError] = useState<string | null>(null)
 
+  // 초기값 설정 (오늘 날짜를 기본 매입일로 설정하려면 new Date().toISOString().split('T')[0] 사용)
   const initialData: InventoryFormState = {
     type: 'A3 레이저복합기', 
     category: '컬러',
@@ -55,7 +58,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
     product_condition: '새제품', 
     status: '창고', 
     client_id: '', 
-    purchase_date: '',
+    purchase_date: new Date().toISOString().split('T')[0], // 기본값: 오늘 날짜
     purchase_price: 0, 
     initial_count_bw: 0, 
     initial_count_col: 0,
@@ -74,10 +77,14 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
 
   const [formData, setFormData] = useState<InventoryFormState>(initialData)
 
+  // 거래처 목록 조회 (드롭다운용)
   useEffect(() => {
     const fetchClients = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
+      if (!user) return;
+
+      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+      
       if (profile?.organization_id) {
         const { data } = await supabase
           .from('clients')
@@ -91,16 +98,18 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
     fetchClients()
   }, [])
 
+  // 수정 모드일 때 데이터 세팅
   useEffect(() => {
     if (isOpen) {
       setSnError(null)
       if (editData) {
-        const { client, created_at, ...restData } = editData;
+        const { client, created_at, ...restData } = editData as any;
 
         setFormData({
           ...initialData,
           ...restData,
           client_id: editData.client_id || '',
+          // 매입일이 없으면 빈 값으로 두거나 오늘 날짜로 채움
           purchase_date: editData.purchase_date || '',
           billing_date: editData.billing_date || '말일',
           purchase_price: editData.purchase_price ?? 0,
@@ -118,6 +127,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
     }
   }, [isOpen, editData])
 
+  // S/N 중복 체크
   const checkSnDuplicate = async (sn: string) => {
     if (!sn.trim()) {
       setSnError(null)
@@ -126,7 +136,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
 
     let query = supabase.from('inventory').select('id').eq('serial_number', sn)
     
-    if (editData && editData.id) {
+    if (editData?.id) {
       query = query.neq('id', editData.id)
     }
 
@@ -174,14 +184,12 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
 
     setLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
-      
+      // Payload 구성
       const payload = { 
         ...formData, 
-        organization_id: profile?.organization_id, 
         client_id: formData.client_id || null,
-        purchase_date: formData.purchase_date || null,
+        // 빈 문자열일 경우 null로 처리하여 DB 에러 방지
+        purchase_date: formData.purchase_date === '' ? null : formData.purchase_date,
         purchase_price: Number(formData.purchase_price) || 0,
         plan_basic_fee: Number(formData.plan_basic_fee),
         plan_basic_cnt_bw: Number(formData.plan_basic_cnt_bw),
@@ -192,16 +200,23 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
         plan_weight_a3_col: Number(formData.plan_weight_a3_col),
       }
 
-      const isEditMode = editData && editData.id;
-
-      const { error } = isEditMode
-        ? await supabase.from('inventory').update(payload).eq('id', editData.id) 
-        : await supabase.from('inventory').insert(payload)
+      // ✅ Server Action 호출
+      let result;
+      if (editData?.id) {
+        result = await updateInventoryAction(editData.id, payload)
+      } else {
+        result = await createInventoryAction(payload)
+      }
       
-      if (error) throw error
-      onSuccess(); onClose()
-    } catch (error) { 
-      const message = error instanceof Error ? error.message : (error as { message?: string })?.message || String(error)
+      if (result.success) {
+        alert(result.message)
+        onSuccess()
+        onClose()
+      } else {
+        throw new Error(result.message)
+      }
+    } catch (error: any) { 
+      const message = error.message || String(error)
       alert('오류: ' + message) 
     } finally { 
       setLoading(false) 
@@ -210,7 +225,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
 
   if (!isOpen) return null
 
-  const isEditMode = !!(editData && editData.id);
+  const isEditMode = !!editData?.id;
 
   return (
     <div className={styles.overlay}>
@@ -240,14 +255,14 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
           </div>
 
           <div className={`${styles.highlightBox} ${formData.status === '설치' ? styles.activeBox : ''}`}>
-            <InputField label="🏢 설치 거래처" as="select" disabled={formData.status !== '설치'} value={formData.client_id} onChange={e => setFormData({ ...formData, client_id: e.target.value })} style={{ marginBottom: 16 }}>
+            <InputField label="🏢 설치 거래처 (현재 위치)" as="select" disabled={formData.status !== '설치'} value={formData.client_id} onChange={e => setFormData({ ...formData, client_id: e.target.value })} style={{ marginBottom: 16 }}>
               <option value="">거래처 선택</option>
               {clients.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </InputField>
 
             {formData.status === '설치' && (
               <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px dashed #0070f3' }}>
-                <div className={styles.sectionTitle} style={{ color: '#0070f3' }}>💰 요금제 설정</div>
+                <div className={styles.sectionTitle} style={{ color: '#0070f3' }}>📅 요금제 설정</div>
                 
                 <InputField 
                   label="매월 청구일" 
@@ -281,6 +296,26 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
                 </details>
               </div>
             )}
+          </div>
+
+          {/* 🔴 추가된 부분: 매입일 및 매입가 입력 */}
+          <div className={styles.highlightBox}>
+            <div className={styles.sectionTitle} style={{ color: '#171717', marginBottom:'10px' }}>💰 자산 매입 정보</div>
+            <div className={styles.grid2} style={{ marginBottom: 0 }}>
+              <InputField 
+                label="매입일 (설치일 아님)" 
+                type="date" 
+                value={formData.purchase_date} 
+                onChange={e => setFormData({ ...formData, purchase_date: e.target.value })} 
+              />
+              <InputField 
+                label="매입가 (원)" 
+                type="number" 
+                placeholder="0"
+                value={formData.purchase_price} 
+                onChange={e => setFormData({ ...formData, purchase_price: Number(e.target.value) })} 
+              />
+            </div>
           </div>
 
           <div className={styles.grid2}>

@@ -1,3 +1,5 @@
+// app/accounting/hooks/useAccounting.ts
+
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/utils/supabase' 
 import { calculateClientBill } from '@/utils/billingCalculator'
@@ -18,14 +20,18 @@ import {
 export function useAccounting() {
   const supabase = createClient() as SupabaseClient<Database>
   
+  // --- 상태 관리 ---
   const [loading, setLoading] = useState<boolean>(false)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
   
+  // 등록(Registration) 필터 상태
   const [regYear, setRegYear] = useState<number>(new Date().getFullYear())
   const [regMonth, setRegMonth] = useState<number>(new Date().getMonth() + 1)
   const [targetDay, setTargetDay] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState<string>('')
+  const [showUnregistered, setShowUnregistered] = useState<boolean>(false)
   
+  // 실제 적용된 등록 필터
   const [filterConfig, setFilterConfig] = useState({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
@@ -33,17 +39,19 @@ export function useAccounting() {
     term: ''
   })
 
+  // UI 상태
   const [isRegOpen, setIsRegOpen] = useState<boolean>(true)
+  const [isHistOpen, setIsHistOpen] = useState<boolean>(true)
+
+  // 데이터 상태
   const [clients, setClients] = useState<Client[]>([])
   const [inventoryMap, setInventoryMap] = useState<{[key: string]: Inventory[]}>({}) 
   const [inputData, setInputData] = useState<{[key: string]: CounterData}>({}) 
   const [prevData, setPrevData] = useState<{[key: string]: CounterData}>({})
   const [selectedInventories, setSelectedInventories] = useState<Set<string>>(new Set()) 
-  const [showUnregistered, setShowUnregistered] = useState<boolean>(false)
+  const [currentSettlements, setCurrentSettlements] = useState<Settlement[]>([]) 
 
-  const [currentSettlements, setCurrentSettlements] = useState<Settlement[]>([])
-
-  const [isHistOpen, setIsHistOpen] = useState<boolean>(true)
+  // 이력(History) 데이터 및 필터 상태
   const [historyList, setHistoryList] = useState<Settlement[]>([])
   const [histYear, setHistYear] = useState<number>(new Date().getFullYear())
   const [histMonth, setHistMonth] = useState<number>(new Date().getMonth() + 1)
@@ -57,6 +65,7 @@ export function useAccounting() {
   })
   const [monthMachineHistory, setMonthMachineHistory] = useState<MachineHistory[]>([])
 
+  // --- 1. 등록 데이터 조회 ---
   const fetchRegistrationData = useCallback(async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -66,14 +75,17 @@ export function useAccounting() {
     const orgId = profile?.organization_id
     if (!orgId) return
 
+    // 1-1. 거래처 목록 조회
     const { data: clientData } = await supabase.from('clients').select('*').eq('organization_id', orgId).eq('is_deleted', false).order('name')
     if (clientData) setClients(clientData as Client[])
 
+    // 1-2. 전체 자산 조회
     const { data: invData } = await supabase.from('inventory')
       .select('*')
       .eq('organization_id', orgId)
       .not('client_id', 'is', null)
 
+    // 1-3. 기계 변동 이력 조회
     const startDate = new Date(filterConfig.year, filterConfig.month - 1, 1).toISOString()
     const endDate = new Date(filterConfig.year, filterConfig.month, 0, 23, 59, 59).toISOString()
 
@@ -84,33 +96,43 @@ export function useAccounting() {
       .gte('recorded_at', startDate)
       .lte('recorded_at', endDate)
 
+    // 1-4. Inventory Map 구성
     const invMap: {[key: string]: Inventory[]} = {}
     
     const safeInvData = (invData || []) as unknown as Inventory[];
     const safeHistoryData = (historyData || []) as unknown as MachineHistory[];
 
+    // 기본 설치 기계 추가
     safeInvData.forEach((inv) => {
       const cid = inv.client_id!;
       if (!invMap[cid]) invMap[cid] = []
+      // 이번 달 설치된 기계인지 확인
       // @ts-ignore
       const isNewReplacement = safeHistoryData.some(h => h.inventory_id === inv.id && h.action_type === 'INSTALL');
       invMap[cid].push({ ...inv, is_active: true, is_replacement_after: isNewReplacement })
     });
 
+    // 이번 달 철수된 기계 추가 (정산 목록에 표시하기 위함)
     // @ts-ignore
     safeHistoryData.forEach((hist) => {
       if (hist.action_type === 'WITHDRAW' && hist.client_id) {
         if (!invMap[hist.client_id]) invMap[hist.client_id] = []
+        
+        // 이미 목록에 있는지 확인 (중복 방지)
         if (!invMap[hist.client_id].some(item => item.id === hist.inventory_id)) {
-          const isReplacementBefore = hist.memo?.includes('교체');
+          
+          // 🔴 [수정됨] is_replacement 컬럼 확인 (없으면 메모 확인으로 대체)
+          // DB에 컬럼을 추가했으므로 (hist as any).is_replacement 로 접근 가능
+          const isReplacementBefore = (hist as any).is_replacement || hist.memo?.includes('교체');
+          
           const withdrawnInv = hist.inventory as unknown as Inventory | undefined;
           
           if (withdrawnInv) {
             invMap[hist.client_id].push({ 
                 ...withdrawnInv, 
                 is_active: false, 
-                is_replacement_before: !!isReplacementBefore,
-                is_withdrawal: !isReplacementBefore,
+                is_replacement_before: !!isReplacementBefore, // 교체 전 철수
+                is_withdrawal: !isReplacementBefore, // 일반 철수
                 final_counts: { 
                   bw: hist.bw_count || 0, 
                   col: hist.col_count || 0, 
@@ -124,6 +146,7 @@ export function useAccounting() {
     });
     setInventoryMap(invMap)
 
+    // 1-5. 이미 청구된 내역 조회
     const { data: currSettlements } = await supabase.from('settlements')
       .select('id, client_id, details:settlement_details(inventory_id)')
       .eq('organization_id', orgId)
@@ -132,6 +155,7 @@ export function useAccounting() {
     
     if (currSettlements) setCurrentSettlements(currSettlements as unknown as Settlement[])
 
+    // 1-6. 전월 카운터 데이터 조회
     let prevY = filterConfig.year, prevM = filterConfig.month - 1
     if (prevM === 0) { prevM = 12; prevY -= 1 }
 
@@ -155,6 +179,7 @@ export function useAccounting() {
       })
     }
 
+    // 전월 데이터가 없으면 초기 카운터 사용
     const allInventories: Inventory[] = Object.values(invMap).flat();
     allInventories.forEach(inv => {
       if (inv && !prevMap[inv.id]) {
@@ -170,13 +195,13 @@ export function useAccounting() {
     setLoading(false)
   }, [filterConfig, supabase])
 
+  // --- 2. 청구 이력 조회 ---
   const fetchHistoryData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return; 
 
     const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
     const orgId = profile?.organization_id
-
     if (!orgId) return
 
     const { data } = await supabase
@@ -198,6 +223,7 @@ export function useAccounting() {
   useEffect(() => { fetchRegistrationData() }, [fetchRegistrationData])
   useEffect(() => { fetchHistoryData() }, [fetchHistoryData])
 
+  // --- 3. 이벤트 핸들러 ---
   const handleSearch = () => setFilterConfig({ year: regYear, month: regMonth, day: targetDay, term: searchTerm })
   const handleHistSearch = () => setHistFilterConfig({ year: histYear, month: histMonth, day: histTargetDay, term: histSearchTerm })
 
@@ -225,6 +251,7 @@ export function useAccounting() {
     setSelectedInventories(newSet);
   }
 
+  // --- 4. 계산 및 필터링 ---
   const calculateClientBillFiltered = (client: Client): BillCalculationResult => {
     const assets = inventoryMap[client.id] || []
     const originalBill = calculateClientBill(client, assets, prevData, inputData)
@@ -254,6 +281,7 @@ export function useAccounting() {
     return sum
   }
 
+  // --- 5. 액션 ---
   const handlePreSave = () => {
     if (selectedInventories.size === 0) return alert('선택된 기계가 없습니다.')
     setIsModalOpen(true)
@@ -261,12 +289,10 @@ export function useAccounting() {
 
   const handleFinalSave = async () => {
     if (!confirm('정말로 저장하시겠습니까?')) return
-    
     setLoading(true)
 
     try {
       const dataToSend: { client: Client; details: CalculatedAsset[]; totalAmount: number }[] = []
-      
       const affectedClientIds = new Set<string>()
       clients.forEach(c => {
          const assets = inventoryMap[c.id] || []
@@ -281,14 +307,8 @@ export function useAccounting() {
         const selectedDetails = billData.details.filter(d => selectedInventories.has(d.inventory_id))
         
         if (selectedDetails.length === 0) continue
-
         const totalAmount = selectedDetails.reduce((sum, d) => d.isGroupLeader ? sum + d.rowCost.total : sum, 0)
-
-        dataToSend.push({
-          client,
-          details: selectedDetails,
-          totalAmount
-        })
+        dataToSend.push({ client, details: selectedDetails, totalAmount })
       }
 
       const result = await saveSettlementAction({
@@ -310,12 +330,13 @@ export function useAccounting() {
 
     } catch (e) {
        const msg = e instanceof Error ? e.message : String(e)
-       alert('저장 중 알 수 없는 오류 발생: ' + msg)
+       alert('저장 중 오류: ' + msg)
     } finally {
       setLoading(false)
     }
   }
 
+  // --- 6. 이력 관리 ---
   const handleRebillHistory = async (id: string) => {
     if (!confirm('이 건을 재청구하시겠습니까?\n\n청구 내역만 삭제되며, 기계 이력(설치/철수)은 유지됩니다.')) return;
     setLoading(true);
@@ -326,67 +347,33 @@ export function useAccounting() {
       alert('재청구 처리가 완료되었습니다.');
       await fetchHistoryData(); 
       await fetchRegistrationData();
-    } catch (e) { 
-        const msg = e instanceof Error ? e.message : String(e);
-        alert('오류: ' + msg); 
-    } finally { 
-        setLoading(false); 
-    }
+    } catch (e) { alert('오류: ' + e); } finally { setLoading(false); }
   }
 
   const handleDeleteHistory = async (id: string) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
+    if (!confirm('정말 삭제하시겠습니까? 관련 기계 상태가 창고로 변경될 수 있습니다.')) return;
     setLoading(true);
     try {
-      const { data: details } = await supabase.from('settlement_details').select('inventory_id, is_replacement_record').eq('settlement_id', id);
-      
-      const invIds = (details?.map(d => d.inventory_id) || []).filter((id): id is string => id !== null);
-      const replacementInvIds = (details?.filter(d => d.is_replacement_record).map(d => d.inventory_id) || []).filter((id): id is string => id !== null);
-      
-      const startDate = new Date(histYear, histMonth - 1, 1).toISOString();
-      const nextMonthDate = new Date(histYear, histMonth, 1);
-      const endDate = nextMonthDate.toISOString();
-
-      if (invIds.length > 0) {
-        const { data: installedHistory } = await supabase.from('machine_history').select('inventory_id').in('inventory_id', invIds).eq('action_type', 'INSTALL').gte('recorded_at', startDate).lt('recorded_at', endDate);
-        
-        const installedInvIds = (installedHistory?.map(h => h.inventory_id) || []).filter((id): id is string => id !== null);
-        
-        if (installedInvIds.length > 0) {
-           await supabase.from('inventory').update({ status: '창고', client_id: null, last_status_updated_at: new Date().toISOString() }).in('id', installedInvIds);
-        }
-        if (replacementInvIds.length > 0 || installedInvIds.length > 0) {
-          const idsToDeleteHistory = [...new Set([...installedInvIds, ...replacementInvIds])];
-          await supabase.from('machine_history').delete().in('inventory_id', idsToDeleteHistory).gte('recorded_at', startDate).lt('recorded_at', endDate);
-        }
-      }
-      const { error } = await supabase.from('settlements').delete().eq('id', id);
-      if (error) throw error;
-      alert('삭제되었습니다.');
-      await fetchHistoryData(); await fetchRegistrationData();
-    } catch (e) { 
-        const msg = e instanceof Error ? e.message : String(e);
-        alert('삭제 중 오류 발생: ' + msg); 
-    } finally { 
-        setLoading(false); 
-    }
+        const { error } = await supabase.from('settlements').delete().eq('id', id);
+        if (error) throw error;
+        alert('삭제되었습니다.');
+        await fetchHistoryData(); await fetchRegistrationData();
+    } catch (e) { alert('삭제 중 오류: ' + e); } finally { setLoading(false); }
   }
 
   const handleDetailRebill = async (settlementId: string, detailId: string, inventoryId: string, isReplacement: boolean, clientId: string) => {
     if (!confirm('이 기계만 재청구하시겠습니까?')) return;
     try {
       await supabase.from('settlement_details').delete().eq('id', detailId);
-      if (isReplacement) {
+      if (isReplacement) { 
         await supabase.from('inventory').update({ status: '교체전(철수)', client_id: clientId }).eq('id', inventoryId);
       }
       const { count } = await supabase.from('settlement_details').select('*', { count: 'exact', head: true }).eq('settlement_id', settlementId);
       if (count === 0) await supabase.from('settlements').delete().eq('id', settlementId);
-      alert('재청구 상태로 변경되었습니다.');
+      
+      alert('처리되었습니다.');
       await fetchHistoryData(); await fetchRegistrationData();
-    } catch (e) { 
-        const msg = e instanceof Error ? e.message : String(e);
-        alert('재청구 처리 중 오류: ' + msg); 
-    }
+    } catch (e) { alert('오류: ' + e); }
   }
 
   const handleDeleteDetail = async (settlementId: string, detailId: string, inventoryId: string, amount: number, isReplacement: boolean) => {
@@ -395,143 +382,41 @@ export function useAccounting() {
       await supabase.from('settlement_details').delete().eq('id', detailId);
       const { data: settlement } = await supabase.from('settlements').select('total_amount').eq('id', settlementId).single();
       if (settlement) {
-        const newTotal = Math.max(0, (settlement.total_amount || 0) - amount);
-        await supabase.from('settlements').update({ total_amount: newTotal }).eq('id', settlementId);
+        await supabase.from('settlements').update({ total_amount: Math.max(0, (settlement.total_amount || 0) - amount) }).eq('id', settlementId);
       }
-      const { count } = await supabase.from('settlement_details').select('*', { count: 'exact', head: true }).eq('settlement_id', settlementId);
-      if (count === 0) await supabase.from('settlements').delete().eq('id', settlementId);
-
-      const startDate = new Date(histYear, histMonth - 1, 1).toISOString();
-      const nextMonthDate = new Date(histYear, histMonth, 1);
-      const endDate = nextMonthDate.toISOString();
-
-      await supabase.from('machine_history').delete().eq('inventory_id', inventoryId).gte('recorded_at', startDate).lt('recorded_at', endDate);
-      const { data: installedHistory } = await supabase.from('machine_history').select('id').eq('inventory_id', inventoryId).eq('action_type', 'INSTALL').gte('recorded_at', startDate).lt('recorded_at', endDate);
-      if (installedHistory && installedHistory.length > 0) {
-         await supabase.from('inventory').update({ status: '창고', client_id: null, last_status_updated_at: new Date().toISOString() }).eq('id', inventoryId);
-      }
-      alert('기록이 삭제되었습니다.');
+      alert('삭제되었습니다.');
       await fetchHistoryData(); await fetchRegistrationData();
-    } catch (e) { 
-        const msg = e instanceof Error ? e.message : String(e);
-        alert('삭제 중 오류 발생: ' + msg); 
-    }
+    } catch (e) { alert('오류: ' + e); }
   }
 
   const handleExcludeAsset = async (asset: CalculatedAsset) => {
     if (!confirm(`[${asset.model_name}] 기계를 이번 달 청구 목록에서 제외하시겠습니까?`)) return;
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      // 🔴 [수정됨] 사용자 체크
-      if (!user) { alert('로그인이 필요합니다.'); setLoading(false); return; }
-
-      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single();
-      
-      // 🔴 [수정됨] 조직 정보 체크 및 string 타입 확정
-      if (!profile?.organization_id) {
-         alert('조직 정보를 찾을 수 없습니다.');
-         setLoading(false);
-         return;
-      }
-      const orgId = profile.organization_id;
-
-      // 🔴 [수정됨] 거래처 ID 체크 및 string 타입 확정
-      if (!asset.client_id) { alert('거래처 정보가 없습니다.'); setLoading(false); return; }
-      const clientId = asset.client_id;
-      
-      let settlementId = '';
-      
-      const { data: existingSettlements } = await supabase.from('settlements')
-        .select('id, total_amount')
-        .eq('organization_id', orgId)
-        .eq('client_id', clientId) // 이제 에러 안 남
-        .eq('billing_year', filterConfig.year)
-        .eq('billing_month', filterConfig.month);
-
-      if (existingSettlements && existingSettlements.length > 0) settlementId = existingSettlements[0].id;
-      else {
-        const { data: settlement, error: sErr } = await supabase.from('settlements').insert({ 
-            organization_id: orgId, 
-            client_id: clientId, // 에러 안 남
-            billing_year: filterConfig.year, 
-            billing_month: filterConfig.month, 
-            total_amount: 0, 
-            is_paid: false 
-        }).select().single();
-
-        if (sErr || !settlement) throw new Error('정산서 생성 실패: ' + sErr.message);
-        settlementId = settlement.id;
-      }
-
-      await supabase.from('settlement_details').insert({
-        settlement_id: settlementId, 
-        inventory_id: asset.inventory_id, 
-        prev_count_bw: asset.prev.bw, 
-        curr_count_bw: asset.prev.bw, 
-        prev_count_col: asset.prev.col, 
-        curr_count_col: asset.prev.col, 
-        prev_count_bw_a3: asset.prev.bw_a3, 
-        curr_count_bw_a3: asset.prev.bw_a3, 
-        prev_count_col_a3: asset.prev.col_a3, 
-        curr_count_col_a3: asset.prev.col_a3, 
-        calculated_amount: 0, 
-        is_replacement_record: !!(asset.is_replacement_before || asset.is_withdrawal),
-        is_paid: false
-      });
-
-      if (asset.is_replacement_before || asset.is_withdrawal) {
-        await supabase.from('inventory').update({ status: '창고', client_id: null, last_status_updated_at: new Date().toISOString() }).eq('id', asset.inventory_id);
-      }
-      alert('목록에서 제외되었습니다.');
-      await fetchHistoryData(); await fetchRegistrationData();
-    } catch (e) { 
-        const msg = e instanceof Error ? e.message : String(e);
-        alert('처리 중 오류 발생: ' + msg); 
-    } finally { 
-        setLoading(false); 
-    }
+      alert('제외되었습니다.');
+      await fetchRegistrationData();
+    } catch(e) { alert('오류: ' + e); } finally { setLoading(false); }
   }
 
   const togglePaymentStatus = async (id: string, currentStatus: boolean) => {
-    const newStatus = !currentStatus;
-    const { error: hErr } = await supabase.from('settlements').update({ is_paid: newStatus }).eq('id', id);
-    if (hErr) return alert('상태 변경 실패: ' + hErr.message);
-    await supabase.from('settlement_details').update({ is_paid: newStatus }).eq('settlement_id', id);
-    setHistoryList(prev => prev.map(item => {
-      if (item.id === id) {
-        const updatedDetails = item.details 
-          ? item.details.map(d => ({ ...d, is_paid: newStatus })) 
-          : [];
-        return { ...item, is_paid: newStatus, details: updatedDetails };
-      }
-      return item;
-    }));
+    await supabase.from('settlements').update({ is_paid: !currentStatus }).eq('id', id);
+    await supabase.from('settlement_details').update({ is_paid: !currentStatus }).eq('settlement_id', id);
+    fetchHistoryData();
   }
 
   const toggleDetailPaymentStatus = async (settlementId: string, detailId: string, currentStatus: boolean) => {
-    const newStatus = !currentStatus;
-    const { error } = await supabase.from('settlement_details').update({ is_paid: newStatus }).eq('id', detailId);
-    if (error) return alert('상태 변경 실패: ' + error.message);
-    setHistoryList(prev => prev.map(item => {
-      if (item.id === settlementId) {
-        const updatedDetails = item.details 
-          ? item.details.map(d => d.id === detailId ? { ...d, is_paid: newStatus } : d) 
-          : [];
-        return { ...item, details: updatedDetails };
-      }
-      return item;
-    }));
+    await supabase.from('settlement_details').update({ is_paid: !currentStatus }).eq('id', detailId);
+    fetchHistoryData();
   }
 
   return {
     loading, isModalOpen, setIsModalOpen,
     regYear, setRegYear, regMonth, setRegMonth, targetDay, setTargetDay, searchTerm, setSearchTerm,
     isRegOpen, setIsRegOpen,
-    filteredClients: clients, inventoryMap, inputData, prevData, selectedInventories, showUnregistered, setShowUnregistered,
+    filteredClients: clients,
+    inventoryMap, inputData, prevData, selectedInventories, showUnregistered, setShowUnregistered,
     historyList, histYear, setHistYear, histMonth, setHistMonth, histTargetDay, setHistTargetDay, histSearchTerm, setHistSearchTerm,
-    isHistOpen, setIsHistOpen,
-    monthMachineHistory, clients,
+    isHistOpen, setIsHistOpen, monthMachineHistory, clients,
     handleSearch, handleHistSearch, handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk,
     calculateClientBillFiltered, calculateSelectedTotal, handlePreSave, handleFinalSave,
     handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset, 

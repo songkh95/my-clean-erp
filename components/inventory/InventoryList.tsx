@@ -11,15 +11,14 @@ interface InventoryListProps {
   refreshTrigger: number
 }
 
-// EditableField의 Props 타입 정의
 interface EditableFieldProps {
   label: string
-  name: keyof Inventory // Inventory의 키만 허용하여 오타 방지
+  name: keyof Inventory
   val: string | number | undefined | null
   isEdit: boolean
   editData: Inventory | null
   setEditData: (data: Inventory) => void
-  type?: 'text' | 'number'
+  type?: 'text' | 'number' | 'date' // 👈 'date' 타입 추가
 }
 
 export default function InventoryList({ type, refreshTrigger }: InventoryListProps) {
@@ -44,16 +43,17 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
     if (user) {
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
       
-      const { data } = await supabase
-        .from('inventory')
-        .select('*, client:client_id(name)')
-        .eq('type', type)
-        .eq('organization_id', profile?.organization_id)
-        .order('created_at', { ascending: false })
-      
-      if (data) setItems(data as Inventory[])
+      if (profile?.organization_id) {
+        const { data } = await supabase
+          .from('inventory')
+          .select('*, client:client_id(name)')
+          .eq('type', type)
+          .eq('organization_id', profile.organization_id)
+          .order('created_at', { ascending: false })
+        
+        if (data) setItems(data as Inventory[])
+      }
 
-      // 활성 상태인 거래처만 조회
       const { data: cData } = await supabase.from('clients').select('*').eq('status', 'active')
       if (cData) setClients(cData as Client[])
     }
@@ -77,13 +77,10 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
   }
 
   const handleUpdate = async () => {
-    if (!editData) return;
+    if (!editData || !editingId) return;
 
-    // 객체 구조 분해 할당을 통해 client(객체)와 created_at(수정 불필요) 등을 제외
-    // 타입 단언 없이 안전하게 처리
     const payload: Partial<Inventory> = { ...editData };
     
-    // DB 업데이트 시 불필요하거나 충돌날 수 있는 필드 제거
     delete payload.client;
     delete payload.created_at;
     
@@ -92,11 +89,11 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
       return
     }
 
-    // 빈 문자열이나 undefined 값 처리
     const updateData = {
       ...payload,
       client_id: payload.client_id || null,
       purchase_price: payload.purchase_price === undefined || payload.purchase_price === null ? null : Number(payload.purchase_price),
+      purchase_date: payload.purchase_date === '' ? null : payload.purchase_date, // 👈 빈 날짜 처리
     }
 
     const { error } = await supabase.from('inventory').update(updateData).eq('id', editingId)
@@ -197,6 +194,8 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                                 <EditableField label="모델명" name="model_name" val={item.model_name} isEdit={isEditing} editData={editData} setEditData={setEditData} />
                                 <EditableField label="S/N" name="serial_number" val={item.serial_number} isEdit={isEditing} editData={editData} setEditData={setEditData} />
                                 <EditableField label="매입가" name="purchase_price" val={item.purchase_price} isEdit={isEditing} editData={editData} setEditData={setEditData} type="number" />
+                                {/* 👇 [추가됨] 매입일 표시 및 수정 */}
+                                <EditableField label="매입일" name="purchase_date" val={item.purchase_date} isEdit={isEditing} editData={editData} setEditData={setEditData} type="date" />
                                 
                                 <div className={styles.editableItem}>
                                   <span className={styles.editableLabel}>설치처</span>

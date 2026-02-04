@@ -102,10 +102,11 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       if (confirmSync) {
         setFormData({
           ...formData,
-          plan_price_bw: targetAsset.plan_price_bw,
-          plan_price_col: targetAsset.plan_price_col,
-          plan_weight_a3_bw: targetAsset.plan_weight_a3_bw,
-          plan_weight_a3_col: targetAsset.plan_weight_a3_col,
+          // 🔴 [수정] DB 값이 null일 경우 기본값(0 또는 1) 사용
+          plan_price_bw: targetAsset.plan_price_bw ?? 0,
+          plan_price_col: targetAsset.plan_price_col ?? 0,
+          plan_weight_a3_bw: targetAsset.plan_weight_a3_bw ?? 1,
+          plan_weight_a3_col: targetAsset.plan_weight_a3_col ?? 1,
           billing_group_id: targetAsset.billing_group_id || 'NEW_GROUP_WITH_' + targetAsset.id
         });
       }

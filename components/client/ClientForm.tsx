@@ -5,6 +5,8 @@ import { createClient } from '@/utils/supabase'
 import Button from './../ui/Button'
 import InputField from './../ui/Input'
 import { Client } from '@/app/types'
+// ✅ Server Actions 임포트
+import { createClientAction, updateClientAction } from '@/app/actions/client'
 
 interface Props {
   isOpen: boolean
@@ -28,6 +30,7 @@ interface ClientFormState {
 }
 
 export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Props) {
+  // 드롭다운 목록 조회용 Supabase 클라이언트 (읽기 전용)
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [potentialParents, setPotentialParents] = useState<Client[]>([])
@@ -39,6 +42,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
 
   const [formData, setFormData] = useState<ClientFormState>(initialData)
 
+  // 소속 본사 목록 조회 (드롭다운용)
   const fetchPotentialParents = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -50,6 +54,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
         .eq('organization_id', profile.organization_id)
         .eq('is_deleted', false)
       
+      // 자기 자신을 부모로 선택할 수 없도록 제외
       if (editData && editData.id) {
         query = query.neq('id', editData.id)
       }
@@ -59,6 +64,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
     }
   }, [editData, supabase]) 
 
+  // 초기 데이터 세팅
   useEffect(() => {
     if (isOpen) {
       fetchPotentialParents()
@@ -86,23 +92,31 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
     e.preventDefault()
     setLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
-      
+      // Payload 구성 (빈 문자열 parent_id를 null로 변환)
       const payload = {
         ...formData,
         parent_id: formData.parent_id === '' ? null : formData.parent_id,
-        organization_id: profile?.organization_id
       }
 
-      const { error } = editData && editData.id
-        ? await supabase.from('clients').update(payload).eq('id', editData.id)
-        : await supabase.from('clients').insert(payload)
+      // ✅ Server Action 호출로 변경
+      let result;
+      if (editData && editData.id) {
+        // 수정
+        result = await updateClientAction(editData.id, payload)
+      } else {
+        // 등록
+        result = await createClientAction(payload)
+      }
 
-      if (error) throw error
-      onSuccess(); onClose()
-    } catch (error) { 
-      const message = error instanceof Error ? error.message : (error as { message?: string })?.message || String(error)
+      if (result.success) {
+        alert(result.message)
+        onSuccess()
+        onClose()
+      } else {
+        throw new Error(result.message)
+      }
+    } catch (error: any) { 
+      const message = error.message || String(error)
       alert('저장 오류: ' + message) 
     } finally { 
       setLoading(false) 

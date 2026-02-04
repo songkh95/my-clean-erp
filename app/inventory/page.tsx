@@ -1,53 +1,19 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { createClient } from '@/utils/supabase'
+import React, { useState } from 'react'
 import InventoryForm from '@/components/inventory/InventoryForm'
 import styles from './inventory.module.css'
 import { Inventory } from '@/app/types'
+import { useInventory } from './hooks/useInventory'
 
 export default function InventoryPage() {
-  const supabase = createClient()
-  
-  const [loading, setLoading] = useState(false)
-  const [items, setItems] = useState<Inventory[]>([]) // ✅ Inventory 타입 적용
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const { 
+    loading, items, searchTerm, setSearchTerm, statusFilter, setStatusFilter, 
+    expandedRows, toggleExpand, fetchInventory, deleteInventory 
+  } = useInventory()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<Inventory | null>(null) // ✅ Inventory 타입 적용
-  
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    fetchInventory()
-  }, [])
-
-  const fetchInventory = async () => {
-    setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
-    
-    if (profile?.organization_id) {
-      const { data } = await supabase
-        .from('inventory')
-        .select(`*, client:client_id (name)`)
-        .eq('organization_id', profile.organization_id)
-        .order('created_at', { ascending: false })
-      
-      if (data) setItems(data as Inventory[])
-    }
-    setLoading(false)
-  }
-
-  const toggleExpand = (id: string) => {
-    const newSet = new Set(expandedRows)
-    if (newSet.has(id)) newSet.delete(id)
-    else newSet.add(id)
-    setExpandedRows(newSet)
-  }
+  const [selectedItem, setSelectedItem] = useState<Inventory | null>(null)
 
   const handleEdit = (e: React.MouseEvent, item: Inventory) => {
     e.stopPropagation() 
@@ -59,23 +25,6 @@ export default function InventoryPage() {
     setSelectedItem(null) 
     setIsModalOpen(true)
   }
-
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation() 
-    if (confirm('정말 삭제하시겠습니까?')) {
-      await supabase.from('inventory').delete().eq('id', id)
-      fetchInventory()
-    }
-  }
-
-  const filteredItems = items.filter(item => {
-    const matchesSearch = 
-      item.model_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.serial_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.client?.name && item.client.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    const matchesStatus = statusFilter === 'all' ? true : item.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
 
   return (
     <div className={styles.container}>
@@ -128,10 +77,10 @@ export default function InventoryPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#666' }}>데이터를 불러오는 중...</td></tr>
-              ) : filteredItems.length === 0 ? (
+              ) : items.length === 0 ? (
                 <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#666' }}>등록된 장비가 없습니다.</td></tr>
               ) : (
-                filteredItems.map(item => (
+                items.map(item => (
                   <React.Fragment key={item.id}>
                     <tr 
                       onClick={() => toggleExpand(item.id)}
@@ -167,11 +116,12 @@ export default function InventoryPage() {
                       <td className={styles.td} style={{ textAlign: 'center' }}>
                          <div style={{display:'flex', gap:'8px', justifyContent:'center'}}>
                            <button onClick={(e) => handleEdit(e, item)} className={styles.secondaryBtn}>수정</button>
-                           <button onClick={(e) => handleDelete(e, item.id)} className={styles.deleteBtn}>삭제</button>
+                           <button onClick={(e) => { e.stopPropagation(); deleteInventory(item.id); }} className={styles.deleteBtn}>삭제</button>
                          </div>
                       </td>
                     </tr>
 
+                    {/* 🔴 [복원 완료] 아코디언 상세 내용 */}
                     {expandedRows.has(item.id) && (
                       <tr className={styles.detailRow}>
                         <td colSpan={7} className={styles.detailContent}>
@@ -194,33 +144,33 @@ export default function InventoryPage() {
                             </div>
                           </div>
 
-                          <div className={styles.detailBox} style={{marginBottom: '20px'}}>
-                            <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#171717', marginBottom: '15px', paddingBottom:'10px', borderBottom:'1px solid #E5E5E5', display:'flex', alignItems:'center', gap:'8px' }}>
+                          <div className={styles.infoBox} style={{marginBottom: '20px'}}>
+                            <div className={styles.boxTitle}>
                               <span style={{color:'#0070f3'}}>🔢</span> 초기 카운터 (Meter Reading)
                             </div>
-                            <div style={{ display: 'flex', gap: '40px' }}>
-                              <div>
-                                <span style={{ color: '#666666', marginRight: '8px', fontSize:'0.9rem' }}>흑백 A4</span>
-                                <b style={{fontSize:'1rem', color:'#171717'}}>{item.initial_count_bw?.toLocaleString() || 0}</b>
+                            <div className={styles.counterGrid}>
+                              <div className={styles.counterItem}>
+                                <span>흑백 A4</span>
+                                <b>{item.initial_count_bw?.toLocaleString() || 0}</b>
                               </div>
-                              <div>
-                                <span style={{ color: '#0070f3', marginRight: '8px', fontSize:'0.9rem' }}>칼라 A4</span>
-                                <b style={{fontSize:'1rem', color:'#171717'}}>{item.initial_count_col?.toLocaleString() || 0}</b>
+                              <div className={styles.counterItem}>
+                                <span style={{ color: '#0070f3' }}>칼라 A4</span>
+                                <b>{item.initial_count_col?.toLocaleString() || 0}</b>
                               </div>
-                              <div style={{ borderLeft:'1px solid #E5E5E5', paddingLeft:'40px' }}>
-                                <span style={{ color: '#666666', marginRight: '8px', fontSize:'0.9rem' }}>흑백 A3</span>
-                                <b style={{fontSize:'1rem', color:'#171717'}}>{item.initial_count_bw_a3?.toLocaleString() || 0}</b>
+                              <div className={styles.counterItem} style={{ borderLeft:'1px solid #E5E5E5', paddingLeft:'40px' }}>
+                                <span>흑백 A3</span>
+                                <b>{item.initial_count_bw_a3?.toLocaleString() || 0}</b>
                               </div>
-                              <div>
-                                <span style={{ color: '#0070f3', marginRight: '8px', fontSize:'0.9rem' }}>칼라 A3</span>
-                                <b style={{fontSize:'1rem', color:'#171717'}}>{item.initial_count_col_a3?.toLocaleString() || 0}</b>
+                              <div className={styles.counterItem}>
+                                <span style={{ color: '#0070f3' }}>칼라 A3</span>
+                                <b>{item.initial_count_col_a3?.toLocaleString() || 0}</b>
                               </div>
                             </div>
                           </div>
 
-                          <div className={styles.detailBox}>
+                          <div className={styles.infoBox}>
                             <div className={styles.label}>📝 비고 (특이사항)</div>
-                            <div style={{ fontSize: '0.95rem', whiteSpace: 'pre-wrap', color: '#171717', lineHeight:'1.5' }}>
+                            <div style={{ fontSize: '0.95rem', whiteSpace: 'pre-wrap', color: '#171717', lineHeight:'1.5', marginTop:'8px' }}>
                               {item.memo || '등록된 메모가 없습니다.'}
                             </div>
                           </div>

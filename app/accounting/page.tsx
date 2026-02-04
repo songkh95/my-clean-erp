@@ -1,3 +1,5 @@
+// app/accounting/page.tsx
+
 'use client'
 
 import styles from './accounting.module.css'
@@ -8,6 +10,7 @@ import { useAccounting } from './hooks/useAccounting'
 
 export default function AccountingPage() {
   const {
+    // 상태값 (State)
     loading, isModalOpen, setIsModalOpen,
     regYear, setRegYear, regMonth, setRegMonth, targetDay, setTargetDay, searchTerm, setSearchTerm,
     isRegOpen, setIsRegOpen,
@@ -16,17 +19,18 @@ export default function AccountingPage() {
     histYear, setHistYear, histMonth, setHistMonth, histTargetDay, setHistTargetDay, histSearchTerm, setHistSearchTerm,
     monthMachineHistory, clients,
     
+    // 기능 함수 (Functions)
     handleSearch, handleHistSearch, handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk,
     calculateClientBillFiltered, calculateSelectedTotal, handlePreSave, handleFinalSave,
-    
     handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset, 
-    togglePaymentStatus, toggleDetailPaymentStatus // ✅ 함수 가져오기
+    togglePaymentStatus, toggleDetailPaymentStatus
   } = useAccounting()
 
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>💰 정산 및 회계 관리</h1>
       
+      {/* 1. 등록 및 청구 섹션 */}
       <AccountingRegistration 
         isRegOpen={isRegOpen} setIsRegOpen={setIsRegOpen}
         regYear={regYear} setRegYear={setRegYear}
@@ -46,6 +50,7 @@ export default function AccountingPage() {
         handleExcludeAsset={handleExcludeAsset}
       />
 
+      {/* 2. 청구 이력 및 관리 섹션 */}
       <AccountingHistory 
         isHistOpen={isHistOpen} setIsHistOpen={setIsHistOpen}
         histYear={histYear} setHistYear={setHistYear}
@@ -60,9 +65,10 @@ export default function AccountingPage() {
         searchTerm={histSearchTerm} setSearchTerm={setHistSearchTerm}
         onSearch={handleHistSearch}
         togglePaymentStatus={togglePaymentStatus}
-        toggleDetailPaymentStatus={toggleDetailPaymentStatus} // ✅ Props 전달
+        toggleDetailPaymentStatus={toggleDetailPaymentStatus}
       />
       
+      {/* 3. 최종 확인 모달 */}
       {isModalOpen && (
         <SettlementConfirmModal 
           selectedInventories={selectedInventories} calculateSelectedTotal={calculateSelectedTotal}

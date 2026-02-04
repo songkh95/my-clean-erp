@@ -209,6 +209,7 @@ export type Database = {
           memo: string | null
           organization_id: string | null
           recorded_at: string | null
+          is_replacement: boolean | null
         }
         Insert: {
           action_type: string
@@ -222,6 +223,7 @@ export type Database = {
           memo?: string | null
           organization_id?: string | null
           recorded_at?: string | null
+          is_replacement?: boolean | null
         }
         Update: {
           action_type?: string
@@ -235,6 +237,7 @@ export type Database = {
           memo?: string | null
           organization_id?: string | null
           recorded_at?: string | null
+          is_replacement: boolean | null
         }
         Relationships: [
           {

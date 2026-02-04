@@ -14,24 +14,21 @@ import { Client, Inventory } from '@/app/types'
 export default function ClientList() {
   const supabase = createClient()
 
-  // 상태 관리 로직 (타입 적용)
   const [clients, setClients] = useState<Client[]>([])
   const [assetsMap, setAssetsMap] = useState<{[key: string]: Inventory[]}>({})
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   
-  // 모달 제어 상태
+  // 모달 상태
   const [isRegModalOpen, setIsRegModalOpen] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [planModalOpen, setPlanModalOpen] = useState(false)
   const [selectedAssetForPlan, setSelectedAssetForPlan] = useState<{id: string, clientId: string} | null>(null)
   
-  // 기계 추가 모달 상태
   const [addMachineModalOpen, setAddMachineModalOpen] = useState(false)
   const [clientForMachineAdd, setClientForMachineAdd] = useState<Client | null>(null)
 
-  // 기계 교체/철수 모달 관련
   const [replaceModalOpen, setReplaceModalOpen] = useState(false)
   const [selectedAssetForReplace, setSelectedAssetForReplace] = useState<Inventory | null>(null)
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
@@ -62,7 +59,6 @@ export default function ClientList() {
         
         const map: {[key: string]: Inventory[]} = {}
         if (assetData) {
-          // ✅ any 제거: Inventory[]로 캐스팅
           (assetData as Inventory[]).forEach((inv) => {
             if (inv.client_id) {
               if (!map[inv.client_id]) map[inv.client_id] = []
@@ -79,10 +75,13 @@ export default function ClientList() {
   const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation()
     if (confirm(`'${name}' 거래처를 정말로 삭제하시겠습니까?`)) { 
-      // 실제 삭제 대신 is_deleted 플래그 업데이트 (ClientForm 로직 참조)
       const { error } = await supabase.from('clients').update({ is_deleted: true }).eq('id', id);
+      
       if (error) alert('삭제 실패: ' + error.message);
-      else { alert('삭제되었습니다.'); fetchClients(); }
+      else { 
+        alert('삭제되었습니다.'); 
+        fetchClients(); 
+      }
     }
   }
 
@@ -93,19 +92,17 @@ export default function ClientList() {
     setExpandedRows(newSet)
   }
 
-const handleAddMachineClick = (e: React.MouseEvent, client: Client) => {
+  const handleAddMachineClick = (e: React.MouseEvent, client: Client) => {
     e.stopPropagation()
     setClientForMachineAdd(client)
     setAddMachineModalOpen(true)
   }
 
-  // 교체 버튼 핸들러
   const handleReplaceClick = (asset: Inventory) => {
     setSelectedAssetForReplace(asset)
     setReplaceModalOpen(true)
   }
 
-  // 철수 버튼 핸들러
   const handleWithdrawClick = (asset: Inventory) => {
     setSelectedAssetForWithdraw(asset)
     setWithdrawModalOpen(true)
@@ -180,20 +177,53 @@ const handleAddMachineClick = (e: React.MouseEvent, client: Client) => {
             {isExpanded && (
               <div className={styles.detailsContainer}>
                 <div className={styles.sectionTitle}>ℹ️ 상세 정보</div>
-                <div className={styles.gridForm}>
+                
+                {/* 🔴 [개선] 반응형 그리드로 모든 필드 표시 (공간 효율화) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '20px' }}>
                   <div className={styles.fieldContainer}>
-                    <span className={styles.label}>이메일</span>
-                    <span className={styles.valueText}>{client.email || '-'}</span>
+                    <span className={styles.label}>대표자명</span>
+                    <span className={styles.valueText}>{client.representative_name || '-'}</span>
+                  </div>
+                  <div className={styles.fieldContainer}>
+                    <span className={styles.label}>사업자번호</span>
+                    <span className={styles.valueText}>{client.business_number || '-'}</span>
                   </div>
                   <div className={styles.fieldContainer}>
                     <span className={styles.label}>담당자</span>
                     <span className={styles.valueText}>{client.contact_person || '-'}</span>
                   </div>
-                  <div className={styles.fieldContainer} style={{ gridColumn: 'span 2' }}>
+                  <div className={styles.fieldContainer}>
+                    <span className={styles.label}>연락처 (휴대폰)</span>
+                    <span className={styles.valueText}>{client.phone || '-'}</span>
+                  </div>
+                  <div className={styles.fieldContainer}>
+                    <span className={styles.label}>사무실 전화</span>
+                    <span className={styles.valueText}>{client.office_phone || '-'}</span>
+                  </div>
+                  <div className={styles.fieldContainer}>
+                    <span className={styles.label}>이메일</span>
+                    <span className={styles.valueText}>{client.email || '-'}</span>
+                  </div>
+                  <div className={styles.fieldContainer} style={{ gridColumn: '1 / -1' }}>
                     <span className={styles.label}>주소</span>
                     <span className={styles.valueText}>{client.address || '-'}</span>
                   </div>
                 </div>
+
+                {/* 🔴 [추가] 메모 영역 (내용이 있을 때만 표시) */}
+                {client.memo && (
+                  <div style={{ 
+                    backgroundColor: '#fff', 
+                    padding: '12px', 
+                    borderRadius: '6px', 
+                    border: '1px solid #e5e5e5', 
+                    marginBottom: '20px',
+                    fontSize: '0.9rem'
+                  }}>
+                    <span className={styles.label} style={{ display:'block', marginBottom:'6px', fontWeight: 'bold' }}>📝 메모</span>
+                    <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5', color: '#171717' }}>{client.memo}</div>
+                  </div>
+                )}
 
                 <div className={styles.divider} />
 
@@ -244,9 +274,7 @@ const handleAddMachineClick = (e: React.MouseEvent, client: Client) => {
                                   setPlanModalOpen(true); 
                                 }
                               }}>요금제</Button>
-                              
                               <Button variant="outline" size="sm" onClick={() => handleReplaceClick(asset)}>교체</Button>
-                              
                               <Button variant="danger" size="sm" onClick={() => handleWithdrawClick(asset)} style={{ border: '1px solid #ff4d4f', background: 'transparent' }}>철수</Button>
                             </div>
                           </td>
@@ -261,54 +289,11 @@ const handleAddMachineClick = (e: React.MouseEvent, client: Client) => {
         )
       })}
 
-      {isRegModalOpen && (
-        <ClientForm 
-          isOpen={isRegModalOpen} 
-          onClose={() => setIsRegModalOpen(false)} 
-          onSuccess={fetchClients} 
-          editData={selectedClient} 
-        />
-      )}
-      
-      {planModalOpen && selectedAssetForPlan && (
-        <PlanSettingModal 
-          inventoryId={selectedAssetForPlan.id} 
-          clientId={selectedAssetForPlan.clientId} 
-          onClose={() => { setPlanModalOpen(false); setSelectedAssetForPlan(null) }} 
-          onUpdate={fetchClients} 
-        />
-      )}
-
-{addMachineModalOpen && clientForMachineAdd && (
-        <InventoryForm 
-          isOpen={addMachineModalOpen}
-          onClose={() => { setAddMachineModalOpen(false); setClientForMachineAdd(null) }}
-          onSuccess={fetchClients}
-          // ✅ any 제거: Inventory 타입의 Partial 객체 전달
-          editData={{
-            status: '설치',
-            client_id: clientForMachineAdd.id,
-          }} 
-        />
-      )}
-
-      {replaceModalOpen && selectedAssetForReplace && selectedAssetForReplace.client_id && (
-        <MachineReplaceModal 
-          oldAsset={selectedAssetForReplace} 
-          clientId={selectedAssetForReplace.client_id} 
-          onClose={() => { setReplaceModalOpen(false); setSelectedAssetForReplace(null) }} 
-          onSuccess={fetchClients} 
-        />
-      )}
-
-      {withdrawModalOpen && selectedAssetForWithdraw && selectedAssetForWithdraw.client_id && (
-        <MachineWithdrawModal 
-          asset={selectedAssetForWithdraw} 
-          clientId={selectedAssetForWithdraw.client_id} 
-          onClose={() => { setWithdrawModalOpen(false); setSelectedAssetForWithdraw(null) }} 
-          onSuccess={fetchClients} 
-        />
-      )}
+      {isRegModalOpen && <ClientForm isOpen={isRegModalOpen} onClose={() => setIsRegModalOpen(false)} onSuccess={fetchClients} editData={selectedClient} />}
+      {planModalOpen && selectedAssetForPlan && <PlanSettingModal inventoryId={selectedAssetForPlan.id} clientId={selectedAssetForPlan.clientId} onClose={() => { setPlanModalOpen(false); setSelectedAssetForPlan(null) }} onUpdate={fetchClients} />}
+      {addMachineModalOpen && clientForMachineAdd && <InventoryForm isOpen={addMachineModalOpen} onClose={() => { setAddMachineModalOpen(false); setClientForMachineAdd(null) }} onSuccess={fetchClients} editData={{ status: '설치', client_id: clientForMachineAdd.id }} />}
+      {replaceModalOpen && selectedAssetForReplace && selectedAssetForReplace.client_id && <MachineReplaceModal oldAsset={selectedAssetForReplace} clientId={selectedAssetForReplace.client_id} onClose={() => { setReplaceModalOpen(false); setSelectedAssetForReplace(null) }} onSuccess={fetchClients} />}
+      {withdrawModalOpen && selectedAssetForWithdraw && selectedAssetForWithdraw.client_id && <MachineWithdrawModal asset={selectedAssetForWithdraw} clientId={selectedAssetForWithdraw.client_id} onClose={() => { setWithdrawModalOpen(false); setSelectedAssetForWithdraw(null) }} onSuccess={fetchClients} />}
     </div>
   )
 }

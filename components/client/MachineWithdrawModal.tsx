@@ -30,13 +30,25 @@ export default function MachineWithdrawModal({ asset, clientId, onClose, onSucce
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user?.id).single()
+      
+      // 🔴 [수정] user 존재 여부 확인 (타입 가드)
+      if (!user) {
+        throw new Error('로그인이 필요합니다.')
+      }
+
+      // 🔴 [수정] user.id가 string임을 보장
+      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+
+      // 🔴 [수정] 조직 정보 확인
+      if (!profile?.organization_id) {
+        throw new Error('조직 정보를 찾을 수 없습니다.')
+      }
 
       // 1. 기계 회수 이력 기록
       await supabase.from('machine_history').insert({
         inventory_id: asset.id,
         client_id: clientId,
-        organization_id: profile?.organization_id,
+        organization_id: profile.organization_id, // profile.organization_id 사용
         action_type: 'WITHDRAW',
         bw_count: formData.final_bw,
         col_count: formData.final_col,
