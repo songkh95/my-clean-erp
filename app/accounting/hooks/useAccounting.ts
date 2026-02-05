@@ -6,8 +6,15 @@ import { calculateClientBill } from '@/utils/billingCalculator'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/types/supabase'
 import { 
-  Client, Inventory, Settlement, MachineHistory, CounterData, 
-  BillCalculationResult, CalculatedAsset, SettlementDetail
+  Client, 
+  Inventory, 
+  Settlement, 
+  MachineHistory, 
+  CounterData, 
+  BillCalculationResult,
+  CalculatedAsset,
+  SettlementDetail,
+  Organization
 } from '@/app/types'
 
 import { 
@@ -18,15 +25,21 @@ import {
   deleteSettlementDetailAction,
   toggleSettlementPaymentAction,
   toggleDetailPaymentAction,
-  deleteSettlementsAction // ✅ 일괄 삭제 액션 추가
+  deleteSettlementsAction
 } from '@/app/actions/accounting'
 
 export function useAccounting() {
   const supabase = createClient() as SupabaseClient<Database>
   
+  // --- 상태 관리 ---
   const [loading, setLoading] = useState<boolean>(false)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
   
+  // 명세서 관련 상태
+  const [isStatementOpen, setIsStatementOpen] = useState<boolean>(false)
+  const [selectedSettlementForStatement, setSelectedSettlementForStatement] = useState<Settlement | null>(null)
+  const [myOrg, setMyOrg] = useState<Organization | null>(null)
+
   const [regYear, setRegYear] = useState<number>(new Date().getFullYear())
   const [regMonth, setRegMonth] = useState<number>(new Date().getMonth() + 1)
   const [targetDay, setTargetDay] = useState<string>('all')
@@ -55,6 +68,7 @@ export function useAccounting() {
   const [histMonth, setHistMonth] = useState<number>(new Date().getMonth() + 1)
   const [histTargetDay, setHistTargetDay] = useState<string>('all')
   const [histSearchTerm, setHistSearchTerm] = useState<string>('')
+  
   const [histFilterConfig, setHistFilterConfig] = useState({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
@@ -63,7 +77,7 @@ export function useAccounting() {
   })
   const [monthMachineHistory, setMonthMachineHistory] = useState<MachineHistory[]>([])
 
-  // ... (fetchRegistrationData, fetchHistoryData 등 기존 로직 동일)
+  // --- 1. 등록 데이터 조회 ---
   const fetchRegistrationData = useCallback(async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -73,15 +87,27 @@ export function useAccounting() {
     const orgId = profile?.organization_id
     if (!orgId) return
 
+    // 내 회사 정보 조회 (명세서 공급자용)
+    const { data: orgData } = await supabase.from('organizations').select('*').eq('id', orgId).single()
+    if (orgData) setMyOrg(orgData as Organization)
+
     const { data: clientData } = await supabase.from('clients').select('*').eq('organization_id', orgId).eq('is_deleted', false).order('name')
     if (clientData) setClients(clientData as Client[])
 
-    const { data: invData } = await supabase.from('inventory').select('*').eq('organization_id', orgId).not('client_id', 'is', null)
+    const { data: invData } = await supabase.from('inventory')
+      .select('*')
+      .eq('organization_id', orgId)
+      .not('client_id', 'is', null)
 
     const startDate = new Date(filterConfig.year, filterConfig.month - 1, 1).toISOString()
     const endDate = new Date(filterConfig.year, filterConfig.month, 0, 23, 59, 59).toISOString()
 
-    const { data: historyData } = await supabase.from('machine_history').select('*, inventory(*)').eq('organization_id', orgId).gte('recorded_at', startDate).lte('recorded_at', endDate)
+    const { data: historyData } = await supabase
+      .from('machine_history')
+      .select('*, inventory(*)')
+      .eq('organization_id', orgId)
+      .gte('recorded_at', startDate)
+      .lte('recorded_at', endDate)
 
     const invMap: {[key: string]: Inventory[]} = {}
     const safeInvData = (invData || []) as unknown as Inventory[];
@@ -105,9 +131,16 @@ export function useAccounting() {
           
           if (withdrawnInv) {
             invMap[hist.client_id].push({ 
-                ...withdrawnInv, is_active: false, is_replacement_before: !!isReplacementBefore,
+                ...withdrawnInv, 
+                is_active: false, 
+                is_replacement_before: !!isReplacementBefore,
                 is_withdrawal: !isReplacementBefore,
-                final_counts: { bw: hist.bw_count || 0, col: hist.col_count || 0, bw_a3: hist.bw_a3_count || 0, col_a3: hist.col_a3_count || 0 }
+                final_counts: { 
+                  bw: hist.bw_count || 0, 
+                  col: hist.col_count || 0, 
+                  bw_a3: hist.bw_a3_count || 0, 
+                  col_a3: hist.col_a3_count || 0 
+                }
             })
           }
         }
@@ -115,7 +148,12 @@ export function useAccounting() {
     });
     setInventoryMap(invMap)
 
-    const { data: currSettlements } = await supabase.from('settlements').select('id, client_id, total_amount, details:settlement_details(inventory_id)').eq('organization_id', orgId).eq('billing_year', filterConfig.year).eq('billing_month', filterConfig.month)
+    const { data: currSettlements } = await supabase.from('settlements')
+      .select('id, client_id, total_amount, details:settlement_details(inventory_id)')
+      .eq('organization_id', orgId)
+      .eq('billing_year', filterConfig.year)
+      .eq('billing_month', filterConfig.month)
+    
     if (currSettlements) setCurrentSettlements(currSettlements as unknown as Settlement[])
 
     let prevY = filterConfig.year, prevM = filterConfig.month - 1
@@ -131,7 +169,12 @@ export function useAccounting() {
       const safeDetails = (details || []) as unknown as SettlementDetail[];
       safeDetails.forEach((d) => { 
         if (d.inventory_id) {
-          prevMap[d.inventory_id] = { bw: d.curr_count_bw || 0, col: d.curr_count_col || 0, bw_a3: d.curr_count_bw_a3 || 0, col_a3: d.curr_count_col_a3 || 0 } 
+          prevMap[d.inventory_id] = { 
+            bw: d.curr_count_bw || 0, 
+            col: d.curr_count_col || 0, 
+            bw_a3: d.curr_count_bw_a3 || 0, 
+            col_a3: d.curr_count_col_a3 || 0 
+          } 
         }
       })
     }
@@ -139,13 +182,19 @@ export function useAccounting() {
     const allInventories: Inventory[] = Object.values(invMap).flat();
     allInventories.forEach(inv => {
       if (inv && !prevMap[inv.id]) {
-        prevMap[inv.id] = { bw: inv.initial_count_bw || 0, col: inv.initial_count_col || 0, bw_a3: inv.initial_count_bw_a3 || 0, col_a3: inv.initial_count_col_a3 || 0 }
+        prevMap[inv.id] = { 
+          bw: inv.initial_count_bw || 0, 
+          col: inv.initial_count_col || 0, 
+          bw_a3: inv.initial_count_bw_a3 || 0, 
+          col_a3: inv.initial_count_col_a3 || 0 
+        }
       }
     })
     setPrevData(prevMap)
     setLoading(false)
   }, [filterConfig, supabase])
 
+  // --- 2. 청구 이력 조회 ---
   const fetchHistoryData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return; 
@@ -154,12 +203,52 @@ export function useAccounting() {
     const orgId = profile?.organization_id
     if (!orgId) return
 
-    const { data, error } = await supabase.from('settlements')
-      .select(`*, client:clients (id, name, business_number, representative_name, email, address), details:settlement_details (*, inventory:inventory (model_name, serial_number, status, billing_date))`)
-      .eq('organization_id', orgId).eq('billing_year', histFilterConfig.year).eq('billing_month', histFilterConfig.month).order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('settlements')
+      .select(`
+        *,
+        client:clients (
+          id, name, business_number, representative_name, email, address
+        ),
+        details:settlement_details (
+          *,
+          inventory:inventory (
+            model_name, serial_number, status, billing_date
+          )
+        )
+      `)
+      .eq('organization_id', orgId)
+      .eq('billing_year', histFilterConfig.year)
+      .eq('billing_month', histFilterConfig.month)
+      .order('created_at', { ascending: false });
 
     if (error) console.error('History Fetch Error:', error);
-    if (data) setHistoryList(data as unknown as Settlement[])
+
+    if (data) {
+      let filteredList = data as unknown as Settlement[];
+
+      if (histFilterConfig.day !== 'all') {
+        filteredList = filteredList.filter(settlement => {
+          return settlement.details?.some(detail => 
+            detail.inventory?.billing_date === histFilterConfig.day
+          );
+        });
+      }
+
+      if (histFilterConfig.term) {
+        const term = histFilterConfig.term.toLowerCase();
+        filteredList = filteredList.filter(settlement => {
+          const clientMatch = settlement.client?.name?.toLowerCase().includes(term);
+          const inventoryMatch = settlement.details?.some(detail => 
+            detail.inventory?.model_name?.toLowerCase().includes(term) ||
+            detail.inventory?.serial_number?.toLowerCase().includes(term)
+          );
+          return clientMatch || inventoryMatch;
+        });
+      }
+
+      setHistoryList(filteredList);
+    }
 
     const startDate = new Date(histFilterConfig.year, histFilterConfig.month - 1, 1).toISOString()
     const endDate = new Date(histFilterConfig.year, histFilterConfig.month, 0, 23, 59, 59).toISOString()
@@ -170,6 +259,7 @@ export function useAccounting() {
   useEffect(() => { fetchRegistrationData() }, [fetchRegistrationData])
   useEffect(() => { fetchHistoryData() }, [fetchHistoryData])
 
+  // --- 이벤트 핸들러 ---
   const handleSearch = () => setFilterConfig({ year: regYear, month: regMonth, day: targetDay, term: searchTerm })
   const handleHistSearch = () => setHistFilterConfig({ year: histYear, month: histMonth, day: histTargetDay, term: histSearchTerm })
 
@@ -194,18 +284,25 @@ export function useAccounting() {
     setSelectedInventories(newSet);
   }
 
+  // --- 계산 및 필터링 ---
   const calculateClientBillFiltered = (client: Client): BillCalculationResult => {
     const assets = inventoryMap[client.id] || []
     const originalBill = calculateClientBill(client, assets, prevData, inputData)
     
     originalBill.details = originalBill.details.filter((d) => {
-        const isSettled = currentSettlements.some(s => s.client_id === client.id && s.details?.some((det: any) => det.inventory_id === d.inventory_id));
+        const isSettled = currentSettlements.some(s => 
+            s.client_id === client.id && 
+            // @ts-ignore
+            s.details?.some((det: any) => det.inventory_id === d.inventory_id)
+        );
         if (isSettled) return false;
         if (filterConfig.day !== 'all' && d.billing_date !== filterConfig.day) return false;
         return true;
     });
 
-    originalBill.totalAmount = originalBill.details.reduce((sum, d) => sum + (d.isGroupLeader ? (d.rowCost?.total || 0) : 0), 0);
+    originalBill.totalAmount = originalBill.details.reduce((sum, d) => 
+      sum + (d.isGroupLeader ? (d.rowCost?.total || 0) : 0), 0);
+      
     return originalBill
   }
 
@@ -217,7 +314,10 @@ export function useAccounting() {
       const assets = inventoryMap[c.id] || []
       const hasMatchingAsset = assets.some(asset => {
         const matchesDay = filterConfig.day === 'all' || asset.billing_date === filterConfig.day
-        const matchesTerm = filterConfig.term === '' || c.name.includes(filterConfig.term) || asset.model_name.includes(filterConfig.term) || asset.serial_number.includes(filterConfig.term)
+        const matchesTerm = filterConfig.term === '' || 
+                           c.name.includes(filterConfig.term) || 
+                           asset.model_name.includes(filterConfig.term) || 
+                           asset.serial_number.includes(filterConfig.term)
         return matchesDay && matchesTerm
       })
 
@@ -241,6 +341,7 @@ export function useAccounting() {
     return sum
   }
 
+  // --- 저장 및 액션 ---
   const handlePreSave = () => {
     if (selectedInventories.size === 0) return alert('선택된 기계가 없습니다.')
     setIsModalOpen(true)
@@ -256,6 +357,7 @@ export function useAccounting() {
       filteredClients.forEach(client => {
         const billData = calculateClientBillFiltered(client)
         const selectedDetails = billData.details.filter(d => selectedInventories.has(d.inventory_id))
+        
         if (selectedDetails.length > 0) {
           const totalAmount = selectedDetails.reduce((sum, d) => d.isGroupLeader ? sum + d.rowCost.total : sum, 0)
           dataToSend.push({ client, details: selectedDetails, totalAmount })
@@ -291,7 +393,6 @@ export function useAccounting() {
     }
   }
 
-  // --- 이력 관리 ---
   const handleRebillHistory = async (id: string) => {
     if (!confirm('이 건을 재청구하시겠습니까?')) return;
     setLoading(true);
@@ -320,11 +421,9 @@ export function useAccounting() {
     } catch (e: any) { alert('삭제 중 오류: ' + e.message); } finally { setLoading(false); }
   }
 
-  // ✅ [추가] 일괄 재청구 핸들러
   const handleBatchRebillHistory = async (ids: string[]) => {
     if (ids.length === 0) return alert('선택된 내역이 없습니다.');
     if (!confirm(`선택한 ${ids.length}건을 재청구(삭제)하시겠습니까?\n내역은 삭제되며 다시 등록할 수 있게 됩니다.`)) return;
-    
     setLoading(true);
     const result = await deleteSettlementsAction(ids);
     if (result.success) {
@@ -336,11 +435,9 @@ export function useAccounting() {
     setLoading(false);
   }
 
-  // ✅ [추가] 일괄 삭제 핸들러
   const handleBatchDeleteHistory = async (ids: string[]) => {
     if (ids.length === 0) return alert('선택된 내역이 없습니다.');
     if (!confirm(`선택한 ${ids.length}건을 정말 삭제하시겠습니까?`)) return;
-    
     setLoading(true);
     const result = await deleteSettlementsAction(ids);
     if (result.success) {
@@ -396,6 +493,33 @@ export function useAccounting() {
     fetchHistoryData();
   }
 
+  // ✅ [수정] 명세서 모달 열기 핸들러 (선택된 기계만 출력)
+  const handleOpenStatement = (originalSettlement: Settlement, targetDetails: SettlementDetail[]) => {
+    if (!targetDetails || targetDetails.length === 0) {
+      alert("명세서를 출력할 기계를 선택해주세요.");
+      return;
+    }
+
+    // 선택된 기계들의 금액 합계 재계산 (공급가 기준)
+    const newTotalAmount = targetDetails.reduce((sum, detail) => {
+      return sum + (detail.calculated_amount || 0);
+    }, 0);
+
+    const tempSettlement: Settlement = {
+      ...originalSettlement,
+      details: targetDetails,
+      total_amount: newTotalAmount // 명세서 하단 합계가 맞도록 수정
+    };
+
+    setSelectedSettlementForStatement(tempSettlement)
+    setIsStatementOpen(true)
+  }
+
+  const handleCloseStatement = () => {
+    setIsStatementOpen(false)
+    setSelectedSettlementForStatement(null)
+  }
+
   return {
     loading, isModalOpen, setIsModalOpen,
     regYear, setRegYear, regMonth, setRegMonth, targetDay, setTargetDay, searchTerm, setSearchTerm,
@@ -408,6 +532,10 @@ export function useAccounting() {
     calculateClientBillFiltered, calculateSelectedTotal, handlePreSave, handleFinalSave,
     handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset, 
     togglePaymentStatus, toggleDetailPaymentStatus,
-    handleBatchDeleteHistory, handleBatchRebillHistory // ✅ 일괄 핸들러 반환
+    handleBatchDeleteHistory, handleBatchRebillHistory,
+    
+    // 명세서 관련 값 반환
+    isStatementOpen, selectedSettlementForStatement, myOrg,
+    handleOpenStatement, handleCloseStatement
   }
 }

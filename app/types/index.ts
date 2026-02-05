@@ -7,12 +7,23 @@ type InventoryRow = Database['public']['Tables']['inventory']['Row']
 type ClientRow = Database['public']['Tables']['clients']['Row']
 type SettlementRow = Database['public']['Tables']['settlements']['Row']
 type SettlementDetailRow = Database['public']['Tables']['settlement_details']['Row']
+// ✅ [핵심 수정] 이 줄이 있어야 MachineHistory 에러가 해결됩니다.
 type MachineHistoryRow = Database['public']['Tables']['machine_history']['Row']
+type OrganizationRow = Database['public']['Tables']['organizations']['Row']
 
 // 2. Client 타입
 export interface Client extends ClientRow {}
 
-// 3. Inventory 타입
+// 3. Organization 타입 (명세서용)
+export interface Organization extends OrganizationRow {
+  business_number?: string;
+  representative_name?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+}
+
+// 4. Inventory 타입
 export interface Inventory extends InventoryRow {
   client?: { name: string } | null; 
   is_active?: boolean;
@@ -22,7 +33,7 @@ export interface Inventory extends InventoryRow {
   final_counts?: CounterData;
 }
 
-// 4. CounterData
+// 5. 공통 데이터 타입
 export interface CounterData {
   bw: number;
   col: number;
@@ -30,7 +41,6 @@ export interface CounterData {
   col_a3: number;
 }
 
-// 5. CalculatedAsset
 export interface CalculatedAsset {
   id: string;
   model_name: string;
@@ -62,15 +72,12 @@ export interface CalculatedAsset {
   is_withdrawal?: boolean;
 }
 
-// 6. 정산 결과
 export interface BillCalculationResult {
   details: CalculatedAsset[];
   totalAmount: number;
 }
 
-// 7. Settlement (✅ 최적화: 쿼리 별칭에 맞춰 깔끔하게 정리)
 export interface Settlement extends SettlementRow {
-  // 'client:clients' 쿼리 결과에 매핑
   client?: { 
     id: string;
     name: string; 
@@ -79,14 +86,10 @@ export interface Settlement extends SettlementRow {
     email: string | null; 
     address: string | null 
   } | null;
-  
-  // 'details:settlement_details' 쿼리 결과에 매핑
   details?: SettlementDetail[];
 }
 
-// 8. SettlementDetail
 export interface SettlementDetail extends SettlementDetailRow {
-  // 'inventory:inventory' 쿼리 결과에 매핑
   inventory?: {
     model_name: string;
     serial_number: string;
@@ -95,7 +98,7 @@ export interface SettlementDetail extends SettlementDetailRow {
   } | null;
 }
 
-// 9. MachineHistory
+// ✅ MachineHistoryRow를 상속받아 DB 컬럼 속성을 모두 갖게 됩니다.
 export interface MachineHistory extends MachineHistoryRow {
   inventory?: Inventory | null;
 }

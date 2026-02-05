@@ -28,6 +28,9 @@ interface Props {
   
   handleBatchDeleteHistory: (ids: string[]) => void
   handleBatchRebillHistory: (ids: string[]) => void
+
+  // ✅ [수정] 명세서 핸들러 타입 변경 (대상 상세내역 배열 추가)
+  handleOpenStatement: (settlement: Settlement, targetDetails: SettlementDetail[]) => void
 }
 
 export default function AccountingHistory({
@@ -35,7 +38,8 @@ export default function AccountingHistory({
   handleDeleteHistory, monthMachineHistory, handleDeleteDetail, handleDetailRebill,
   handleRebillHistory,
   targetDay, setTargetDay, searchTerm, setSearchTerm, onSearch, togglePaymentStatus, toggleDetailPaymentStatus,
-  handleBatchDeleteHistory, handleBatchRebillHistory
+  handleBatchDeleteHistory, handleBatchRebillHistory,
+  handleOpenStatement
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedSettlementIds, setSelectedSettlementIds] = useState<Set<string>>(new Set());
@@ -152,7 +156,6 @@ export default function AccountingHistory({
 
           <div className={styles.tableContainer}>
             <table className={styles.table} style={{ tableLayout: 'fixed' }}>
-              {/* ✅ 주석 제거됨: Hydration Error 해결 */}
               <colgroup>
                 <col style={{ width: '50px' }} />
                 <col style={{ width: '30%' }} />
@@ -214,8 +217,20 @@ export default function AccountingHistory({
                         </td>
                         <td className={styles.td} style={{ padding: '8px', backgroundColor: 'inherit' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                            <button onClick={(e) => { e.stopPropagation(); handleRebillHistory(hist.id); }} style={{ color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>전체 재청구</button>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(hist.id); }} style={{ color: '#d93025', border: '1px solid #ffe2dd', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>전체 삭제</button>
+                            {/* ✅ [수정] 거래처(상단) 행 명세서 버튼 */}
+                            <button 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                // 체크된 기계들만 필터링하여 전달
+                                const targetDetails = hist.details?.filter(d => selectedExportItems.has(d.id)) || [];
+                                handleOpenStatement(hist, targetDetails); 
+                              }} 
+                              style={{ color: '#333', border: '1px solid #ccc', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}
+                            >
+                              📄 명세서
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleRebillHistory(hist.id); }} style={{ color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>재청구</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(hist.id); }} style={{ color: '#d93025', border: '1px solid #ffe2dd', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>삭제</button>
                           </div>
                         </td>
                       </tr>
@@ -225,7 +240,6 @@ export default function AccountingHistory({
                           <td colSpan={6} style={{ padding: '0', backgroundColor: '#fff' }}>
                             <div style={{ borderTop: '1px solid var(--notion-border)', borderBottom: '1px solid var(--notion-border)' }}>
                               <table className={styles.table} style={{ tableLayout: 'fixed', backgroundColor: '#fff' }}>
-                                {/* ✅ 주석 제거됨: Hydration Error 해결 */}
                                 <colgroup>
                                   <col style={{ width: '50px' }} />
                                   <col style={{ width: '25%' }} />
@@ -308,6 +322,13 @@ export default function AccountingHistory({
                                         </td>
                                         <td className={styles.td} style={{ padding: '8px', verticalAlign: 'middle' }}>
                                           <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                            {/* ✅ [추가] 기계별(하단) 행 명세서 버튼 */}
+                                            <button 
+                                              onClick={() => handleOpenStatement(hist, [detail])} 
+                                              style={{ color: '#333', border: '1px solid #ccc', background: 'white', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}
+                                            >
+                                              명세서
+                                            </button>
                                             <button onClick={() => handleDetailRebill(hist.id, detail.id, detail.inventory_id ?? '', false, hist.client?.id ?? '')} style={{ color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>재청구</button>
                                             {isComplexCase && <button onClick={() => handleDeleteDetail(hist.id, detail.id, detail.inventory_id ?? '', detail.calculated_amount ?? 0, false)} style={{ backgroundColor: '#fff', border: '1px solid #ffe2dd', color: '#d93025', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>삭제</button>}
                                           </div>

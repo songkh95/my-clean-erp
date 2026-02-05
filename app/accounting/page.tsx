@@ -1,16 +1,14 @@
-// app/accounting/page.tsx
-
 'use client'
 
 import styles from './accounting.module.css'
 import AccountingRegistration from '@/components/accounting/AccountingRegistration'
 import AccountingHistory from '@/components/accounting/AccountingHistory'
 import SettlementConfirmModal from '@/components/accounting/SettlementConfirmModal'
+import StatementModal from '@/components/accounting/StatementModal' 
 import { useAccounting } from './hooks/useAccounting'
 
 export default function AccountingPage() {
   const {
-    // 상태값
     loading, isModalOpen, setIsModalOpen,
     regYear, setRegYear, regMonth, setRegMonth, targetDay, setTargetDay, searchTerm, setSearchTerm,
     isRegOpen, setIsRegOpen,
@@ -19,14 +17,15 @@ export default function AccountingPage() {
     histYear, setHistYear, histMonth, setHistMonth, histTargetDay, setHistTargetDay, histSearchTerm, setHistSearchTerm,
     monthMachineHistory, clients,
     
-    // 기능 함수
     handleSearch, handleHistSearch, handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk,
     calculateClientBillFiltered, calculateSelectedTotal, handlePreSave, handleFinalSave,
     handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset, 
     togglePaymentStatus, toggleDetailPaymentStatus,
-    
-    // ✅ 추가된 일괄 처리 함수
-    handleBatchDeleteHistory, handleBatchRebillHistory
+    handleBatchDeleteHistory, handleBatchRebillHistory,
+
+    // ✅ [확인] 여기서 useAccounting 훅으로부터 명세서 관련 기능을 가져옵니다.
+    isStatementOpen, selectedSettlementForStatement, myOrg,
+    handleOpenStatement, handleCloseStatement
   } = useAccounting()
 
   return (
@@ -69,9 +68,11 @@ export default function AccountingPage() {
         onSearch={handleHistSearch}
         togglePaymentStatus={togglePaymentStatus}
         toggleDetailPaymentStatus={toggleDetailPaymentStatus}
-        // ✅ Props 전달
         handleBatchDeleteHistory={handleBatchDeleteHistory}
         handleBatchRebillHistory={handleBatchRebillHistory}
+        
+        // ✅ [필수 수정] 이 부분이 누락되어 에러가 발생했습니다. 꼭 추가해주세요!
+        handleOpenStatement={handleOpenStatement}
       />
       
       {/* 3. 최종 확인 모달 */}
@@ -81,6 +82,15 @@ export default function AccountingPage() {
           clients={clients} inventoryMap={inventoryMap} calculateClientBill={calculateClientBillFiltered}
           onClose={() => setIsModalOpen(false)} onSave={handleFinalSave}
           loading={loading}
+        />
+      )}
+
+      {/* ✅ 4. 거래명세서 출력 모달 */}
+      {isStatementOpen && selectedSettlementForStatement && (
+        <StatementModal 
+          settlement={selectedSettlementForStatement}
+          supplier={myOrg}
+          onClose={handleCloseStatement}
         />
       )}
     </div>
