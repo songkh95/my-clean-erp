@@ -5,6 +5,8 @@ import { createClient } from '@/utils/supabase'
 import styles from './InventoryList.module.css'
 import Button from './../ui/Button'
 import { Inventory, Client } from '@/app/types'
+// ✅ [최적화] Server Actions 임포트
+import { deleteInventoryAction, updateInventoryAction } from '@/app/actions/inventory'
 
 interface InventoryListProps {
   type: string
@@ -18,7 +20,7 @@ interface EditableFieldProps {
   isEdit: boolean
   editData: Inventory | null
   setEditData: (data: Inventory) => void
-  type?: 'text' | 'number' | 'date' // 👈 'date' 타입 추가
+  type?: 'text' | 'number' | 'date'
 }
 
 export default function InventoryList({ type, refreshTrigger }: InventoryListProps) {
@@ -44,6 +46,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
       
       if (profile?.organization_id) {
+        // 클라이언트 사이드 조회는 허용 (단순 조회이므로)
         const { data } = await supabase
           .from('inventory')
           .select('*, client:client_id(name)')
@@ -62,11 +65,20 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
 
   useEffect(() => { fetchItems() }, [type, refreshTrigger])
 
+  // ✅ [최적화] Server Action으로 삭제 (보안 강화)
   const handleDelete = async (id: string) => {
     if (confirm('정말 삭제하시겠습니까? 복구할 수 없습니다.')) {
-      await supabase.from('inventory').delete().eq('id', id)
-      alert('삭제되었습니다.')
-      fetchItems()
+      try {
+        const result = await deleteInventoryAction(id);
+        if (result.success) {
+          alert(result.message);
+          fetchItems();
+        } else {
+          throw new Error(result.message);
+        }
+      } catch (e: any) {
+        alert('삭제 실패: ' + e.message);
+      }
     }
   }
 
@@ -76,35 +88,44 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
     setClientSearchTerm(item.client?.name || '')
   }
 
+  // ✅ [최적화] Server Action으로 수정 (데이터 무결성 보장)
   const handleUpdate = async () => {
     if (!editData || !editingId) return;
 
+    // Server Action에 보낼 데이터 정제
     const payload: Partial<Inventory> = { ...editData };
     
+    // 관계형 데이터나 불필요한 필드 제거
     delete payload.client;
     delete payload.created_at;
     
+    // 유효성 검사
     if (payload.status === '설치' && !payload.client_id) {
       alert("⚠️ 상태가 '설치'일 경우, 설치처를 반드시 입력(선택)해야 합니다.")
       return
     }
 
-    const updateData = {
-      ...payload,
-      client_id: payload.client_id || null,
-      purchase_price: payload.purchase_price === undefined || payload.purchase_price === null ? null : Number(payload.purchase_price),
-      purchase_date: payload.purchase_date === '' ? null : payload.purchase_date, // 👈 빈 날짜 처리
-    }
+    try {
+      // payload에서 필요한 값만 추출하여 전송
+      const updateData = {
+        ...payload,
+        client_id: payload.client_id || null,
+        purchase_price: payload.purchase_price === undefined || payload.purchase_price === null ? null : Number(payload.purchase_price),
+        purchase_date: payload.purchase_date === '' ? null : payload.purchase_date,
+      }
 
-    const { error } = await supabase.from('inventory').update(updateData).eq('id', editingId)
+      const result = await updateInventoryAction(editingId, updateData);
 
-    if (!error) {
-      alert('수정 완료!')
-      setEditingId(null)
-      setExpandedId(null)
-      fetchItems()
-    } else {
-      alert('수정 실패: ' + error.message)
+      if (result.success) {
+        alert(result.message);
+        setEditingId(null);
+        setExpandedId(null);
+        fetchItems();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (e: any) {
+      alert('수정 실패: ' + e.message);
     }
   }
 
@@ -194,7 +215,6 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                                 <EditableField label="모델명" name="model_name" val={item.model_name} isEdit={isEditing} editData={editData} setEditData={setEditData} />
                                 <EditableField label="S/N" name="serial_number" val={item.serial_number} isEdit={isEditing} editData={editData} setEditData={setEditData} />
                                 <EditableField label="매입가" name="purchase_price" val={item.purchase_price} isEdit={isEditing} editData={editData} setEditData={setEditData} type="number" />
-                                {/* 👇 [추가됨] 매입일 표시 및 수정 */}
                                 <EditableField label="매입일" name="purchase_date" val={item.purchase_date} isEdit={isEditing} editData={editData} setEditData={setEditData} type="date" />
                                 
                                 <div className={styles.editableItem}>
@@ -296,7 +316,6 @@ function EditableField({ label, name, val, isEdit, editData, setEditData, type =
       {isEdit && editData ? (
         <input 
           type={type}
-          // 값이 null/undefined일 경우 빈 문자열로 처리
           value={(editData[name] as string | number) ?? ''} 
           onChange={e => setEditData({ ...editData, [name]: type === "number" ? Number(e.target.value) : e.target.value })} 
           className={styles.formInput} 

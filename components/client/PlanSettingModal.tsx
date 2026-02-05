@@ -5,9 +5,8 @@ import { createClient } from '@/utils/supabase'
 import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/Input'
 import { Inventory } from '@/app/types'
-// 👇 타입 임포트 추가
-import { SupabaseClient } from '@supabase/supabase-js'
-import { Database } from '@/types/supabase'
+// ✅ Server Action 임포트
+import { updateInventoryPlanAction } from '@/app/actions/inventory'
 
 interface Props {
   inventoryId: string
@@ -17,11 +16,11 @@ interface Props {
 }
 
 export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpdate }: Props) {
-  // 👇 타입을 명시적으로 지정
-  const supabase: SupabaseClient<Database> = createClient()
+  // 조회용 클라이언트 (읽기 전용)
+  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   
-  // 요금제 데이터
+  // 요금제 데이터 상태
   const [formData, setFormData] = useState({
     plan_basic_fee: 0,
     plan_basic_cnt_bw: 0,
@@ -83,7 +82,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       return;
     }
 
-    // 합산 시 단가/가중치가 다르면 경고 및 동기화 제안
+    // 합산 시 단가/가중치 동기화 제안 로직
     const isPriceDifferent = 
       formData.plan_price_bw !== targetAsset.plan_price_bw ||
       formData.plan_price_col !== targetAsset.plan_price_col ||
@@ -102,7 +101,6 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       if (confirmSync) {
         setFormData({
           ...formData,
-          // 🔴 [수정] DB 값이 null일 경우 기본값(0 또는 1) 사용
           plan_price_bw: targetAsset.plan_price_bw ?? 0,
           plan_price_col: targetAsset.plan_price_col ?? 0,
           plan_weight_a3_bw: targetAsset.plan_weight_a3_bw ?? 1,
@@ -121,21 +119,10 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
   const handleSave = async () => {
     setLoading(true)
     try {
-      let finalGroupId = formData.billing_group_id
-
-      // 새 그룹 생성 로직 (임시 ID인 경우)
-      if (finalGroupId && finalGroupId.startsWith('NEW_GROUP_WITH_')) {
-        const targetId = finalGroupId.replace('NEW_GROUP_WITH_', '')
-        const newGroupUUID = crypto.randomUUID()
-        
-        // 대상 기계에도 새 그룹 ID 부여
-        await supabase.from('inventory').update({ billing_group_id: newGroupUUID }).eq('id', targetId)
-        finalGroupId = newGroupUUID
-      }
-
-      const { error } = await supabase
-        .from('inventory')
-        .update({
+      // ✅ Server Action 호출
+      const result = await updateInventoryPlanAction(
+        inventoryId,
+        {
           plan_basic_fee: formData.plan_basic_fee,
           plan_basic_cnt_bw: formData.plan_basic_cnt_bw,
           plan_basic_cnt_col: formData.plan_basic_cnt_col,
@@ -143,19 +130,20 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
           plan_price_col: formData.plan_price_col,
           plan_weight_a3_bw: formData.plan_weight_a3_bw,
           plan_weight_a3_col: formData.plan_weight_a3_col,
-          billing_group_id: finalGroupId,
           billing_date: formData.billing_date
-        })
-        .eq('id', inventoryId)
+        },
+        formData.billing_group_id
+      )
 
-      if (error) throw error
-      
-      alert('설정이 완료되었습니다.')
-      onUpdate()
-      onClose()
-    } catch (e) {
-      const message = e instanceof Error ? e.message : (e as { message?: string })?.message || String(e)
-      alert('저장 실패: ' + message)
+      if (result.success) {
+        alert(result.message)
+        onUpdate()
+        onClose()
+      } else {
+        throw new Error(result.message)
+      }
+    } catch (e: any) {
+      alert('저장 실패: ' + e.message)
     } finally {
       setLoading(false)
     }

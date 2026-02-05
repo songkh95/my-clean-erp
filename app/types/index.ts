@@ -1,7 +1,8 @@
+// app/types/index.ts
+
 import { Database } from '@/types/supabase'
 
 // 1. 기본 Row 타입 추출
-// (Supabase 자동 생성 타입은 모든 필드가 null일 수 있다고 가정하므로 이를 보완합니다)
 type InventoryRow = Database['public']['Tables']['inventory']['Row']
 type ClientRow = Database['public']['Tables']['clients']['Row']
 type SettlementRow = Database['public']['Tables']['settlements']['Row']
@@ -11,12 +12,9 @@ type MachineHistoryRow = Database['public']['Tables']['machine_history']['Row']
 // 2. Client 타입
 export interface Client extends ClientRow {}
 
-// 3. Inventory 타입 (조인된 데이터 포함)
+// 3. Inventory 타입
 export interface Inventory extends InventoryRow {
-  // Supabase join 결과는 단일 객체일수도, null일수도 있음
   client?: { name: string } | null; 
-
-  // UI 확장 필드
   is_active?: boolean;
   is_replacement_before?: boolean;
   is_replacement_after?: boolean;
@@ -33,9 +31,7 @@ export interface CounterData {
 }
 
 // 5. CalculatedAsset
-// (Inventory 상속 대신 필요한 필드만 명시적으로 선언하여 충돌 방지)
 export interface CalculatedAsset {
-  // Inventory 기본 필드
   id: string;
   model_name: string;
   serial_number: string;
@@ -45,8 +41,6 @@ export interface CalculatedAsset {
   billing_date: string | null;
   plan_weight_a3_bw: number | null;
   plan_weight_a3_col: number | null;
-
-  // 확장 필드
   inventory_id: string;
   plan: {
     basic_fee: number;
@@ -74,20 +68,25 @@ export interface BillCalculationResult {
   totalAmount: number;
 }
 
-// 7. Settlement
+// 7. Settlement (✅ 최적화: 쿼리 별칭에 맞춰 깔끔하게 정리)
 export interface Settlement extends SettlementRow {
+  // 'client:clients' 쿼리 결과에 매핑
   client?: { 
+    id: string;
     name: string; 
     business_number: string | null; 
     representative_name: string | null; 
     email: string | null; 
     address: string | null 
   } | null;
+  
+  // 'details:settlement_details' 쿼리 결과에 매핑
   details?: SettlementDetail[];
 }
 
 // 8. SettlementDetail
 export interface SettlementDetail extends SettlementDetailRow {
+  // 'inventory:inventory' 쿼리 결과에 매핑
   inventory?: {
     model_name: string;
     serial_number: string;

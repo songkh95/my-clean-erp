@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState } from 'react'
 import styles from '@/app/accounting/accounting.module.css'
 import { exportHistoryToExcel } from '@/utils/excelExporter'
 import { Settlement, MachineHistory, SettlementDetail } from '@/app/types'
@@ -25,116 +25,92 @@ interface Props {
   onSearch: () => void
   togglePaymentStatus: (id: string, currentStatus: boolean) => void
   toggleDetailPaymentStatus: (settlementId: string, detailId: string, currentStatus: boolean) => void
+  
+  handleBatchDeleteHistory: (ids: string[]) => void
+  handleBatchRebillHistory: (ids: string[]) => void
 }
 
 export default function AccountingHistory({
   isHistOpen, setIsHistOpen, histYear, setHistYear, histMonth, setHistMonth, historyList, 
   handleDeleteHistory, monthMachineHistory, handleDeleteDetail, handleDetailRebill,
   handleRebillHistory,
-  targetDay, setTargetDay, searchTerm, setSearchTerm, onSearch, togglePaymentStatus, toggleDetailPaymentStatus
+  targetDay, setTargetDay, searchTerm, setSearchTerm, onSearch, togglePaymentStatus, toggleDetailPaymentStatus,
+  handleBatchDeleteHistory, handleBatchRebillHistory
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedSettlementIds, setSelectedSettlementIds] = useState<Set<string>>(new Set());
   const [selectedExportItems, setSelectedExportItems] = useState<Set<string>>(new Set());
-  const [colWidths, setColWidths] = useState<number[]>([50, 300, 100, 150, 100, 160]);
-  const activeIndex = useRef<number | null>(null); 
-  const startX = useRef<number>(0); 
-  const startWidth = useRef<number>(0); 
 
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
-
+  const toggleExpand = (id: string) => setExpandedId(expandedId === id ? null : id);
+  
   const toggleDetailSelection = (detailId: string) => {
     const newSet = new Set(selectedExportItems);
-    if (newSet.has(detailId)) newSet.delete(detailId);
-    else newSet.add(detailId);
+    if (newSet.has(detailId)) newSet.delete(detailId); else newSet.add(detailId);
     setSelectedExportItems(newSet);
   };
 
   const toggleClientSelection = (hist: Settlement) => {
-    const newSet = new Set(selectedExportItems);
+    const newSettlementSet = new Set(selectedSettlementIds);
+    const newDetailSet = new Set(selectedExportItems);
     const detailIds = hist.details?.map(d => d.id) || [];
-    const isAllSelected = detailIds.length > 0 && detailIds.every(id => newSet.has(id));
-
-    if (isAllSelected) {
-      detailIds.forEach(id => newSet.delete(id));
+    
+    if (newSettlementSet.has(hist.id)) {
+        newSettlementSet.delete(hist.id);
+        detailIds.forEach(id => newDetailSet.delete(id));
     } else {
-      detailIds.forEach(id => newSet.add(id));
+        newSettlementSet.add(hist.id);
+        detailIds.forEach(id => newDetailSet.add(id));
     }
-    setSelectedExportItems(newSet);
+    setSelectedSettlementIds(newSettlementSet);
+    setSelectedExportItems(newDetailSet);
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSettlementSet = new Set<string>();
+    const newDetailSet = new Set<string>();
+    
+    if (e.target.checked) {
+        historyList.forEach(hist => {
+            newSettlementSet.add(hist.id);
+            hist.details?.forEach(d => newDetailSet.add(d.id));
+        });
+    }
+    setSelectedSettlementIds(newSettlementSet);
+    setSelectedExportItems(newDetailSet);
+  };
+
+  const isAllSelected = historyList.length > 0 && historyList.every(h => selectedSettlementIds.has(h.id));
+
+  const onBatchRebill = () => {
+    handleBatchRebillHistory(Array.from(selectedSettlementIds));
+    setSelectedSettlementIds(new Set()); setSelectedExportItems(new Set());
+  };
+  
+  const onBatchDelete = () => {
+    handleBatchDeleteHistory(Array.from(selectedSettlementIds));
+    setSelectedSettlementIds(new Set()); setSelectedExportItems(new Set());
   };
 
   const handleExcelDownload = () => {
-    if (selectedExportItems.size === 0) {
-      alert('엑셀로 다운로드할 항목을 선택해주세요.');
-      return;
-    }
-
+    if (selectedExportItems.size === 0) { alert('엑셀로 다운로드할 항목을 선택해주세요.'); return; }
     const exportData = historyList.map((hist): Settlement | null => {
       const currentDetails = hist.details || [];
       const selectedDetails = currentDetails.filter((d: SettlementDetail) => selectedExportItems.has(d.id));
-      
       if (selectedDetails.length === 0) return null;
-
-      return {
-        ...hist,
-        details: selectedDetails
-      };
+      return { ...hist, details: selectedDetails };
     }).filter((item): item is Settlement => item !== null);
-
     exportHistoryToExcel(exportData);
   };
 
   const handlePaymentClick = (e: React.MouseEvent, id: string, currentStatus: boolean | null) => {
     e.stopPropagation(); 
-    // 🔴 [수정] null일 경우 false로 처리
     const safeStatus = currentStatus ?? false;
-    
-    const message = !safeStatus 
-      ? "입금이 확인되었습니까?\n\n[확인]을 누르면 이 거래처의 모든 기계가 '입금완료' 처리됩니다."
-      : "입금 완료 상태를 취소하시겠습니까?\n\n[확인]을 누르면 이 거래처의 모든 기계가 '미입금' 처리됩니다.";
-
-    if (confirm(message)) {
-      togglePaymentStatus(id, safeStatus);
-    }
+    if (confirm(!safeStatus ? "입금이 확인되었습니까?" : "입금 완료 상태를 취소하시겠습니까?")) togglePaymentStatus(id, safeStatus);
   };
-
   const handleDetailPaymentClick = (settlementId: string, detailId: string, currentStatus: boolean | null) => {
-    // 🔴 [수정] null일 경우 false로 처리
     const safeStatus = currentStatus ?? false;
-
-    const message = !safeStatus 
-      ? "이 기계의 입금이 확인되었습니까?"
-      : "이 기계의 입금 상태를 취소하시겠습니까?";
-      
-    if (confirm(message)) {
-      toggleDetailPaymentStatus(settlementId, detailId, safeStatus);
-    }
+    if (confirm(!safeStatus ? "이 기계의 입금이 확인되었습니까?" : "이 기계의 입금 상태를 취소하시겠습니까?")) toggleDetailPaymentStatus(settlementId, detailId, safeStatus);
   }
-
-  const handleMouseDown = (index: number, e: React.MouseEvent) => {
-    e.preventDefault(); e.stopPropagation(); 
-    activeIndex.current = index; startX.current = e.clientX; startWidth.current = colWidths[index];
-    document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (activeIndex.current === null) return;
-    const deltaX = e.clientX - startX.current;
-    const newWidth = Math.max(30, startWidth.current + deltaX); 
-    setColWidths(prev => { const next = [...prev]; next[activeIndex.current!] = newWidth; return next; });
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    activeIndex.current = null; document.body.style.cursor = ''; document.body.style.userSelect = '';
-    document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp);
-  }, [handleMouseMove]);
-
-  useEffect(() => {
-    return () => { document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); };
-  }, [handleMouseMove, handleMouseUp]);
-
 
   return (
     <div className={styles.section} style={{ marginTop: '30px' }}>
@@ -165,17 +141,34 @@ export default function AccountingHistory({
             </div>
             <button onClick={onSearch} className={styles.saveBtn}>조회</button>
             <button onClick={handleExcelDownload} className={styles.saveBtn} style={{ backgroundColor: '#217346', marginLeft: '8px' }}>📥 엑셀</button>
+            
+            {selectedSettlementIds.size > 0 && (
+              <>
+                <button onClick={onBatchRebill} className={styles.saveBtn} style={{ backgroundColor: '#0070f3', marginLeft: '8px' }}>전체 재청구</button>
+                <button onClick={onBatchDelete} className={styles.saveBtn} style={{ backgroundColor: '#d93025', marginLeft: '8px' }}>전체 삭제</button>
+              </>
+            )}
           </div>
 
           <div className={styles.tableContainer}>
             <table className={styles.table} style={{ tableLayout: 'fixed' }}>
-              <colgroup>{colWidths.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+              {/* ✅ 주석 제거됨: Hydration Error 해결 */}
+              <colgroup>
+                <col style={{ width: '50px' }} />
+                <col style={{ width: '30%' }} />
+                <col style={{ width: '80px' }} />
+                <col style={{ width: '220px' }} />
+                <col style={{ width: '90px' }} />
+                <col style={{ width: '140px' }} />
+              </colgroup>
               <thead>
                 <tr>
-                  {['선택', '거래처명', '기기수', '총 청구액', '입금상태', '관리'].map((title, idx) => (
-                    <th key={idx} className={styles.th}>
+                  <th className={styles.th}>
+                    <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} style={{ cursor: 'pointer', transform: 'scale(1.2)' }} />
+                  </th>
+                  {['거래처명', '기기수', '청구 금액 (VAT포함)', '입금상태', '관리'].map((title, idx) => (
+                    <th key={idx + 1} className={styles.th}>
                       {title}
-                      <div className={styles.resizer} onMouseDown={(e) => handleMouseDown(idx, e)} onClick={(e) => e.stopPropagation()} />
                     </th>
                   ))}
                 </tr>
@@ -184,48 +177,75 @@ export default function AccountingHistory({
                 {historyList.length === 0 ? (
                   <tr><td colSpan={6} className={styles.td} style={{ color: 'var(--notion-sub-text)', padding: '40px' }}>조회된 내역이 없습니다.</td></tr>
                 ) : historyList.map(hist => {
-                  const detailIds = hist.details?.map(d => d.id) || [];
-                  const isAllSelected = detailIds.length > 0 && detailIds.every(id => selectedExportItems.has(id));
-                  
+                  const supply = hist.total_amount ?? 0;
+                  const vat = Math.floor(supply * 0.1);
+                  const total = supply + vat;
+
                   return (
                     <React.Fragment key={hist.id}>
-                      <tr onClick={() => toggleExpand(hist.id)} style={{ cursor: 'pointer', backgroundColor: expandedId === hist.id ? 'var(--notion-soft-bg)' : 'transparent' }}>
-                        <td className={styles.td} onClick={(e) => e.stopPropagation()}>
-                          <input type="checkbox" checked={isAllSelected} onChange={() => toggleClientSelection(hist)} style={{ cursor: 'pointer', transform: 'scale(1.2)' }} />
+                      <tr 
+                        onClick={() => toggleExpand(hist.id)} 
+                        style={{ 
+                          cursor: 'pointer', 
+                          backgroundColor: expandedId === hist.id ? 'var(--notion-soft-bg)' : '#fafafa',
+                          borderBottom: '1px solid #e0e0e0' 
+                        }}
+                      >
+                        <td className={styles.td} onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'inherit' }}>
+                          <input type="checkbox" checked={selectedSettlementIds.has(hist.id)} onChange={() => toggleClientSelection(hist)} style={{ cursor: 'pointer', transform: 'scale(1.2)' }} />
                         </td>
-                        <td className={styles.td} style={{ textAlign: 'left', padding: '16px 16px 16px 24px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          <span style={{ marginRight: '8px', fontSize:'0.7rem', color:'#aaa' }}>{expandedId === hist.id ? '▼' : '▶'}</span>
-                          {hist.client?.name}
+                        <td className={styles.td} style={{ textAlign: 'left', padding: '12px 16px', fontWeight: '600', color: '#171717', backgroundColor: 'inherit' }}>
+                          <span style={{ marginRight: '8px', fontSize:'0.7rem', color:'#888' }}>{expandedId === hist.id ? '▼' : '▶'}</span>
+                          {hist.client?.name || '(거래처 미상)'}
                         </td>
-                        <td className={styles.td} style={{ padding: '16px' }}>{hist.details?.length || 0}대</td>
-                        <td className={styles.td} style={{ padding: '16px', color: 'var(--notion-blue)', fontWeight: '600' }}>{hist.total_amount?.toLocaleString()}원</td>
-                        <td className={styles.td} style={{ padding: '16px' }}>
-                          <span onClick={(e) => handlePaymentClick(e, hist.id, hist.is_paid)} style={{ fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px', backgroundColor: hist.is_paid ? '#dbeddb' : '#ffe2dd', color: hist.is_paid ? '#2eaadc' : '#d93025', cursor: 'pointer' }}>{hist.is_paid ? '입금완료' : '미입금'}</span>
+                        <td className={styles.td} style={{ padding: '12px', fontSize: '0.9rem', backgroundColor: 'inherit' }}>{hist.details?.length || 0}대</td>
+                        
+                        <td className={styles.td} style={{ padding: '8px 16px', backgroundColor: 'inherit' }}>
+                          <div style={{ color: '#0070f3', fontWeight: '700', fontSize: '0.95rem' }}>
+                            {total.toLocaleString()}원
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '2px' }}>
+                            (공급 {supply.toLocaleString()} / 세액 {vat.toLocaleString()})
+                          </div>
                         </td>
-                        <td className={styles.td} style={{ padding: '16px' }}>
+                        
+                        <td className={styles.td} style={{ padding: '8px', backgroundColor: 'inherit' }}>
+                          <span onClick={(e) => handlePaymentClick(e, hist.id, hist.is_paid)} style={{ fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px', backgroundColor: hist.is_paid ? '#dbeddb' : '#ffe2dd', color: hist.is_paid ? '#2eaadc' : '#d93025', cursor: 'pointer', fontWeight: '600' }}>{hist.is_paid ? '입금완료' : '미입금'}</span>
+                        </td>
+                        <td className={styles.td} style={{ padding: '8px', backgroundColor: 'inherit' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                            <button onClick={(e) => { e.stopPropagation(); handleRebillHistory(hist.id); }} style={{ color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>전체 재청구</button>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(hist.id); }} style={{ color: '#d93025', border: '1px solid #ffe2dd', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>전체 삭제</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleRebillHistory(hist.id); }} style={{ color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>전체 재청구</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(hist.id); }} style={{ color: '#d93025', border: '1px solid #ffe2dd', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>전체 삭제</button>
                           </div>
                         </td>
                       </tr>
-
+                      
                       {expandedId === hist.id && (
                         <tr>
                           <td colSpan={6} style={{ padding: '0', backgroundColor: '#fff' }}>
                             <div style={{ borderTop: '1px solid var(--notion-border)', borderBottom: '1px solid var(--notion-border)' }}>
-                              <table className={styles.table} style={{ backgroundColor: '#fafafa' }}>
+                              <table className={styles.table} style={{ tableLayout: 'fixed', backgroundColor: '#fff' }}>
+                                {/* ✅ 주석 제거됨: Hydration Error 해결 */}
+                                <colgroup>
+                                  <col style={{ width: '50px' }} />
+                                  <col style={{ width: '25%' }} />
+                                  <col style={{ width: '80px' }} />
+                                  <col style={{ width: '15%' }} />
+                                  <col style={{ width: '15%' }} />
+                                  <col style={{ width: '15%' }} />
+                                  <col style={{ width: '90px' }} />
+                                  <col style={{ width: '140px' }} />
+                                </colgroup>
                                 <thead>
                                   <tr>
-                                    <th className={styles.th} style={{ width: '40px' }}>선택</th>
-                                    <th className={styles.th} style={{ width: '20%' }}>기계 모델 (S/N)</th>
-                                    <th className={styles.th} style={{ width: '60px' }}>구분</th>
-                                    <th className={styles.th} style={{ width: '80px' }}>전월</th>
-                                    <th className={styles.th} style={{ width: '80px' }}>당월</th>
-                                    <th className={styles.th} style={{ width: '120px' }}>실사용량 (가중치)</th>
-                                    <th className={styles.th} style={{ width: '100px' }}>청구 금액</th>
-                                    <th className={styles.th} style={{ width: '80px' }}>입금</th>
-                                    <th className={styles.th} style={{ width: '120px' }}>관리</th>
+                                    <th className={styles.th} style={{backgroundColor: '#f1f1f1'}}>선택</th>
+                                    <th className={styles.th} style={{backgroundColor: '#f1f1f1'}}>기계 모델 (S/N)</th>
+                                    <th className={styles.th} style={{backgroundColor: '#f1f1f1'}}>구분</th>
+                                    <th className={styles.th} style={{backgroundColor: '#f1f1f1'}}>전월 / 당월</th>
+                                    <th className={styles.th} style={{backgroundColor: '#f1f1f1'}}>실사용량</th>
+                                    <th className={styles.th} style={{backgroundColor: '#f1f1f1'}}>상세 금액 (VAT포함)</th>
+                                    <th className={styles.th} style={{backgroundColor: '#f1f1f1'}}>입금</th>
+                                    <th className={styles.th} style={{backgroundColor: '#f1f1f1'}}>관리</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -233,54 +253,63 @@ export default function AccountingHistory({
                                     let badgeLabel = detail.inventory?.status || '설치';
                                     let badgeStyle = { backgroundColor: '#f1f1f0', color: '#37352f' };
                                     let isComplexCase = false;
-
-                                    if (detail.is_replacement_record) {
-                                      badgeLabel = "교체(철수)"; badgeStyle = { backgroundColor: '#ffe2dd', color: '#d93025' };
-                                      isComplexCase = true;
-                                    } else {
-                                      const isInstalledThisMonth = monthMachineHistory?.some(mh => mh.inventory_id === detail.inventory_id && mh.action_type === 'INSTALL');
-                                      if (isInstalledThisMonth) { 
-                                        badgeLabel = "교체(설치)"; badgeStyle = { backgroundColor: '#d3e5ef', color: '#0070f3' }; isComplexCase = true;
-                                      }
-                                    }
+                                    if (detail.inventory?.status === '교체전(철수)') { badgeLabel = "교체(철수)"; badgeStyle = { backgroundColor: '#ffe2dd', color: '#d93025' }; isComplexCase = true; }
+                                    
+                                    const rowSupply = detail.calculated_amount ?? 0;
+                                    const rowVat = Math.floor(rowSupply * 0.1);
+                                    const rowTotal = rowSupply + rowVat;
 
                                     return (
-                                      <tr key={detail.id} style={{ backgroundColor: '#fff' }}>
-                                        <td className={styles.td}>
+                                      <tr key={detail.id} style={{ borderBottom: '1px solid #eee' }}>
+                                        <td className={styles.td} style={{ verticalAlign: 'middle' }}>
                                           <input type="checkbox" checked={selectedExportItems.has(detail.id)} onChange={() => toggleDetailSelection(detail.id)} style={{ cursor: 'pointer' }} />
                                         </td>
-                                        <td className={styles.td} style={{ textAlign: 'left', padding: '12px' }}>
-                                          <div style={{ marginBottom: '4px' }}><span style={{ ...badgeStyle, fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: '500' }}>{badgeLabel}</span></div>
-                                          <div style={{ fontWeight: '600', marginBottom: '2px' }}>{detail.inventory?.model_name}</div>
-                                          <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px' }}>{detail.inventory?.serial_number}</div>
-                                          <div style={{ fontSize: '0.75rem', color: '#666' }}>청구일: {detail.inventory?.billing_date || '-'}</div>
-                                        </td>
-                                        <td className={styles.td} style={{ padding: '0' }}><div className={styles.splitCellContainer}><div className={styles.rowGray}>흑백</div><div className={styles.rowBlue}>칼라</div><div className={styles.rowGray}>흑백(A3)</div><div className={`${styles.rowBlue} ${styles.rowLast}`}>칼라(A3)</div></div></td>
-                                        
-                                        {/* 🔴 [수정] 숫자 필드들에 null 체크(?? 0) 및 toLocaleString() 적용 */}
-                                        <td className={styles.td} style={{ padding: '0' }}><div className={styles.splitCellContainer}><div className={styles.rowGray}>{(detail.prev_count_bw ?? 0).toLocaleString()}</div><div className={styles.rowBlue}>{(detail.prev_count_col ?? 0).toLocaleString()}</div><div className={styles.rowGray}>{(detail.prev_count_bw_a3 ?? 0).toLocaleString()}</div><div className={`${styles.rowBlue} ${styles.rowLast}`}>{(detail.prev_count_col_a3 ?? 0).toLocaleString()}</div></div></td>
-                                        <td className={styles.td} style={{ padding: '0' }}><div className={styles.splitCellContainer}><div className={styles.rowGray} style={{ fontWeight:'bold' }}>{(detail.curr_count_bw ?? 0).toLocaleString()}</div><div className={styles.rowBlue} style={{ fontWeight:'bold' }}>{(detail.curr_count_col ?? 0).toLocaleString()}</div><div className={styles.rowGray} style={{ fontWeight:'bold' }}>{(detail.curr_count_bw_a3 ?? 0).toLocaleString()}</div><div className={`${styles.rowBlue} ${styles.rowLast}`} style={{ fontWeight:'bold' }}>{(detail.curr_count_col_a3 ?? 0).toLocaleString()}</div></div></td>
-                                        
-                                        <td className={styles.td} style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', lineHeight: '1.6', verticalAlign: 'top' }}>
-                                          <div style={{ fontWeight: '600', color: '#555', marginBottom: '2px' }}>기본매수</div>
-                                          <div style={{ display:'flex', justifyContent:'space-between', color: '#666', marginBottom:'2px' }}><span>흑백:</span> <span>0</span></div>
-                                          <div style={{ display:'flex', justifyContent:'space-between', color: '#0070f3', marginBottom:'4px' }}><span>칼라:</span> <span>0</span></div>
-                                          <div style={{ borderTop: '1px solid #eee', margin: '6px 0' }}></div>
-                                          <div style={{ fontWeight: '600', color: '#d93025', marginBottom: '2px' }}>추가매수</div>
-                                          <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025', marginBottom:'2px' }}><span>흑백:</span> <span>0</span></div>
-                                          <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025' }}><span>칼라:</span> <span>0</span></div>
+                                        <td className={styles.td} style={{ textAlign: 'left', padding: '8px 12px', verticalAlign: 'middle' }}>
+                                          <div style={{ marginBottom: '2px' }}><span style={{ ...badgeStyle, fontSize: '0.65rem', padding: '2px 4px', borderRadius: '3px', fontWeight: '500' }}>{badgeLabel}</span></div>
+                                          <div style={{ fontWeight: '600', fontSize:'0.9rem', marginBottom: '2px' }}>{detail.inventory?.model_name}</div>
+                                          <div style={{ fontSize: '0.75rem', color: '#999' }}>{detail.inventory?.serial_number}</div>
                                         </td>
                                         
-                                        {/* 🔴 [수정] 계산 금액 null 체크 */}
-                                        <td className={styles.td} style={{ padding: '12px', verticalAlign: 'middle', fontWeight: 'bold' }}>{(detail.calculated_amount ?? 0).toLocaleString()}원</td>
-                                        <td className={styles.td} style={{ padding: '12px', verticalAlign: 'middle' }}>
+                                        <td className={styles.td} style={{ padding: '0', fontSize:'0.8rem' }}>
+                                            <div style={{ padding:'4px', borderBottom:'1px solid #eee', color:'#666' }}>흑백</div>
+                                            <div style={{ padding:'4px', borderBottom:'1px solid #eee', color:'#0070f3' }}>칼라</div>
+                                            <div style={{ padding:'4px', borderBottom:'1px solid #eee', color:'#666' }}>흑(A3)</div>
+                                            <div style={{ padding:'4px', color:'#0070f3' }}>칼(A3)</div>
+                                        </td>
+
+                                        <td className={styles.td} style={{ padding: '0', fontSize:'0.8rem' }}>
+                                            <div style={{ padding:'4px', borderBottom:'1px solid #eee' }}>{detail.prev_count_bw?.toLocaleString()} / <b>{detail.curr_count_bw?.toLocaleString()}</b></div>
+                                            <div style={{ padding:'4px', borderBottom:'1px solid #eee' }}>{detail.prev_count_col?.toLocaleString()} / <b>{detail.curr_count_col?.toLocaleString()}</b></div>
+                                            <div style={{ padding:'4px', borderBottom:'1px solid #eee' }}>{detail.prev_count_bw_a3?.toLocaleString()} / <b>{detail.curr_count_bw_a3?.toLocaleString()}</b></div>
+                                            <div style={{ padding:'4px' }}>{detail.prev_count_col_a3?.toLocaleString()} / <b>{detail.curr_count_col_a3?.toLocaleString()}</b></div>
+                                        </td>
+
+                                        <td className={styles.td} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.8rem', lineHeight: '1.6', verticalAlign: 'middle' }}>
+                                          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}><span>흑백:</span> <b>{(detail.usage_bw ?? 0).toLocaleString()}</b></div>
+                                          <div style={{ display:'flex', justifyContent:'space-between', color: '#0070f3' }}><span>칼라:</span> <b>{(detail.usage_col ?? 0).toLocaleString()}</b></div>
+                                        </td>
+                                        
+                                        <td className={styles.td} style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                <div style={{ fontSize: '0.75rem', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
+                                                    <span>공급</span> <span>{rowSupply.toLocaleString()}</span>
+                                                </div>
+                                                <div style={{ fontSize: '0.75rem', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
+                                                    <span>VAT</span> <span>{rowVat.toLocaleString()}</span>
+                                                </div>
+                                                <div style={{ borderTop: '1px solid #eee', paddingTop: '2px', marginTop: '2px', display: 'flex', justifyContent: 'space-between', color: '#333', fontWeight: 'bold' }}>
+                                                    <span style={{ fontSize: '0.75rem' }}>합계</span> <span style={{fontSize:'0.9rem'}}>{rowTotal.toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td className={styles.td} style={{ padding: '8px', verticalAlign: 'middle' }}>
                                           <span onClick={() => handleDetailPaymentClick(hist.id, detail.id, detail.is_paid)} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: detail.is_paid ? '#dbeddb' : '#ffe2dd', color: detail.is_paid ? '#2eaadc' : '#d93025', cursor: 'pointer' }}>{detail.is_paid ? '완료' : '미납'}</span>
                                         </td>
-                                        <td className={styles.td} style={{ padding: '12px', verticalAlign: 'middle' }}>
-                                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                            {/* 🔴 [수정] inventory_id, is_replacement_record, client_id, calculated_amount 등 인자들의 null 체크 */}
-                                            <button onClick={() => handleDetailRebill(hist.id, detail.id, detail.inventory_id ?? '', detail.is_replacement_record ?? false, hist.client_id ?? '')} style={{ color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>재청구</button>
-                                            {isComplexCase && <button onClick={() => handleDeleteDetail(hist.id, detail.id, detail.inventory_id ?? '', detail.calculated_amount ?? 0, detail.is_replacement_record ?? false)} style={{ backgroundColor: '#fff', border: '1px solid #ffe2dd', color: '#d93025', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>삭제</button>}
+                                        <td className={styles.td} style={{ padding: '8px', verticalAlign: 'middle' }}>
+                                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                            <button onClick={() => handleDetailRebill(hist.id, detail.id, detail.inventory_id ?? '', false, hist.client?.id ?? '')} style={{ color: 'var(--notion-blue)', border: '1px solid #d3e5ef', background: 'white', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>재청구</button>
+                                            {isComplexCase && <button onClick={() => handleDeleteDetail(hist.id, detail.id, detail.inventory_id ?? '', detail.calculated_amount ?? 0, false)} style={{ backgroundColor: '#fff', border: '1px solid #ffe2dd', color: '#d93025', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>삭제</button>}
                                           </div>
                                         </td>
                                       </tr>
@@ -288,7 +317,7 @@ export default function AccountingHistory({
                                   })}
                                 </tbody>
                               </table>
-                              {hist.memo && <div style={{ marginTop: '10px', padding: '10px', border: '1px solid #f9f0ff', fontSize: '0.85rem', color: '#666', backgroundColor: '#fcfcfc', borderRadius: '6px', margin: '16px' }}>📌 비고: {hist.memo}</div>}
+                              {hist.memo && <div style={{ marginTop: '0', padding: '10px 16px', borderTop: '1px solid #eee', fontSize: '0.8rem', color: '#666', backgroundColor: '#fafafa' }}>📌 비고: {hist.memo}</div>}
                             </div>
                           </td>
                         </tr>

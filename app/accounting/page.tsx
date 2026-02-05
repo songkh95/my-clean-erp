@@ -10,7 +10,7 @@ import { useAccounting } from './hooks/useAccounting'
 
 export default function AccountingPage() {
   const {
-    // 상태값 (State)
+    // 상태값
     loading, isModalOpen, setIsModalOpen,
     regYear, setRegYear, regMonth, setRegMonth, targetDay, setTargetDay, searchTerm, setSearchTerm,
     isRegOpen, setIsRegOpen,
@@ -19,11 +19,14 @@ export default function AccountingPage() {
     histYear, setHistYear, histMonth, setHistMonth, histTargetDay, setHistTargetDay, histSearchTerm, setHistSearchTerm,
     monthMachineHistory, clients,
     
-    // 기능 함수 (Functions)
+    // 기능 함수
     handleSearch, handleHistSearch, handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk,
     calculateClientBillFiltered, calculateSelectedTotal, handlePreSave, handleFinalSave,
     handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset, 
-    togglePaymentStatus, toggleDetailPaymentStatus
+    togglePaymentStatus, toggleDetailPaymentStatus,
+    
+    // ✅ 추가된 일괄 처리 함수
+    handleBatchDeleteHistory, handleBatchRebillHistory
   } = useAccounting()
 
   return (
@@ -66,6 +69,9 @@ export default function AccountingPage() {
         onSearch={handleHistSearch}
         togglePaymentStatus={togglePaymentStatus}
         toggleDetailPaymentStatus={toggleDetailPaymentStatus}
+        // ✅ Props 전달
+        handleBatchDeleteHistory={handleBatchDeleteHistory}
+        handleBatchRebillHistory={handleBatchRebillHistory}
       />
       
       {/* 3. 최종 확인 모달 */}

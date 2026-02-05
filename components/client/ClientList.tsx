@@ -1,3 +1,4 @@
+// components/client/ClientList.tsx
 'use client'
 
 import React, { useState, useEffect } from 'react'
@@ -10,6 +11,8 @@ import InventoryForm from '../inventory/InventoryForm'
 import Button from '@/components/ui/Button' 
 import styles from './ClientList.module.css'
 import { Client, Inventory } from '@/app/types'
+// ✅ [추가] 서버 액션 임포트
+import { deleteClientAction } from '@/app/actions/client'
 
 export default function ClientList() {
   const supabase = createClient()
@@ -72,15 +75,20 @@ export default function ClientList() {
     setLoading(false)
   }
 
+  // ✅ [수정] 삭제 로직을 Server Action 호출로 변경
   const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation()
     if (confirm(`'${name}' 거래처를 정말로 삭제하시겠습니까?`)) { 
-      const { error } = await supabase.from('clients').update({ is_deleted: true }).eq('id', id);
-      
-      if (error) alert('삭제 실패: ' + error.message);
-      else { 
-        alert('삭제되었습니다.'); 
-        fetchClients(); 
+      try {
+        const result = await deleteClientAction(id)
+        if (result.success) {
+          alert(result.message)
+          fetchClients()
+        } else {
+          throw new Error(result.message)
+        }
+      } catch (e: any) {
+        alert('삭제 실패: ' + e.message)
       }
     }
   }
@@ -178,7 +186,6 @@ export default function ClientList() {
               <div className={styles.detailsContainer}>
                 <div className={styles.sectionTitle}>ℹ️ 상세 정보</div>
                 
-                {/* 🔴 [개선] 반응형 그리드로 모든 필드 표시 (공간 효율화) */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '20px' }}>
                   <div className={styles.fieldContainer}>
                     <span className={styles.label}>대표자명</span>
@@ -210,7 +217,6 @@ export default function ClientList() {
                   </div>
                 </div>
 
-                {/* 🔴 [추가] 메모 영역 (내용이 있을 때만 표시) */}
                 {client.memo && (
                   <div style={{ 
                     backgroundColor: '#fff', 

@@ -121,7 +121,6 @@ export default function InventoryPage() {
                       </td>
                     </tr>
 
-                    {/* 🔴 [복원 완료] 아코디언 상세 내용 */}
                     {expandedRows.has(item.id) && (
                       <tr className={styles.detailRow}>
                         <td colSpan={7} className={styles.detailContent}>
@@ -144,26 +143,45 @@ export default function InventoryPage() {
                             </div>
                           </div>
 
-                          <div className={styles.infoBox} style={{marginBottom: '20px'}}>
-                            <div className={styles.boxTitle}>
-                              <span style={{color:'#0070f3'}}>🔢</span> 초기 카운터 (Meter Reading)
+                          {/* ✅ [수정됨] 초기 카운터 정보 박스 - 한 줄(Flex) 레이아웃 적용 */}
+                          <div className={styles.infoBox} style={{
+                            marginBottom: '20px', 
+                            padding: '16px 20px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '30px'
+                          }}>
+                            <div style={{ 
+                              fontSize: '0.9rem', 
+                              fontWeight: '700', 
+                              color: '#171717', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '6px',
+                              minWidth: '150px' 
+                            }}>
+                              <span style={{color:'#0070f3'}}>🔢</span> 초기 카운터
                             </div>
-                            <div className={styles.counterGrid}>
-                              <div className={styles.counterItem}>
-                                <span>흑백 A4</span>
-                                <b>{item.initial_count_bw?.toLocaleString() || 0}</b>
+                            
+                            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <div style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ color: '#666' }}>흑백 A4</span>
+                                <b style={{ color: '#171717' }}>{item.initial_count_bw?.toLocaleString() || 0}</b>
                               </div>
-                              <div className={styles.counterItem}>
+                              <div style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span style={{ color: '#0070f3' }}>칼라 A4</span>
-                                <b>{item.initial_count_col?.toLocaleString() || 0}</b>
+                                <b style={{ color: '#171717' }}>{item.initial_count_col?.toLocaleString() || 0}</b>
                               </div>
-                              <div className={styles.counterItem} style={{ borderLeft:'1px solid #E5E5E5', paddingLeft:'40px' }}>
-                                <span>흑백 A3</span>
-                                <b>{item.initial_count_bw_a3?.toLocaleString() || 0}</b>
+                              {/* 구분선 */}
+                              <div style={{ width: '1px', height: '14px', backgroundColor: '#E5E5E5' }}></div>
+                              
+                              <div style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ color: '#666' }}>흑백 A3</span>
+                                <b style={{ color: '#171717' }}>{item.initial_count_bw_a3?.toLocaleString() || 0}</b>
                               </div>
-                              <div className={styles.counterItem}>
+                              <div style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span style={{ color: '#0070f3' }}>칼라 A3</span>
-                                <b>{item.initial_count_col_a3?.toLocaleString() || 0}</b>
+                                <b style={{ color: '#171717' }}>{item.initial_count_col_a3?.toLocaleString() || 0}</b>
                               </div>
                             </div>
                           </div>

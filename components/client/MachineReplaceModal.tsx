@@ -5,8 +5,8 @@ import { createClient } from '@/utils/supabase'
 import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/Input'
 import { Inventory } from '@/app/types'
-import { SupabaseClient } from '@supabase/supabase-js'
-import { Database } from '@/types/supabase'
+// ✅ Server Action 임포트
+import { replaceInventoryAction } from '@/app/actions/inventory'
 
 interface Props {
   oldAsset: Inventory
@@ -16,7 +16,9 @@ interface Props {
 }
 
 export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuccess }: Props) {
-  const supabase: SupabaseClient<Database> = createClient()
+  // 창고 목록 조회용 (읽기 전용이라 클라이언트 사용 OK)
+  const supabase = createClient()
+  
   const [loading, setLoading] = useState(false)
   const [warehouseItems, setWarehouseItems] = useState<Inventory[]>([])
   
@@ -63,84 +65,39 @@ export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuc
     setLoading(true)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) throw new Error('로그인이 필요합니다.')
+      // ✅ Server Action 호출
+      const result = await replaceInventoryAction(
+        clientId,
+        oldAsset.id,
+        formData.new_asset_id,
+        {
+          final_counts: {
+            bw: formData.final_bw,
+            col: formData.final_col,
+            bw_a3: formData.final_bw_a3,
+            col_a3: formData.final_col_a3
+          },
+          new_initial_counts: {
+            bw: formData.new_initial_bw,
+            col: formData.new_initial_col,
+            bw_a3: formData.new_initial_bw_a3,
+            col_a3: formData.new_initial_col_a3
+          },
+          memo: formData.memo,
+          inheritPlan: inheritPlan
+        }
+      )
 
-      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
-      
-      if (!profile?.organization_id) throw new Error('조직 정보를 찾을 수 없습니다.')
-      
-      const orgId = profile.organization_id
-
-      // 2. 기존 기계 회수 이력 기록 (is_replacement: true 추가)
-      await supabase.from('machine_history').insert({
-        inventory_id: oldAsset.id,
-        client_id: clientId,
-        organization_id: orgId,
-        action_type: 'WITHDRAW',
-        bw_count: formData.final_bw,
-        col_count: formData.final_col,
-        bw_a3_count: formData.final_bw_a3,
-        col_a3_count: formData.final_col_a3,
-        memo: `교체로 인한 회수: ${formData.memo}`,
-        // @ts-ignore (DB 타입을 아직 업데이트하지 않았을 경우를 대비)
-        is_replacement: true 
-      })
-
-      // 3. 기존 기계 상태 변경 (설치 -> 창고)
-      await supabase.from('inventory').update({
-        status: '창고',
-        client_id: null,
-      }).eq('id', oldAsset.id)
-
-      // 4. 새 기계 업데이트 Payload 구성
-      const newMachinePayload: any = {
-        status: '설치',
-        client_id: clientId,
-        initial_count_bw: formData.new_initial_bw,
-        initial_count_col: formData.new_initial_col,
-        initial_count_bw_a3: formData.new_initial_bw_a3,
-        initial_count_col_a3: formData.new_initial_col_a3,
+      if (result.success) {
+        alert(result.message)
+        onSuccess()
+        onClose()
+      } else {
+        throw new Error(result.message)
       }
 
-      // 사용자가 [확인]을 눌렀을 경우 요금제 정보 승계
-      if (inheritPlan) {
-        newMachinePayload.plan_basic_fee = oldAsset.plan_basic_fee;
-        newMachinePayload.plan_basic_cnt_bw = oldAsset.plan_basic_cnt_bw;
-        newMachinePayload.plan_basic_cnt_col = oldAsset.plan_basic_cnt_col;
-        newMachinePayload.plan_price_bw = oldAsset.plan_price_bw;
-        newMachinePayload.plan_price_col = oldAsset.plan_price_col;
-        newMachinePayload.plan_weight_a3_bw = oldAsset.plan_weight_a3_bw;
-        newMachinePayload.plan_weight_a3_col = oldAsset.plan_weight_a3_col;
-        newMachinePayload.billing_group_id = oldAsset.billing_group_id;
-        newMachinePayload.billing_date = oldAsset.billing_date;
-      }
-
-      // 5. 새 기계 상태 변경 (창고 -> 설치) 및 정보 업데이트
-      await supabase.from('inventory').update(newMachinePayload).eq('id', formData.new_asset_id)
-
-      // 6. 새 기계 설치 이력 기록 (is_replacement: true 추가)
-      await supabase.from('machine_history').insert({
-        inventory_id: formData.new_asset_id,
-        client_id: clientId,
-        organization_id: orgId,
-        action_type: 'INSTALL',
-        bw_count: formData.new_initial_bw,
-        col_count: formData.new_initial_col,
-        bw_a3_count: formData.new_initial_bw_a3,
-        col_a3_count: formData.new_initial_col_a3,
-        memo: `교체로 인한 설치`,
-        // @ts-ignore
-        is_replacement: true
-      })
-
-      alert('기계 교체 처리가 완료되었습니다.')
-      onSuccess()
-      onClose()
-    } catch (e) {
-      const message = e instanceof Error ? e.message : (e as { message?: string })?.message || String(e)
-      alert('오류 발생: ' + message)
+    } catch (e: any) {
+      alert('오류 발생: ' + e.message)
     } finally {
       setLoading(false)
     }
@@ -156,11 +113,9 @@ export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuc
           <div style={{ fontWeight: '600', marginBottom: '10px', color: '#cf1322' }}>[기존 기계 회수] {oldAsset.model_name} ({oldAsset.serial_number})</div>
           <div style={{ fontSize: '0.85rem', marginBottom: '12px', color: '#666' }}>회수 시점의 최종 카운터를 입력하세요. (정산 근거가 됩니다)</div>
           
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <InputField label="최종 흑백(A4)" type="number" value={formData.final_bw} onChange={e => setFormData({ ...formData, final_bw: Number(e.target.value) })} />
             <InputField label="최종 컬러(A4)" type="number" value={formData.final_col} onChange={e => setFormData({ ...formData, final_col: Number(e.target.value) })} />
-          </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '-10px' }}>
             <InputField label="최종 흑백(A3)" type="number" value={formData.final_bw_a3} onChange={e => setFormData({ ...formData, final_bw_a3: Number(e.target.value) })} />
             <InputField label="최종 컬러(A3)" type="number" value={formData.final_col_a3} onChange={e => setFormData({ ...formData, final_col_a3: Number(e.target.value) })} />
           </div>
@@ -169,18 +124,16 @@ export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuc
         {/* 새 기계 섹션 */}
         <div style={{ padding: '16px', backgroundColor: '#e6f7ff', borderRadius: '8px', marginBottom: '20px', border: '1px solid #91d5ff' }}>
           <div style={{ fontWeight: '600', marginBottom: '10px', color: '#0050b3' }}>[새 기계 설치]</div>
-          <InputField label="교체할 기계 선택" as="select" value={formData.new_asset_id} onChange={e => setFormData({ ...formData, new_asset_id: e.target.value })}>
+          <InputField label="교체할 기계 선택" as="select" value={formData.new_asset_id} onChange={e => setFormData({ ...formData, new_asset_id: e.target.value })} style={{marginBottom: '16px'}}>
             <option value="">창고 내 기계 선택...</option>
             {warehouseItems.map(item => (
               <option key={item.id} value={item.id}>{item.brand} {item.model_name} ({item.serial_number})</option>
             ))}
           </InputField>
           
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <InputField label="설치 흑백(A4)" type="number" value={formData.new_initial_bw} onChange={e => setFormData({ ...formData, new_initial_bw: Number(e.target.value) })} />
             <InputField label="설치 컬러(A4)" type="number" value={formData.new_initial_col} onChange={e => setFormData({ ...formData, new_initial_col: Number(e.target.value) })} />
-          </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '-10px' }}>
             <InputField label="설치 흑백(A3)" type="number" value={formData.new_initial_bw_a3} onChange={e => setFormData({ ...formData, new_initial_bw_a3: Number(e.target.value) })} />
             <InputField label="설치 컬러(A3)" type="number" value={formData.new_initial_col_a3} onChange={e => setFormData({ ...formData, new_initial_col_a3: Number(e.target.value) })} />
           </div>

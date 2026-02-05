@@ -1,10 +1,12 @@
+// components/client/MachineWithdrawModal.tsx
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/utils/supabase'
 import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/Input'
 import { Inventory } from '@/app/types'
+// ✅ Server Action 임포트
+import { withdrawInventoryAction } from '@/app/actions/inventory'
 
 interface Props {
   asset: Inventory
@@ -14,8 +16,9 @@ interface Props {
 }
 
 export default function MachineWithdrawModal({ asset, clientId, onClose, onSuccess }: Props) {
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
+  
+  // 사용자 입력 상태 관리
   const [formData, setFormData] = useState({
     final_bw: 0,
     final_col: 0,
@@ -25,78 +28,84 @@ export default function MachineWithdrawModal({ asset, clientId, onClose, onSucce
   })
 
   const handleWithdraw = async () => {
-    if (!confirm(`'${asset.model_name}' 기기를 철수 처리하시겠습니까?`)) return
+    if (!confirm(`'${asset.model_name}' 기기를 정말로 철수 처리하시겠습니까?\n(상태가 '창고'로 변경됩니다)`)) return
+    
     setLoading(true)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      // 🔴 [수정] user 존재 여부 확인 (타입 가드)
-      if (!user) {
-        throw new Error('로그인이 필요합니다.')
+      // ✅ 서버 액션 호출 (복잡한 로직은 서버에서 수행)
+      const result = await withdrawInventoryAction(
+        asset.id,
+        clientId,
+        {
+          bw: formData.final_bw,
+          col: formData.final_col,
+          bw_a3: formData.final_bw_a3,
+          col_a3: formData.final_col_a3
+        },
+        formData.memo
+      )
+
+      if (result.success) {
+        alert(result.message)
+        onSuccess() // 상위 컴포넌트 목록 새로고침
+        onClose()   // 모달 닫기
+      } else {
+        throw new Error(result.message)
       }
 
-      // 🔴 [수정] user.id가 string임을 보장
-      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
-
-      // 🔴 [수정] 조직 정보 확인
-      if (!profile?.organization_id) {
-        throw new Error('조직 정보를 찾을 수 없습니다.')
-      }
-
-      // 1. 기계 회수 이력 기록
-      await supabase.from('machine_history').insert({
-        inventory_id: asset.id,
-        client_id: clientId,
-        organization_id: profile.organization_id, // profile.organization_id 사용
-        action_type: 'WITHDRAW',
-        bw_count: formData.final_bw,
-        col_count: formData.final_col,
-        bw_a3_count: formData.final_bw_a3,
-        col_a3_count: formData.final_col_a3,
-        memo: `단독 철수: ${formData.memo}`
-      })
-
-      // 2. 기계 상태 변경 (거래처 해제 및 창고행)
-      const { error } = await supabase.from('inventory').update({
-        status: '창고',
-        client_id: null,
-      }).eq('id', asset.id)
-
-      if (error) throw error
-
-      alert('철수 처리가 완료되었습니다.')
-      onSuccess()
-      onClose()
-    } catch (e) {
-      const message = e instanceof Error ? e.message : (e as { message?: string })?.message || String(e)
-      alert('오류 발생: ' + message)
+    } catch (e: any) {
+      alert('오류 발생: ' + e.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }}>
-      <div style={{ backgroundColor: 'var(--notion-bg)', padding: '32px', borderRadius: '12px', width: '500px' }}>
-        <h2 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '20px' }}>📤 기기 철수 처리</h2>
-        <div style={{ padding: '12px', backgroundColor: 'var(--notion-soft-bg)', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem' }}>
-          기기: <strong>{asset.model_name} ({asset.serial_number})</strong>
+    <div style={{ 
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+      backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 
+    }}>
+      <div style={{ 
+        backgroundColor: 'var(--notion-bg)', padding: '32px', borderRadius: '12px', width: '500px', 
+        boxShadow: '0 15px 50px rgba(0,0,0,0.1)' 
+      }}>
+        
+        <h2 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '20px', color: 'var(--notion-main-text)' }}>
+          📤 기기 철수 처리
+        </h2>
+        
+        <div style={{ padding: '12px', backgroundColor: 'var(--notion-soft-bg)', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem', border: '1px solid var(--notion-border)' }}>
+          기기: <strong style={{color: 'var(--notion-blue)'}}>{asset.model_name}</strong> <span style={{color: 'var(--notion-sub-text)'}}>({asset.serial_number})</span>
         </div>
         
         <div style={{ marginBottom: '20px' }}>
-          <p style={{ fontSize: '0.85rem', color: 'var(--notion-sub-text)', marginBottom: '8px' }}>회수 시점 최종 카운터 입력 (정산용)</p>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <InputField label="최종 흑백" type="number" value={formData.final_bw} onChange={e => setFormData({ ...formData, final_bw: Number(e.target.value) })} />
-            <InputField label="최종 컬러" type="number" value={formData.final_col} onChange={e => setFormData({ ...formData, final_col: Number(e.target.value) })} />
+          <p style={{ fontSize: '0.85rem', color: 'var(--notion-sub-text)', marginBottom: '8px', fontWeight: '600' }}>
+            🏁 회수 시점 최종 카운터 (정산용)
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <InputField label="최종 흑백(A4)" type="number" value={formData.final_bw} onChange={e => setFormData({ ...formData, final_bw: Number(e.target.value) })} />
+            <InputField label="최종 컬러(A4)" type="number" value={formData.final_col} onChange={e => setFormData({ ...formData, final_col: Number(e.target.value) })} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <InputField label="최종 흑백(A3)" type="number" value={formData.final_bw_a3} onChange={e => setFormData({ ...formData, final_bw_a3: Number(e.target.value) })} />
+            <InputField label="최종 컬러(A3)" type="number" value={formData.final_col_a3} onChange={e => setFormData({ ...formData, final_col_a3: Number(e.target.value) })} />
           </div>
         </div>
 
-        <InputField label="철수 사유 및 비고" as="textarea" value={formData.memo} onChange={e => setFormData({ ...formData, memo: e.target.value })} style={{ height: '60px' }} />
+        <InputField 
+          label="철수 사유 및 비고" 
+          as="textarea" 
+          value={formData.memo} 
+          onChange={e => setFormData({ ...formData, memo: e.target.value })} 
+          style={{ height: '80px' }} 
+        />
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px', borderTop: '1px solid var(--notion-border)', paddingTop: '20px' }}>
           <Button variant="ghost" onClick={onClose}>취소</Button>
-          <Button variant="danger" onClick={handleWithdraw} disabled={loading}>{loading ? '처리 중...' : '철수 확정'}</Button>
+          <Button variant="danger" onClick={handleWithdraw} disabled={loading}>
+            {loading ? '처리 중...' : '철수 확정'}
+          </Button>
         </div>
       </div>
     </div>
