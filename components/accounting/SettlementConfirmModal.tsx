@@ -1,3 +1,4 @@
+// components/accounting/SettlementConfirmModal.tsx
 'use client'
 
 import React from 'react'
@@ -19,7 +20,6 @@ export default function SettlementConfirmModal({
     selectedInventories, calculateSelectedTotal, clients, inventoryMap, calculateClientBill, onClose, onSave, loading
 }: Props) {
 
-    // 전체 선택 합계 계산
     const totalSupply = calculateSelectedTotal();
     const totalVat = Math.floor(totalSupply * 0.1);
     const grandTotal = totalSupply + totalVat;
@@ -38,8 +38,8 @@ export default function SettlementConfirmModal({
                             
                             if (selectedDetails.length === 0) return null;
 
-                            // 거래처별 합계 (선택된 기계만)
-                            const clientSupply = selectedDetails.reduce((sum, d) => sum + (d.isGroupLeader ? d.rowCost.total : 0), 0);
+                            // 거래처별 합계
+                            const clientSupply = selectedDetails.reduce((sum, d) => sum + d.rowCost.total, 0);
                             const clientVat = Math.floor(clientSupply * 0.1);
                             const clientTotal = clientSupply + clientVat;
 
@@ -55,37 +55,93 @@ export default function SettlementConfirmModal({
                                     </div>
 
                                     <table className={styles.modalTable}>
+                                        <colgroup>
+                                            <col style={{ width: '25%' }} />
+                                            <col style={{ width: '15%' }} />
+                                            <col style={{ width: '20%' }} />
+                                            <col style={{ width: '20%' }} />
+                                            <col style={{ width: '20%' }} />
+                                        </colgroup>
                                         <thead>
                                             <tr>
-                                                <th style={{ width: '25%' }}>기계명(S/N)</th>
-                                                <th style={{ width: '15%' }}>전월</th>
-                                                <th style={{ width: '15%' }}>당월</th>
-                                                <th style={{ width: '15%' }}>실사용</th>
-                                                <th style={{ width: '15%' }}>공급가</th>
-                                                <th style={{ width: '15%' }}>부가세</th>
+                                                <th>기계명(S/N)</th>
+                                                <th>전월</th>
+                                                <th>당월(기본 매수)</th>
+                                                <th>추가 매수</th>
+                                                <th>공급가</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {selectedDetails.map((d: CalculatedAsset) => {
-                                                const rowSupply = d.isGroupLeader ? d.rowCost.total : 0;
-                                                const rowVat = Math.floor(rowSupply * 0.1);
+                                                const rowSupply = d.rowCost.total;
+                                                
+                                                // 그룹 여부 확인 (병합용)
+                                                const shouldRenderExtraCell = !d.billing_group_id || d.isGroupLeader;
                                                 
                                                 return (
                                                     <tr key={d.inventory_id}>
                                                         <td style={{ textAlign: 'left' }}>
                                                             <div style={{fontSize: '0.7rem', marginBottom: '2px'}}>
                                                                 {d.is_replacement_before && <span style={{color: '#ff4d4f', fontWeight: 'bold'}}>[교체전] </span>}
-                                                                {d.is_replacement_after && <span style={{color: '#0070f3', fontWeight: 'bold'}}>[교체후] </span>}
-                                                                {d.is_withdrawal && <span style={{color: '#8c8c8c', fontWeight: 'bold'}}>[철수] </span>}
+                                                                {d.billing_group_id && <span style={{color: '#9065b0', fontWeight: 'bold'}}>[그룹합산] </span>}
                                                             </div>
                                                             <strong>{d.model_name}</strong><br />
                                                             <span style={{color: '#888', fontSize: '0.75rem'}}>{d.serial_number}</span>
                                                         </td>
-                                                        <td>{d.prev.bw.toLocaleString()} / {d.prev.col.toLocaleString()}</td>
-                                                        <td>{d.curr.bw.toLocaleString()} / {d.curr.col.toLocaleString()}</td>
-                                                        <td>{d.converted.bw.toLocaleString()} / {d.converted.col.toLocaleString()}</td>
-                                                        <td style={{ color: '#333' }}>{d.isGroupLeader ? rowSupply.toLocaleString() : '-'}</td>
-                                                        <td style={{ color: '#666' }}>{d.isGroupLeader ? rowVat.toLocaleString() : '-'}</td>
+                                                        <td>
+                                                            <div>{d.prev.bw.toLocaleString()}</div>
+                                                            <div style={{color:'#0070f3'}}>{d.prev.col.toLocaleString()}</div>
+                                                        </td>
+                                                        <td>
+                                                            <div>{d.curr.bw.toLocaleString()} <span style={{color:'#888', fontSize:'0.8em'}}>(기본:{d.usageBreakdown.basicBW})</span></div>
+                                                            <div style={{color:'#0070f3'}}>
+                                                                {d.curr.col.toLocaleString()} <span style={{color:'#88aaff', fontSize:'0.8em'}}>(기본:{d.usageBreakdown.basicCol})</span>
+                                                            </div>
+                                                        </td>
+                                                        
+                                                        {/* 추가매수 (그룹이면 병합) */}
+                                                        {shouldRenderExtraCell && (
+                                                            <td rowSpan={d.billing_group_id ? d.groupSpan : 1} style={{ verticalAlign: 'top', padding:'10px', backgroundColor: d.billing_group_id ? '#fdfdfd' : 'inherit' }}>
+                                                                {d.billing_group_id && d.groupUsageBreakdown ? (
+                                                                    // 그룹 합산 추가매수
+                                                                    <>
+                                                                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#0070f3', marginBottom: '6px', borderBottom: '1px dashed #e0e0e0', paddingBottom: '4px' }}>
+                                                                            합산 기본 매수 ({d.groupUsageBreakdown.poolBasicBW.toLocaleString()}/{d.groupUsageBreakdown.poolBasicCol.toLocaleString()})
+                                                                        </div>
+                                                                        
+                                                                        <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: '2px', fontWeight: '600' }}>기본 매수</div>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '2px' }}>
+                                                                            <span style={{ color: '#666' }}>흑백:</span>
+                                                                            <b>{d.groupUsageBreakdown.basicBW.toLocaleString()}</b>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                                                                            <span style={{ color: '#0070f3' }}>칼라:</span>
+                                                                            <b>{d.groupUsageBreakdown.basicCol.toLocaleString()}</b>
+                                                                        </div>
+
+                                                                        <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
+
+                                                                        <div style={{ fontSize: '0.75rem', color: '#d93025', marginBottom: '2px', fontWeight: '600' }}>추가 매수</div>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '2px' }}>
+                                                                            <span style={{ color: '#d93025' }}>흑백:</span>
+                                                                            <b>{d.groupUsageBreakdown.extraBW.toLocaleString()}</b>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                                                                            <span style={{ color: '#d93025' }}>칼라:</span>
+                                                                            <b>{d.groupUsageBreakdown.extraCol.toLocaleString()}</b>
+                                                                        </div>
+                                                                    </>
+                                                                ) : (
+                                                                    // 개별 추가매수
+                                                                    <>
+                                                                        <div>흑백: <span style={{color: d.usageBreakdown.extraBW > 0 ? '#d93025' : '#ccc'}}>{d.usageBreakdown.extraBW.toLocaleString()}</span></div>
+                                                                        <div>칼라: <span style={{color: d.usageBreakdown.extraCol > 0 ? '#d93025' : '#ccc'}}>{d.usageBreakdown.extraCol.toLocaleString()}</span></div>
+                                                                    </>
+                                                                )}
+                                                            </td>
+                                                        )}
+
+                                                        <td style={{ color: '#333', fontWeight:'bold' }}>{rowSupply.toLocaleString()}</td>
                                                     </tr>
                                                 );
                                             })}
@@ -95,18 +151,11 @@ export default function SettlementConfirmModal({
                             );
                         })}
                     
-                    {/* 최종 합계 요약 */}
-                    <div className={styles.modalSummary} style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                        <div style={{ fontSize: '1rem', color: '#666' }}>
-                           선택 기계: {selectedInventories.size}대
-                        </div>
-                        <div style={{ display: 'flex', gap: '20px', fontSize: '1.1rem', color: '#333' }}>
-                            <span>총 공급가액: <b>{totalSupply.toLocaleString()}</b>원</span>
-                            <span>+</span>
-                            <span>총 부가세(10%): <b>{totalVat.toLocaleString()}</b>원</span>
-                        </div>
-                        <div style={{ fontSize: '1.4rem', color: 'var(--notion-blue)', fontWeight: 'bold', borderTop:'1px solid #ddd', paddingTop:'8px', marginTop:'4px' }}>
-                           = 최종 청구 금액: {grandTotal.toLocaleString()} 원
+                    <div className={styles.modalSummary} style={{ display: 'flex', gap: '20px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <div>총 공급가: <b>{totalSupply.toLocaleString()}</b>원</div>
+                        <div>총 부가세: <b>{totalVat.toLocaleString()}</b>원</div>
+                        <div style={{ fontSize: '1.2rem', color: 'var(--notion-blue)', fontWeight: 'bold' }}>
+                           최종: {grandTotal.toLocaleString()} 원
                         </div>
                     </div>
                 </div>

@@ -15,6 +15,10 @@ const SettlementSchema = z.object({
       inventory_id: z.string(),
       prev: z.object({ bw: z.number(), col: z.number(), bw_a3: z.number(), col_a3: z.number() }),
       curr: z.object({ bw: z.number(), col: z.number(), bw_a3: z.number(), col_a3: z.number() }),
+      // 사용량 데이터 스키마 추가
+      usage: z.object({ bw: z.number(), col: z.number(), bw_a3: z.number(), col_a3: z.number() }),
+      converted: z.object({ bw: z.number(), col: z.number() }),
+      
       isGroupLeader: z.boolean().optional(),
       rowCost: z.object({ total: z.number() }).optional(),
       is_replacement_before: z.boolean().optional(),
@@ -72,6 +76,8 @@ export async function saveSettlementAction(unsafeParams: unknown) {
       const detailsPayload = item.details.map(d => ({
         settlement_id: settlement.id,
         inventory_id: d.inventory_id,
+        
+        // 카운터 정보
         prev_count_bw: d.prev.bw,
         prev_count_col: d.prev.col,
         prev_count_bw_a3: d.prev.bw_a3,
@@ -80,7 +86,16 @@ export async function saveSettlementAction(unsafeParams: unknown) {
         curr_count_col: d.curr.col,
         curr_count_bw_a3: d.curr.bw_a3,
         curr_count_col_a3: d.curr.col_a3,
-        calculated_amount: d.isGroupLeader ? (d.rowCost?.total || 0) : 0,
+        
+        // ✅ [핵심 수정] 사용량 정보 저장 (이게 없어서 0으로 나왔습니다)
+        usage_bw: d.usage.bw,
+        usage_col: d.usage.col,
+        usage_bw_a3: d.usage.bw_a3,
+        usage_col_a3: d.usage.col_a3,
+        converted_usage_bw: d.converted.bw,
+        converted_usage_col: d.converted.col,
+
+        calculated_amount: d.rowCost?.total || 0,
         is_replacement_record: !!(d.is_replacement_before || d.is_withdrawal)
       }));
 
@@ -117,15 +132,12 @@ export async function rebillSettlementHistoryAction(settlementId: string) {
   return deleteSettlementAction(settlementId);
 }
 
-// ✅ [추가] 일괄 삭제/재청구 액션
+// 3. 일괄 삭제/재청구 액션
 export async function deleteSettlementsAction(settlementIds: string[]) {
   const supabase = await createClient()
   try {
-    // 상세 내역 일괄 삭제
     await supabase.from('settlement_details').delete().in('settlement_id', settlementIds)
-    // 마스터 일괄 삭제
     const { error } = await supabase.from('settlements').delete().in('id', settlementIds)
-    
     if (error) throw error
     revalidatePath('/accounting')
     return { success: true, message: '선택한 내역이 일괄 처리되었습니다.' }

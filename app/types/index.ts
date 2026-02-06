@@ -7,7 +7,6 @@ type InventoryRow = Database['public']['Tables']['inventory']['Row']
 type ClientRow = Database['public']['Tables']['clients']['Row']
 type SettlementRow = Database['public']['Tables']['settlements']['Row']
 type SettlementDetailRow = Database['public']['Tables']['settlement_details']['Row']
-// ✅ [핵심 수정] 이 줄이 있어야 MachineHistory 에러가 해결됩니다.
 type MachineHistoryRow = Database['public']['Tables']['machine_history']['Row']
 type OrganizationRow = Database['public']['Tables']['organizations']['Row']
 
@@ -63,7 +62,20 @@ export interface CalculatedAsset {
   curr: CounterData;
   usage: CounterData;
   converted: { bw: number; col: number };
+  
+  // 개별 기계의 사용량 (단순 참고용)
   usageBreakdown: { basicBW: number; extraBW: number; basicCol: number; extraCol: number };
+  
+  // 그룹 합산 디스플레이용 데이터 (리더에게만 존재)
+  groupUsageBreakdown?: {
+    poolBasicBW: number;   // 그룹 총 기본제공 흑백
+    poolBasicCol: number;  // 그룹 총 기본제공 칼라
+    basicBW: number;       // 그룹 총 사용 흑백 (기본내)
+    extraBW: number;       // 그룹 총 초과 흑백
+    basicCol: number;      // 그룹 총 사용 칼라 (기본내)
+    extraCol: number;      // 그룹 총 초과 칼라
+  };
+
   rowCost: { basic: number; extra: number; total: number };
   isGroupLeader: boolean;
   groupSpan: number;
@@ -91,14 +103,25 @@ export interface Settlement extends SettlementRow {
 
 export interface SettlementDetail extends SettlementDetailRow {
   inventory?: {
+    id: string; // id 추가
     model_name: string;
     serial_number: string;
     status: string;
     billing_date: string | null;
+    billing_group_id?: string | null; // 그룹 ID 추가
+    // ✅ [수정] 아래 두 필드 추가 (AccountingHistory에서 사용됨)
+    plan_basic_cnt_bw?: number | null;
+    plan_basic_cnt_col?: number | null;
   } | null;
+  
+  // ✅ [수정] UI용 임시 속성 추가 (AccountingHistory에서 계산 후 사용됨)
+  _ui?: {
+    rowSpan: number;
+    isHidden: boolean;
+    groupStats: any;
+  };
 }
 
-// ✅ MachineHistoryRow를 상속받아 DB 컬럼 속성을 모두 갖게 됩니다.
 export interface MachineHistory extends MachineHistoryRow {
   inventory?: Inventory | null;
 }

@@ -11,11 +11,11 @@ export const calculateClientBill = (
     return { details: [], totalAmount: 0 };
   }
 
-  // 1. 각 기계별 사용량 계산
+  // 1. 각 기계별 기초 사용량 및 변환 매수 계산
   let tempCalculations: CalculatedAsset[] = assets.map(inv => {
     const p = prevData[inv.id] || { bw: 0, col: 0, bw_a3: 0, col_a3: 0 };
     
-    // 철수/교체 기기 대응 로직
+    // 철수/교체 기기 대응
     const isWithdrawn = inv.is_replacement_before || inv.is_withdrawal;
     const c = isWithdrawn && inv.final_counts 
       ? inv.final_counts 
@@ -29,10 +29,10 @@ export const calculateClientBill = (
     const weightBW = inv.plan_weight_a3_bw || 1;
     const weightCol = inv.plan_weight_a3_col || 1;
 
+    // A3 가중치가 적용된 변환 사용량 (정산 기준)
     const convertedBW = usageRawBW + (usageRawBW_A3 * weightBW);
     const convertedCol = usageRawCol + (usageRawCol_A3 * weightCol);
 
-    // CalculatedAsset 객체 생성 (Inventory 속성 상속)
     return {
       ...inv,
       inventory_id: inv.id,
@@ -49,12 +49,12 @@ export const calculateClientBill = (
         price_col: inv.plan_price_col || 0
       },
       rowCost: { basic: 0, extra: 0, total: 0 },
-      isGroupLeader: true,
+      isGroupLeader: false,
       groupSpan: 1
     };
   });
 
-  // 2. 합산 청구 그룹화
+  // 2. 그룹핑 (billing_group_id가 같으면 묶음)
   const groups: { [key: string]: CalculatedAsset[] } = {};
   tempCalculations.forEach(calc => {
     const groupKey = calc.billing_group_id || `INDIVIDUAL_${calc.inventory_id}`;
@@ -62,42 +62,109 @@ export const calculateClientBill = (
     groups[groupKey].push(calc);
   });
 
-  // 3. 그룹별 합산 요금 계산
+  // 3. 그룹별 요금 계산 및 배분
   Object.values(groups).forEach(groupAssets => {
-    const groupBasicFee = groupAssets.reduce((sum, item) => sum + item.plan.basic_fee, 0);
-    const groupFreeBW = groupAssets.reduce((sum, item) => sum + item.plan.free_bw, 0);
-    const groupFreeCol = groupAssets.reduce((sum, item) => sum + item.plan.free_col, 0);
+    // 3.1 그룹 전체 합산 데이터 계산
+    const groupTotalFreeBW = groupAssets.reduce((sum, item) => sum + item.plan.free_bw, 0);
+    const groupTotalFreeCol = groupAssets.reduce((sum, item) => sum + item.plan.free_col, 0);
     
-    const groupUsageBW = groupAssets.reduce((sum, item) => sum + item.converted.bw, 0);
-    const groupUsageCol = groupAssets.reduce((sum, item) => sum + item.converted.col, 0);
+    const groupTotalUsageBW = groupAssets.reduce((sum, item) => sum + item.converted.bw, 0);
+    const groupTotalUsageCol = groupAssets.reduce((sum, item) => sum + item.converted.col, 0);
 
-    const usedBasicBW = Math.min(groupUsageBW, groupFreeBW);
-    const usedExtraBW = Math.max(0, groupUsageBW - groupFreeBW);
-    const usedBasicCol = Math.min(groupUsageCol, groupFreeCol);
-    const usedExtraCol = Math.max(0, groupUsageCol - groupFreeCol);
+    // 3.2 그룹 전체의 순수 초과 사용량 (Net Excess)
+    const groupNetExtraBW = Math.max(0, groupTotalUsageBW - groupTotalFreeBW);
+    const groupNetExtraCol = Math.max(0, groupTotalUsageCol - groupTotalFreeCol);
 
+    // 그룹 내 사용량 (기본 제공량 이내)
+    const groupBasicUsageBW = Math.min(groupTotalUsageBW, groupTotalFreeBW);
+    const groupBasicUsageCol = Math.min(groupTotalUsageCol, groupTotalFreeCol);
+
+    // 단가 (그룹 내 첫번째 기계 기준)
     const unitPriceBW = groupAssets[0].plan.price_bw;
     const unitPriceCol = groupAssets[0].plan.price_col;
 
-    const groupExtraFee = (usedExtraBW * unitPriceBW) + (usedExtraCol * unitPriceCol);
-    const groupTotal = groupBasicFee + groupExtraFee;
+    // 그룹 전체 추가 요금 총액
+    const groupTotalExtraFee = Math.floor((groupNetExtraBW * unitPriceBW) + (groupNetExtraCol * unitPriceCol));
+
+    // 3.3 기계별 "초과 기여도" 계산 (비용 배분용)
+    let totalIndivExcessBW = 0;
+    let totalIndivExcessCol = 0;
+
+    const indivExcessMap = groupAssets.map(asset => {
+      const excessBW = Math.max(0, asset.converted.bw - asset.plan.free_bw);
+      const excessCol = Math.max(0, asset.converted.col - asset.plan.free_col);
+      
+      totalIndivExcessBW += excessBW;
+      totalIndivExcessCol += excessCol;
+
+      return { id: asset.id, excessBW, excessCol };
+    });
+
+    // 3.4 비용 및 사용량 할당
+    let distributedExtraFee = 0;
 
     groupAssets.forEach((asset, idx) => {
-      if (idx === 0) {
-        asset.isGroupLeader = true;
-        asset.groupSpan = groupAssets.length;
-        asset.rowCost = { basic: groupBasicFee, extra: groupExtraFee, total: groupTotal };
-        asset.usageBreakdown = { basicBW: usedBasicBW, extraBW: usedExtraBW, basicCol: usedBasicCol, extraCol: usedExtraCol };
-      } else { 
-        asset.isGroupLeader = false;
-        asset.groupSpan = 0; 
-        asset.rowCost = { basic: 0, extra: 0, total: 0 };
-        asset.usageBreakdown = { basicBW: 0, extraBW: 0, basicCol: 0, extraCol: 0 };
+      const isLeader = idx === 0;
+      const isLast = idx === groupAssets.length - 1;
+
+      // 3.4.1 UI 제어용 플래그
+      asset.isGroupLeader = isLeader;
+      asset.groupSpan = isLeader ? groupAssets.length : 0;
+
+      // 3.4.2 리더에게 그룹 통계 데이터 주입 (합산 기계 UI 표시용)
+      if (isLeader) {
+        asset.groupUsageBreakdown = {
+          poolBasicBW: groupTotalFreeBW,
+          poolBasicCol: groupTotalFreeCol,
+          basicBW: groupBasicUsageBW,
+          extraBW: groupNetExtraBW,
+          basicCol: groupBasicUsageCol,
+          extraCol: groupNetExtraCol
+        };
       }
+
+      // 3.4.3 개별 기계 사용량 Breakdown (단독 기계 UI 표시용)
+      // (그룹 기계여도 개별 데이터는 가지고 있어야 함)
+      asset.usageBreakdown = { 
+        basicBW: Math.min(asset.converted.bw, asset.plan.free_bw),
+        extraBW: Math.max(0, asset.converted.bw - asset.plan.free_bw),
+        basicCol: Math.min(asset.converted.col, asset.plan.free_col),
+        extraCol: Math.max(0, asset.converted.col - asset.plan.free_col)
+      };
+
+      // 3.4.4 금액 계산
+      const myBasicFee = asset.plan.basic_fee;
+
+      // 추가요금 배분 (초과 기여도 비례)
+      let myExtraFee = 0;
+      const myIndiv = indivExcessMap.find(x => x.id === asset.id)!;
+      
+      // 기여도를 금액 가치로 환산하여 비율 계산
+      const myExcessValue = (myIndiv.excessBW * unitPriceBW) + (myIndiv.excessCol * unitPriceCol);
+      const totalExcessValue = (totalIndivExcessBW * unitPriceBW) + (totalIndivExcessCol * unitPriceCol);
+
+      if (groupTotalExtraFee > 0 && totalExcessValue > 0) {
+        const ratio = myExcessValue / totalExcessValue;
+        
+        if (isLast) {
+          myExtraFee = groupTotalExtraFee - distributedExtraFee; // 잔수 처리
+        } else {
+          myExtraFee = Math.floor(groupTotalExtraFee * ratio);
+          distributedExtraFee += myExtraFee;
+        }
+      }
+
+      // 최종 금액 세팅
+      asset.rowCost = {
+        basic: myBasicFee,
+        extra: myExtraFee,
+        total: myBasicFee + myExtraFee
+      };
     });
   });
 
-  const totalAmount = tempCalculations.reduce((sum, d) => sum + (d.isGroupLeader ? d.rowCost.total : 0), 0);
+  // 4. 총 청구액 합계
+  const totalAmount = tempCalculations.reduce((sum, d) => sum + d.rowCost.total, 0);
 
   return { details: tempCalculations, totalAmount };
 };

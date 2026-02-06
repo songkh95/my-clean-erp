@@ -203,6 +203,7 @@ export function useAccounting() {
     const orgId = profile?.organization_id
     if (!orgId) return
 
+    // ✅ [수정] inventory의 billing_group_id 및 요금제 정보(plan_*)를 함께 가져옵니다.
     const { data, error } = await supabase
       .from('settlements')
       .select(`
@@ -213,7 +214,8 @@ export function useAccounting() {
         details:settlement_details (
           *,
           inventory:inventory (
-            model_name, serial_number, status, billing_date
+            model_name, serial_number, status, billing_date, billing_group_id,
+            plan_basic_cnt_bw, plan_basic_cnt_col
           )
         )
       `)
@@ -301,7 +303,7 @@ export function useAccounting() {
     });
 
     originalBill.totalAmount = originalBill.details.reduce((sum, d) => 
-      sum + (d.isGroupLeader ? (d.rowCost?.total || 0) : 0), 0);
+      sum + (d.rowCost?.total || 0), 0);
       
     return originalBill
   }
@@ -335,7 +337,7 @@ export function useAccounting() {
     targetClients.forEach(client => {
       const billData = calculateClientBillFiltered(client)
       billData.details.forEach(d => { 
-        if (selectedInventories.has(d.inventory_id) && d.isGroupLeader) sum += d.rowCost.total 
+        if (selectedInventories.has(d.inventory_id)) sum += d.rowCost.total 
       })
     })
     return sum
@@ -359,7 +361,7 @@ export function useAccounting() {
         const selectedDetails = billData.details.filter(d => selectedInventories.has(d.inventory_id))
         
         if (selectedDetails.length > 0) {
-          const totalAmount = selectedDetails.reduce((sum, d) => d.isGroupLeader ? sum + d.rowCost.total : sum, 0)
+          const totalAmount = selectedDetails.reduce((sum, d) => sum + d.rowCost.total, 0)
           dataToSend.push({ client, details: selectedDetails, totalAmount })
         }
       })
@@ -493,14 +495,12 @@ export function useAccounting() {
     fetchHistoryData();
   }
 
-  // ✅ [수정] 명세서 모달 열기 핸들러 (선택된 기계만 출력)
   const handleOpenStatement = (originalSettlement: Settlement, targetDetails: SettlementDetail[]) => {
     if (!targetDetails || targetDetails.length === 0) {
       alert("명세서를 출력할 기계를 선택해주세요.");
       return;
     }
 
-    // 선택된 기계들의 금액 합계 재계산 (공급가 기준)
     const newTotalAmount = targetDetails.reduce((sum, detail) => {
       return sum + (detail.calculated_amount || 0);
     }, 0);
@@ -508,7 +508,7 @@ export function useAccounting() {
     const tempSettlement: Settlement = {
       ...originalSettlement,
       details: targetDetails,
-      total_amount: newTotalAmount // 명세서 하단 합계가 맞도록 수정
+      total_amount: newTotalAmount 
     };
 
     setSelectedSettlementForStatement(tempSettlement)
@@ -534,7 +534,6 @@ export function useAccounting() {
     togglePaymentStatus, toggleDetailPaymentStatus,
     handleBatchDeleteHistory, handleBatchRebillHistory,
     
-    // 명세서 관련 값 반환
     isStatementOpen, selectedSettlementForStatement, myOrg,
     handleOpenStatement, handleCloseStatement
   }

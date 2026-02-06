@@ -1,3 +1,4 @@
+// components/accounting/AccountingRegistration.tsx
 'use client'
 
 import React, { useMemo } from 'react'
@@ -77,7 +78,6 @@ export default function AccountingRegistration({
     handleInputChange(invId, field, cleanValue);
   };
 
-  // 하단 선택 합계 계산
   const totalSupplyValue = calculateSelectedTotal(filteredClients);
   const totalVat = Math.floor(totalSupplyValue * 0.1);
   const grandTotal = totalSupplyValue + totalVat;
@@ -105,6 +105,7 @@ export default function AccountingRegistration({
       {isRegOpen && (
         <div className={styles.content}>
           <div className={styles.controls}>
+            {/* 상단 컨트롤 영역 (기존 유지) */}
             <div className={styles.controlItem}>
               <input type="number" value={regYear} onChange={e => setRegYear(Number(e.target.value))} className={styles.input} style={{ width: '60px', textAlign: 'center' }} />
               <span>년</span>
@@ -132,15 +133,13 @@ export default function AccountingRegistration({
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.th} style={{ width: '40px' }}>
-                    <input type="checkbox" checked={isAllSelected} onChange={handleToggleAll} />
-                  </th>
+                  <th className={styles.th} style={{ width: '40px' }}><input type="checkbox" checked={isAllSelected} onChange={handleToggleAll} /></th>
                   <th className={styles.th} style={{ width: '140px' }}>거래처</th>
                   <th className={styles.th} style={{ width: '180px' }}>기계 (모델/S.N)</th>
                   <th className={styles.th} style={{ width: '60px' }}>구분</th>
                   <th className={styles.th} style={{ width: '90px' }}>전월</th>
                   <th className={styles.th} style={{ width: '90px' }}>당월(입력)</th>
-                  <th className={styles.th} style={{ width: '160px' }}>실사용 (가중치)</th>
+                  <th className={styles.th} style={{ width: '160px' }}>실사용 (분배됨)</th>
                   <th className={styles.th} style={{ width: '130px' }}>기계별 금액</th>
                   <th className={styles.th} style={{ width: '150px' }}>총 청구 합계</th>
                 </tr>
@@ -149,17 +148,12 @@ export default function AccountingRegistration({
                 {loading ? (
                   <tr><td colSpan={9} className={styles.td} style={{ padding: '60px' }}>데이터 로딩 중...</td></tr>
                 ) : filteredClients.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: '60px', textAlign: 'center', color: 'var(--notion-sub-text)' }}>
-                      <div style={{ fontSize: '1rem', marginBottom: '8px' }}>📭 청구할 거래처가 없습니다.</div>
-                    </td>
-                  </tr>
+                  <tr><td colSpan={9} style={{ padding: '60px', textAlign: 'center' }}>데이터가 없습니다.</td></tr>
                 ) : filteredClients.map(client => {
                   const billData = calculateClientBill(client)
                   const rowSpan = billData.details.length
                   if (rowSpan === 0) return null
 
-                  // 거래처별 합계 계산 (공급가, 부가세, 합계)
                   const clientSupply = billData.totalAmount;
                   const clientVat = Math.floor(clientSupply * 0.1);
                   const clientTotal = clientSupply + clientVat;
@@ -167,30 +161,18 @@ export default function AccountingRegistration({
                   return billData.details.map((calc, idx) => {
                     const isItemSelected = selectedInventories.has(calc.inventory_id)
                     const isWithdrawn = calc.is_replacement_before || calc.is_withdrawal; 
-                    const isPlanMissing = calc.plan.basic_fee === 0 && calc.plan.price_bw === 0 && calc.plan.price_col === 0;
-                    const isGroupMember = calc.billing_group_id && !calc.isGroupLeader;
                     const showExcludeBtn = calc.is_replacement_before || calc.is_withdrawal;
 
                     let badgeLabel = calc.status;
                     let badgeStyle = { backgroundColor: '#f1f1f0', color: '#37352f' };
+                    if (calc.is_replacement_before) { badgeLabel = "교체(철수)"; badgeStyle = { backgroundColor: '#ffe2dd', color: '#d93025' }; }
+                    else if (calc.status === '설치') { badgeLabel = "설치"; badgeStyle = { backgroundColor: '#dbeddb', color: '#2eaadc' }; }
 
-                    if (calc.is_replacement_before) {
-                      badgeLabel = "교체(철수)"; badgeStyle = { backgroundColor: '#ffe2dd', color: '#d93025' };
-                    } else if (calc.is_replacement_after) {
-                      badgeLabel = "교체(설치)"; badgeStyle = { backgroundColor: '#d3e5ef', color: '#0070f3' };
-                    } else if (calc.is_withdrawal) {
-                      badgeLabel = "회수"; badgeStyle = { backgroundColor: '#f1f1f0', color: '#787774' };
-                    } else if (calc.status === '설치') {
-                      badgeLabel = "설치"; badgeStyle = { backgroundColor: '#dbeddb', color: '#2eaadc' };
-                    }
+                    const shouldRenderUsageCell = calc.isGroupLeader || !calc.billing_group_id;
 
                     return (
-                      <tr key={calc.inventory_id} style={{
-                        backgroundColor: isWithdrawn ? '#fff9f9' : (isItemSelected ? 'var(--notion-blue-light)' : 'transparent')
-                      }}>
-                        <td className={styles.td}>
-                          <input type="checkbox" checked={isItemSelected} onChange={() => toggleInventorySelection(calc.inventory_id)} />
-                        </td>
+                      <tr key={calc.inventory_id} style={{ backgroundColor: isWithdrawn ? '#fff9f9' : (isItemSelected ? 'var(--notion-blue-light)' : 'transparent') }}>
+                        <td className={styles.td}><input type="checkbox" checked={isItemSelected} onChange={() => toggleInventorySelection(calc.inventory_id)} /></td>
 
                         {idx === 0 && (
                           <td className={styles.clientInfoCell} rowSpan={rowSpan}>
@@ -201,22 +183,16 @@ export default function AccountingRegistration({
                         <td className={styles.td} style={{ textAlign: 'left', padding: '12px' }}>
                            <div style={{ marginBottom: '6px', display:'flex', gap:'4px' }}>
                              <span className={styles.badge} style={badgeStyle}>{badgeLabel}</span>
-                             {calc.billing_group_id && (
-                               <span className={styles.badge} style={{ backgroundColor: '#f9f0ff', color: '#9065b0' }} title="합산 청구">🔗 합산</span>
-                             )}
+                             {calc.billing_group_id && <span className={styles.badge} style={{ backgroundColor: '#f9f0ff', color: '#9065b0' }}>🔗 합산</span>}
                            </div>
-                           <div style={{ fontWeight: '600', fontSize:'0.9rem' }}>{calc.model_name}</div>
+                           <div style={{ fontWeight: '600' }}>{calc.model_name}</div>
                            <div style={{ fontSize: '0.75rem', color: '#999' }}>{calc.serial_number}</div>
-                           <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '4px' }}>청구일: {calc.billing_date || '-'}</div>
-                           {isPlanMissing && <div style={{ fontSize: '0.7rem', color: '#d93025', marginTop: '4px' }}>(요금제 미등록)</div>}
-                           {showExcludeBtn && (
-                              <button onClick={(e) => { e.stopPropagation(); handleExcludeAsset(calc); }} style={{ marginTop: '6px', fontSize: '0.7rem', padding: '2px 6px', border: '1px solid #e5e5e5', borderRadius: '4px', backgroundColor: '#fff', color: '#666', cursor: 'pointer' }}>🚫 제외</button>
-                           )}
+                           {showExcludeBtn && <button onClick={(e) => { e.stopPropagation(); handleExcludeAsset(calc); }} style={{ marginTop: '6px', fontSize: '0.7rem' }}>🚫 제외</button>}
                         </td>
 
                         <td className={styles.td}>
                           <div className={styles.splitCellContainer}>
-                            <div className={styles.rowGray}>흑백</div><div className={styles.rowBlue}>칼라</div><div className={styles.rowGray}>흑백(A3)</div><div className={`${styles.rowBlue} ${styles.rowLast}`}>칼라(A3)</div>
+                            <div className={styles.rowGray}>흑백</div><div className={styles.rowBlue}>칼라</div><div className={styles.rowGray}>흑A3</div><div className={`${styles.rowBlue} ${styles.rowLast}`}>칼A3</div>
                           </div>
                         </td>
 
@@ -227,74 +203,74 @@ export default function AccountingRegistration({
                         </td>
 
                         <td className={styles.td}>
-                          {isWithdrawn ? (
-                            <div className={styles.splitCellContainer} style={{ backgroundColor: '#fff9f9' }}>
-                              <div className={styles.rowGray} style={{fontWeight:'bold'}}>{calc.curr?.bw ?? 0}</div><div className={styles.rowBlue} style={{fontWeight:'bold'}}>{calc.curr?.col ?? 0}</div><div className={styles.rowGray} style={{fontWeight:'bold'}}>{calc.curr?.bw_a3 ?? 0}</div><div className={`${styles.rowBlue} ${styles.rowLast}`} style={{fontWeight:'bold'}}>{calc.curr?.col_a3 ?? 0}</div>
-                            </div>
-                          ) : (
-                            <div className={styles.splitCellContainer}>
-                              <div className={styles.rowGray}><input type="number" className={styles.numberInput} placeholder="0" value={inputData[calc.inventory_id]?.bw ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'bw', e.target.value)} /></div>
-                              <div className={styles.rowBlue}><input type="number" className={styles.numberInput} placeholder="0" value={inputData[calc.inventory_id]?.col ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'col', e.target.value)} /></div>
-                              <div className={styles.rowGray}><input type="number" className={styles.numberInput} placeholder="0" value={inputData[calc.inventory_id]?.bw_a3 ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'bw_a3', e.target.value)} /></div>
-                              <div className={`${styles.rowBlue} ${styles.rowLast}`}><input type="number" className={styles.numberInput} placeholder="0" value={inputData[calc.inventory_id]?.col_a3 ?? ''} onKeyDown={onNumberKeyDown} onChange={e => onNumberChange(calc.inventory_id, 'col_a3', e.target.value)} /></div>
-                            </div>
-                          )}
+                          <div className={styles.splitCellContainer}>
+                            <div className={styles.rowGray}><input type="number" className={styles.numberInput} value={inputData[calc.inventory_id]?.bw ?? ''} onChange={e => onNumberChange(calc.inventory_id, 'bw', e.target.value)} /></div>
+                            <div className={styles.rowBlue}><input type="number" className={styles.numberInput} value={inputData[calc.inventory_id]?.col ?? ''} onChange={e => onNumberChange(calc.inventory_id, 'col', e.target.value)} /></div>
+                            <div className={styles.rowGray}><input type="number" className={styles.numberInput} value={inputData[calc.inventory_id]?.bw_a3 ?? ''} onChange={e => onNumberChange(calc.inventory_id, 'bw_a3', e.target.value)} /></div>
+                            <div className={`${styles.rowBlue} ${styles.rowLast}`}><input type="number" className={styles.numberInput} value={inputData[calc.inventory_id]?.col_a3 ?? ''} onChange={e => onNumberChange(calc.inventory_id, 'col_a3', e.target.value)} /></div>
+                          </div>
                         </td>
                         
-                        <td className={styles.td} style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', lineHeight: '1.6', verticalAlign: 'top' }}>
-                          {isGroupMember ? (
-                            <div style={{ color: '#aaa', textAlign: 'center', padding: '30px 0' }}>그룹 합산</div>
-                          ) : (
-                            <>
-                              <div style={{ fontWeight: '600', color: '#555', marginBottom: '2px' }}>기본매수</div>
-                              <div style={{ display:'flex', justifyContent:'space-between', color: '#666', marginBottom:'2px' }}><span>흑:</span> <span>{(calc.usageBreakdown?.basicBW ?? 0).toLocaleString()}</span></div>
-                              <div style={{ display:'flex', justifyContent:'space-between', color: '#0070f3', marginBottom:'4px' }}><span>칼:</span> <span>{(calc.usageBreakdown?.basicCol ?? 0).toLocaleString()}</span></div>
-                              <div style={{ borderTop: '1px solid #eee', margin: '6px 0' }}></div>
-                              <div style={{ fontWeight: '600', color: '#d93025', marginBottom: '2px' }}>추가매수</div>
-                              <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025', marginBottom:'2px' }}><span>흑:</span> <span>{(calc.usageBreakdown?.extraBW ?? 0).toLocaleString()}</span></div>
-                              <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025' }}><span>칼:</span> <span>{(calc.usageBreakdown?.extraCol ?? 0).toLocaleString()}</span></div>
-                            </>
-                          )}
-                        </td>
-
-                        {/* 기계별 청구액 (공급가) */}
-                        {calc.isGroupLeader && (
-                          <td className={styles.td} rowSpan={calc.groupSpan} style={{ padding: '12px', textAlign: 'right', verticalAlign: 'bottom' }}>
-                            <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
-                              <div>기본: {(calc.rowCost?.basic ?? 0).toLocaleString()}</div>
-                              <div>추가: {(calc.rowCost?.extra ?? 0).toLocaleString()}</div>
-                            </div>
-                            <div style={{ fontWeight: 'bold', color: 'var(--notion-main-text)', fontSize:'0.9rem', borderTop:'1px solid #eee', paddingTop:'6px' }}>
-                              {(calc.rowCost?.total ?? 0).toLocaleString()}원
-                            </div>
+                        {/* ✅ 실사용량 컬럼: 그룹합산 / 단독 기계 분기 처리 */}
+                        {shouldRenderUsageCell && (
+                          <td className={styles.td} rowSpan={calc.isGroupLeader ? calc.groupSpan : 1} style={{ padding: '12px', textAlign: 'left', verticalAlign: 'top', backgroundColor: calc.billing_group_id ? '#fbfbff' : 'inherit' }}>
+                            {calc.billing_group_id && calc.groupUsageBreakdown ? (
+                              // 그룹 합산 표시
+                              <>
+                                <div style={{ fontSize:'0.85rem', fontWeight: '700', color: '#0070f3', marginBottom: '6px', textAlign:'center', borderBottom:'1px dashed #e0e0e0', paddingBottom:'4px' }}>
+                                  합산 기본 매수 ({calc.groupUsageBreakdown.poolBasicBW.toLocaleString()}/{calc.groupUsageBreakdown.poolBasicCol.toLocaleString()})
+                                </div>
+                                
+                                <div style={{ fontSize:'0.75rem', color: '#555', marginBottom:'2px', fontWeight:'600' }}>기본 매수</div>
+                                <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.75rem', color: '#666', marginBottom:'2px' }}><span>흑백:</span> <b>{calc.groupUsageBreakdown.basicBW.toLocaleString()}</b></div>
+                                <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.75rem', color: '#0070f3', marginBottom:'4px' }}><span>칼라:</span> <b>{calc.groupUsageBreakdown.basicCol.toLocaleString()}</b></div>
+                                
+                                <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
+                                
+                                <div style={{ fontSize:'0.75rem', color: '#d93025', marginBottom:'2px', fontWeight:'600' }}>추가 매수</div>
+                                <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.75rem', color: '#d93025', marginBottom:'2px' }}><span>흑백:</span> <b>{calc.groupUsageBreakdown.extraBW.toLocaleString()}</b></div>
+                                <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.75rem', color: '#d93025' }}><span>칼라:</span> <b>{calc.groupUsageBreakdown.extraCol.toLocaleString()}</b></div>
+                              </>
+                            ) : (
+                              // 단독 기계 (기존 기능 복구)
+                              <>
+                                <div style={{ fontWeight: '600', color: '#555', marginBottom: '2px' }}>기본 매수</div>
+                                <div style={{ display:'flex', justifyContent:'space-between', color: '#666', marginBottom:'2px' }}><span>흑백:</span> <span>{calc.usageBreakdown.basicBW.toLocaleString()}</span></div>
+                                <div style={{ display:'flex', justifyContent:'space-between', color: '#0070f3', marginBottom:'4px' }}><span>칼라:</span> <span>{calc.usageBreakdown.basicCol.toLocaleString()}</span></div>
+                                
+                                {(calc.usageBreakdown.extraBW > 0 || calc.usageBreakdown.extraCol > 0) && (
+                                  <>
+                                    <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }}></div>
+                                    <div style={{ fontWeight: '600', color: '#d93025', marginBottom: '2px' }}>추가 매수</div>
+                                    <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025', marginBottom:'2px' }}><span>흑백:</span> <span>{calc.usageBreakdown.extraBW.toLocaleString()}</span></div>
+                                    <div style={{ display:'flex', justifyContent:'space-between', color: '#d93025' }}><span>칼라:</span> <span>{calc.usageBreakdown.extraCol.toLocaleString()}</span></div>
+                                  </>
+                                )}
+                              </>
+                            )}
                           </td>
                         )}
 
-                        {/* ✅ [수정] 거래처 총 합계 (하단 정렬 + 좌우 배치) */}
+                        {/* 기계별 금액 컬럼 */}
+                        <td className={styles.td} style={{ padding: '12px', textAlign: 'right', verticalAlign: 'bottom' }}>
+                          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
+                            <div>기본: {(calc.rowCost?.basic ?? 0).toLocaleString()}</div>
+                            <div>추가: {(calc.rowCost?.extra ?? 0).toLocaleString()}</div>
+                          </div>
+                          <div style={{ fontWeight: 'bold', fontSize:'0.9rem', borderTop:'1px solid #eee', paddingTop:'6px' }}>
+                            {(calc.rowCost?.total ?? 0).toLocaleString()}원
+                          </div>
+                        </td>
+
                         {idx === 0 && (
                           <td className={styles.td} rowSpan={rowSpan} style={{ padding: '16px 12px', backgroundColor: '#fff', verticalAlign: 'bottom', textAlign: 'right' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              
-                              {/* 공급가액 */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#666' }}>
-                                <span>공급</span>
-                                <span>{clientSupply.toLocaleString()}</span>
-                              </div>
-
-                              {/* 부가세 */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#666' }}>
-                                <span>VAT</span>
-                                <span>{clientVat.toLocaleString()}</span>
-                              </div>
-
-                              {/* 구분선 및 합계 */}
-                              <div style={{ borderTop: '1px solid #ddd', marginTop: '6px', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#666' }}><span>공급</span> <span>{clientSupply.toLocaleString()}</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#666' }}><span>VAT</span> <span>{clientVat.toLocaleString()}</span></div>
+                              <div style={{ borderTop: '1px solid #ddd', marginTop: '6px', paddingTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ fontSize: '0.9rem', color: '#0070f3', fontWeight: 'bold' }}>합계</span>
-                                <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#d93025' }}>
-                                  {clientTotal.toLocaleString()}
-                                </span>
+                                <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#d93025' }}>{clientTotal.toLocaleString()}</span>
                               </div>
-
                             </div>
                           </td>
                         )}
@@ -308,19 +284,10 @@ export default function AccountingRegistration({
 
           <div className={styles.actionBar}>
             <div className={styles.totalLabel}>
-              <span style={{ fontSize: '0.9rem', color: '#666', marginRight: '16px' }}>
-                공급가: <b>{totalSupplyValue.toLocaleString()}</b>원
-              </span>
-              <span style={{ fontSize: '0.9rem', color: '#666', marginRight: '16px' }}>
-                부가세: <b>{totalVat.toLocaleString()}</b>원
-              </span>
-              <span style={{ fontSize: '1.1rem', fontWeight:'bold' }}>
-                총 합계: <span className={styles.totalAmount}>{grandTotal.toLocaleString()} 원</span>
-              </span>
+              공급가: <b>{totalSupplyValue.toLocaleString()}</b>원 (+VAT {totalVat.toLocaleString()}) = 
+              <span className={styles.totalAmount}>{grandTotal.toLocaleString()} 원</span>
             </div>
-            <button onClick={handlePreSave} disabled={selectedInventories.size === 0} className={styles.saveBtn}>
-              🚀 청구서 확정 및 저장
-            </button>
+            <button onClick={handlePreSave} disabled={selectedInventories.size === 0} className={styles.saveBtn}>🚀 청구서 확정 및 저장</button>
           </div>
         </div>
       )}
