@@ -16,11 +16,10 @@ interface Props {
 }
 
 export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpdate }: Props) {
-  // 조회용 클라이언트 (읽기 전용)
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   
-  // 요금제 데이터 상태
+  // 상태 관리: 계약 기간 필드 포함
   const [formData, setFormData] = useState({
     plan_basic_fee: 0,
     plan_basic_cnt_bw: 0,
@@ -30,7 +29,9 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     plan_weight_a3_bw: 1,
     plan_weight_a3_col: 1,
     billing_group_id: null as string | null,
-    billing_date: '말일'
+    billing_date: '말일',
+    contract_start_date: '',
+    contract_end_date: ''
   })
 
   const [siblings, setSiblings] = useState<Inventory[]>([])
@@ -49,21 +50,26 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       .single()
     
     if (current) {
-      setCurrentItem(current as Inventory)
+      // ✅ [수정] DB 타입 정의가 업데이트되지 않았을 경우를 대비해 Inventory 타입으로 강제 변환
+      const item = current as unknown as Inventory
+      
+      setCurrentItem(item)
       setFormData({
-        plan_basic_fee: current.plan_basic_fee || 0,
-        plan_basic_cnt_bw: current.plan_basic_cnt_bw || 0,
-        plan_basic_cnt_col: current.plan_basic_cnt_col || 0,
-        plan_price_bw: current.plan_price_bw || 0,
-        plan_price_col: current.plan_price_col || 0,
-        plan_weight_a3_bw: current.plan_weight_a3_bw || 1,
-        plan_weight_a3_col: current.plan_weight_a3_col || 1,
-        billing_group_id: current.billing_group_id,
-        billing_date: current.billing_date || '말일'
+        plan_basic_fee: item.plan_basic_fee || 0,
+        plan_basic_cnt_bw: item.plan_basic_cnt_bw || 0,
+        plan_basic_cnt_col: item.plan_basic_cnt_col || 0,
+        plan_price_bw: item.plan_price_bw || 0,
+        plan_price_col: item.plan_price_col || 0,
+        plan_weight_a3_bw: item.plan_weight_a3_bw || 1,
+        plan_weight_a3_col: item.plan_weight_a3_col || 1,
+        billing_group_id: item.billing_group_id,
+        billing_date: item.billing_date || '말일',
+        contract_start_date: item.contract_start_date || '', // 이제 에러가 사라집니다
+        contract_end_date: item.contract_end_date || ''      // 이제 에러가 사라집니다
       })
     }
 
-    // 2. 같은 거래처의 다른 기기 조회 (합산 대상 후보)
+    // 2. 같은 거래처의 다른 기기 조회
     const { data: sibs } = await supabase
       .from('inventory')
       .select('*')
@@ -74,15 +80,13 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     if (sibs) setSiblings(sibs as Inventory[])
   }
 
-  // 합산 청구 그룹 선택 핸들러
   const handleGroupSelect = (targetAsset: Inventory) => {
-    // 이미 같은 그룹이면 해제
     if (formData.billing_group_id === targetAsset.billing_group_id && targetAsset.billing_group_id !== null) {
       setFormData({ ...formData, billing_group_id: null });
       return;
     }
 
-    // 합산 시 단가/가중치 동기화 제안 로직
+    // 단가/가중치 동기화 로직
     const isPriceDifferent = 
       formData.plan_price_bw !== targetAsset.plan_price_bw ||
       formData.plan_price_col !== targetAsset.plan_price_col ||
@@ -90,15 +94,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
       formData.plan_weight_a3_col !== targetAsset.plan_weight_a3_col;
 
     if (isPriceDifferent) {
-      const confirmSync = confirm(
-        `⚠️ 선택한 기계 [${targetAsset.model_name}]와 초과 단가 또는 가중치가 다릅니다.\n\n` +
-        `합산 청구를 하려면 단가가 동일해야 합니다.\n` +
-        `현재 기계의 단가를 대상 기계와 동일하게 변경하고 묶으시겠습니까?\n\n` +
-        ` - 대상 흑백단가: ${targetAsset.plan_price_bw}원 (현재: ${formData.plan_price_bw}원)\n` +
-        ` - 대상 컬러단가: ${targetAsset.plan_price_col}원 (현재: ${formData.plan_price_col}원)`
-      );
-
-      if (confirmSync) {
+      if (confirm(`⚠️ 선택한 기계와 단가가 다릅니다. 단가를 동기화하고 묶으시겠습니까?`)) {
         setFormData({
           ...formData,
           plan_price_bw: targetAsset.plan_price_bw ?? 0,
@@ -119,7 +115,6 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
   const handleSave = async () => {
     setLoading(true)
     try {
-      // ✅ Server Action 호출
       const result = await updateInventoryPlanAction(
         inventoryId,
         {
@@ -130,7 +125,9 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
           plan_price_col: formData.plan_price_col,
           plan_weight_a3_bw: formData.plan_weight_a3_bw,
           plan_weight_a3_col: formData.plan_weight_a3_col,
-          billing_date: formData.billing_date
+          billing_date: formData.billing_date,
+          contract_start_date: formData.contract_start_date, 
+          contract_end_date: formData.contract_end_date       
         },
         formData.billing_group_id
       )
@@ -158,7 +155,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
         backgroundColor:'var(--notion-bg)', 
         padding:'32px', 
         borderRadius:'12px', 
-        width:'500px', 
+        width:'550px', 
         maxHeight:'90vh', 
         overflowY:'auto',
         boxShadow: '0 15px 50px rgba(0,0,0,0.1)'
@@ -174,37 +171,62 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
           </div>
         )}
 
-        <InputField 
-          label="매월 정기 청구일" 
-          as="select" 
-          value={formData.billing_date} 
-          onChange={e => setFormData({ ...formData, billing_date: e.target.value })}
-        >
-          <option value="말일">매월 말일</option>
-          {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-            <option key={day} value={String(day)}>매월 {day}일</option>
-          ))}
-        </InputField>
-
-        <InputField label="월 기본료 (원)" type="number" value={formData.plan_basic_fee} onChange={e => setFormData({...formData, plan_basic_fee: Number(e.target.value)})} />
-
-        <div style={{display:'flex', gap:'12px'}}>
-          <InputField label="흑백 무료매수" type="number" value={formData.plan_basic_cnt_bw} onChange={e => setFormData({...formData, plan_basic_cnt_bw: Number(e.target.value)})} />
-          <InputField label="칼라 무료매수" type="number" value={formData.plan_basic_cnt_col} onChange={e => setFormData({...formData, plan_basic_cnt_col: Number(e.target.value)})} />
-        </div>
-
-        <div style={{display:'flex', gap:'12px'}}>
-          <InputField label="흑백 초과단가" type="number" value={formData.plan_price_bw} onChange={e => setFormData({...formData, plan_price_bw: Number(e.target.value)})} />
-          <InputField label="칼라 초과단가" type="number" value={formData.plan_price_col} onChange={e => setFormData({...formData, plan_price_col: Number(e.target.value)})} />
-        </div>
-        
-        <details style={{marginBottom:'24px'}}>
-          <summary style={{cursor:'pointer', fontSize:'0.85rem', color:'var(--notion-sub-text)', fontWeight:'500'}}>A3 가중치 설정 (기본 1배)</summary>
-          <div style={{display:'flex', gap:'12px', marginTop:'12px', padding:'16px', backgroundColor:'var(--notion-soft-bg)', borderRadius:'var(--radius-md)', border:'1px solid var(--notion-border)'}}>
-             <InputField label="A3 흑백 배수" type="number" step="0.1" value={formData.plan_weight_a3_bw} onChange={e => setFormData({...formData, plan_weight_a3_bw: Number(e.target.value)})} style={{marginBottom:0}} />
-             <InputField label="A3 칼라 배수" type="number" step="0.1" value={formData.plan_weight_a3_col} onChange={e => setFormData({...formData, plan_weight_a3_col: Number(e.target.value)})} style={{marginBottom:0}} />
+        {/* 계약 기간 설정 섹션 */}
+        <div style={{ marginBottom: '20px', padding: '16px', border: '1px solid var(--notion-border)', borderRadius: '8px', backgroundColor: '#fff' }}>
+          <div style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '10px', color: '#171717' }}>📅 계약 기간 설정</div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <InputField 
+              label="계약 시작일" 
+              type="date" 
+              value={formData.contract_start_date} 
+              onChange={e => setFormData({ ...formData, contract_start_date: e.target.value })} 
+              style={{ marginBottom: 0 }}
+            />
+            <InputField 
+              label="계약 종료일" 
+              type="date" 
+              value={formData.contract_end_date} 
+              onChange={e => setFormData({ ...formData, contract_end_date: e.target.value })} 
+              style={{ marginBottom: 0 }}
+            />
           </div>
-        </details>
+        </div>
+
+        <div style={{ borderTop: '1px dashed #e5e5e5', paddingTop: '20px', marginBottom: '20px' }}>
+          <div style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '10px', color: '#171717' }}>💰 청구 조건</div>
+          
+          <InputField 
+            label="매월 정기 청구일" 
+            as="select" 
+            value={formData.billing_date} 
+            onChange={e => setFormData({ ...formData, billing_date: e.target.value })}
+          >
+            <option value="말일">매월 말일</option>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+              <option key={day} value={String(day)}>매월 {day}일</option>
+            ))}
+          </InputField>
+
+          <InputField label="월 기본료 (원)" type="number" value={formData.plan_basic_fee} onChange={e => setFormData({...formData, plan_basic_fee: Number(e.target.value)})} />
+
+          <div style={{display:'flex', gap:'12px'}}>
+            <InputField label="흑백 무료매수" type="number" value={formData.plan_basic_cnt_bw} onChange={e => setFormData({...formData, plan_basic_cnt_bw: Number(e.target.value)})} />
+            <InputField label="칼라 무료매수" type="number" value={formData.plan_basic_cnt_col} onChange={e => setFormData({...formData, plan_basic_cnt_col: Number(e.target.value)})} />
+          </div>
+
+          <div style={{display:'flex', gap:'12px'}}>
+            <InputField label="흑백 초과단가" type="number" value={formData.plan_price_bw} onChange={e => setFormData({...formData, plan_price_bw: Number(e.target.value)})} />
+            <InputField label="칼라 초과단가" type="number" value={formData.plan_price_col} onChange={e => setFormData({...formData, plan_price_col: Number(e.target.value)})} />
+          </div>
+          
+          <details style={{ marginTop: '10px' }}>
+            <summary style={{cursor:'pointer', fontSize:'0.85rem', color:'var(--notion-sub-text)', fontWeight:'500'}}>A3 가중치 설정 (기본 1배) ▼</summary>
+            <div style={{display:'flex', gap:'12px', marginTop:'12px', padding:'16px', backgroundColor:'var(--notion-soft-bg)', borderRadius:'var(--radius-md)', border:'1px solid var(--notion-border)'}}>
+              <InputField label="A3 흑백 배수" type="number" step="0.1" value={formData.plan_weight_a3_bw} onChange={e => setFormData({...formData, plan_weight_a3_bw: Number(e.target.value)})} style={{marginBottom:0}} />
+              <InputField label="A3 칼라 배수" type="number" step="0.1" value={formData.plan_weight_a3_col} onChange={e => setFormData({...formData, plan_weight_a3_col: Number(e.target.value)})} style={{marginBottom:0}} />
+            </div>
+          </details>
+        </div>
 
         <div style={{borderTop:'1px solid var(--notion-border)', paddingTop:'20px'}}>
           <h3 style={{fontSize:'0.9rem', fontWeight:'700', marginBottom:'12px', color:'var(--notion-main-text)'}}>🔗 청구 방식 선택</h3>

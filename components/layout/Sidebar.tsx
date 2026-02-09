@@ -12,9 +12,9 @@ type SidebarProps = {
 export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
   const pathname = usePathname()
 
-  // 노션 스타일 내비게이션 아이템 스타일 정의 (기능 보존)
   const getNavStyle = (path: string) => {
-    const isActive = (pathname.startsWith(path) && path !== '/') || pathname === path
+    // 하위 경로까지 포함하여 활성화 상태 체크 (예: /accounting/registration)
+    const isActive = pathname === path || (pathname.startsWith(path) && path !== '/');
 
     return {
       display: 'flex',
@@ -22,14 +22,12 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
       justifyContent: isCollapsed ? 'center' : 'flex-start',
       padding: '8px 12px',
       borderRadius: 'var(--radius-sm)',
-      marginBottom: '2px',
+      marginBottom: '4px', // 간격 약간 조정
       textDecoration: 'none',
       fontSize: '0.9rem',
       fontWeight: isActive ? '600' : '500',
       transition: 'background 0.2s',
-      // 활성화 시 노션 특유의 연한 배경색 적용
       backgroundColor: isActive ? 'var(--notion-soft-bg)' : 'transparent',
-      // 활성화 시 메인 텍스트, 비활성 시 서브 텍스트 색상
       color: isActive ? 'var(--notion-main-text)' : 'var(--notion-sub-text)',
       whiteSpace: 'nowrap' as const,
       overflow: 'hidden',
@@ -38,18 +36,21 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     }
   }
 
+  // ✅ 메뉴 구조 업데이트
   const navItems = [
     { name: '홈 (대시보드)', path: '/', icon: '🏠' },
     { name: '거래처 관리', path: '/clients', icon: '👥' },
     { name: '자산 및 재고', path: '/inventory', icon: '📦' },
-    { name: '정산 및 회계', path: '/accounting', icon: '💰' },
+    // 정산 메뉴 분리
+    { name: '월 정산 등록', path: '/accounting/registration', icon: '📝' },
+    { name: '청구 이력/수정', path: '/accounting/history', icon: '🕒' },
   ]
 
   return (
     <aside style={{
       width: isCollapsed ? '72px' : '240px',
       height: '100vh',
-      borderRight: '1px solid var(--notion-border)', // 노션 스타일 구분선
+      borderRight: '1px solid var(--notion-border)',
       padding: '12px',
       backgroundColor: 'var(--notion-bg)',
       position: 'fixed',
@@ -61,7 +62,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {/* 상단 로고 및 토글 영역 */}
       <div style={{ 
         display: 'flex', 
         justifyContent: isCollapsed ? 'center' : 'space-between', 
@@ -83,7 +83,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           </h2>
         )}
         
-        {/* 공통 Button 컴포넌트의 ghost 스타일 적용 */}
         <Button 
           variant="ghost" 
           size="sm" 
@@ -99,7 +98,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
         </Button>
       </div>
       
-      {/* 내비게이션 메뉴 */}
       <nav style={{ flex: 1 }}>
         {navItems.map((item) => (
           <Link 
@@ -108,11 +106,11 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
             style={getNavStyle(item.path)}
             title={isCollapsed ? item.name : ''}
             onMouseOver={(e) => {
-              const isActive = (pathname.startsWith(item.path) && item.path !== '/') || pathname === item.path
+              const isActive = pathname === item.path || (pathname.startsWith(item.path) && item.path !== '/');
               if (!isActive) e.currentTarget.style.backgroundColor = 'var(--notion-soft-bg)'
             }}
             onMouseOut={(e) => {
-              const isActive = (pathname.startsWith(item.path) && item.path !== '/') || pathname === item.path
+              const isActive = pathname === item.path || (pathname.startsWith(item.path) && item.path !== '/');
               if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
@@ -138,7 +136,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
         ))}
       </nav>
 
-      {/* 하단 버전 표시 (디테일) */}
       {!isCollapsed && (
         <div style={{ 
           padding: '12px 4px', 
@@ -146,7 +143,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           color: 'var(--notion-sub-text)',
           borderTop: '1px solid var(--notion-border)'
         }}>
-          v0.1.0-alpha
+          v0.2.0-beta
         </div>
       )}
     </aside>

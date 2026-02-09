@@ -297,12 +297,13 @@ export async function updateInventoryPlanAction(
     plan_weight_a3_bw: number;
     plan_weight_a3_col: number;
     billing_date: string;
+    contract_start_date?: string | null; // ✅ 추가
+    contract_end_date?: string | null;   // ✅ 추가
   },
   billingGroupId: string | null
 ) {
   const supabase = await createClient()
 
-  // 1) 보안 검증
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, message: '로그인이 필요합니다.' }
 
@@ -313,12 +314,11 @@ export async function updateInventoryPlanAction(
   try {
     let finalGroupId = billingGroupId
 
-    // 2) 신규 그룹 생성 로직 (NEW_GROUP_WITH_ 접두어 처리)
+    // 신규 그룹 생성 로직
     if (finalGroupId && finalGroupId.startsWith('NEW_GROUP_WITH_')) {
       const targetId = finalGroupId.replace('NEW_GROUP_WITH_', '')
       const newGroupUUID = crypto.randomUUID()
       
-      // 대상 기계(targetId)를 새 그룹으로 업데이트 (내 조직 기기인지 확인 필수)
       const { error: groupErr } = await supabase.from('inventory')
         .update({ billing_group_id: newGroupUUID })
         .eq('id', targetId)
@@ -329,24 +329,26 @@ export async function updateInventoryPlanAction(
       finalGroupId = newGroupUUID
     }
 
-    // 3) 현재 기계 정보 업데이트
+    // ✅ 계약 기간을 포함하여 업데이트
     const { error } = await supabase
       .from('inventory')
       .update({
         ...planData,
+        // 빈 문자열이 올 경우 null로 처리
+        contract_start_date: planData.contract_start_date || null,
+        contract_end_date: planData.contract_end_date || null,
         billing_group_id: finalGroupId
       })
       .eq('id', inventoryId)
-      .eq('organization_id', orgId) // 보안: 내 조직의 기기만 수정 가능
+      .eq('organization_id', orgId)
 
     if (error) throw error
     
-    // 4) 데이터 갱신
     revalidatePath('/clients')
     revalidatePath('/inventory')
     revalidatePath('/accounting')
 
-    return { success: true, message: '요금제 설정이 저장되었습니다.' }
+    return { success: true, message: '요금제 및 계약 정보가 저장되었습니다.' }
 
   } catch (e: any) {
     return { success: false, message: '저장 실패: ' + e.message }

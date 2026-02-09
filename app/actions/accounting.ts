@@ -15,7 +15,6 @@ const SettlementSchema = z.object({
       inventory_id: z.string(),
       prev: z.object({ bw: z.number(), col: z.number(), bw_a3: z.number(), col_a3: z.number() }),
       curr: z.object({ bw: z.number(), col: z.number(), bw_a3: z.number(), col_a3: z.number() }),
-      // 사용량 데이터 스키마 추가
       usage: z.object({ bw: z.number(), col: z.number(), bw_a3: z.number(), col_a3: z.number() }),
       converted: z.object({ bw: z.number(), col: z.number() }),
       
@@ -77,7 +76,6 @@ export async function saveSettlementAction(unsafeParams: unknown) {
         settlement_id: settlement.id,
         inventory_id: d.inventory_id,
         
-        // 카운터 정보
         prev_count_bw: d.prev.bw,
         prev_count_col: d.prev.col,
         prev_count_bw_a3: d.prev.bw_a3,
@@ -87,7 +85,6 @@ export async function saveSettlementAction(unsafeParams: unknown) {
         curr_count_bw_a3: d.curr.bw_a3,
         curr_count_col_a3: d.curr.col_a3,
         
-        // ✅ [핵심 수정] 사용량 정보 저장 (이게 없어서 0으로 나왔습니다)
         usage_bw: d.usage.bw,
         usage_col: d.usage.col,
         usage_bw_a3: d.usage.bw_a3,
@@ -204,4 +201,129 @@ export async function toggleDetailPaymentAction(detailId: string, currentStatus:
     revalidatePath('/accounting')
     return { success: true }
   } catch (e: any) { return { success: false, message: e.message } }
+}
+
+// 7. [NEW] 미래 정산 내역 존재 여부 확인 (등록 검증용)
+export async function checkFutureSettlementsAction(inventoryId: string, year: number, month: number) {
+  const supabase = await createClient()
+  
+  // 입력된 년/월보다 미래의 데이터가 있는지 확인
+  const { count, error } = await supabase
+    .from('settlements')
+    .select('id, billing_year, billing_month, settlement_details!inner(inventory_id)', { count: 'exact', head: true })
+    .eq('settlement_details.inventory_id', inventoryId)
+    .or(`billing_year.gt.${year},and(billing_year.eq.${year},billing_month.gt.${month})`)
+
+  if (error) {
+    console.error('Check Future Error:', error)
+    return { hasFuture: false }
+  }
+
+  return { hasFuture: (count || 0) > 0 }
+}
+
+// 8. [NEW] 정산 내역 일괄 수정 (타임라인 수정용)
+export async function updateBulkSettlementHistoryAction(updates: any[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.' }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  
+  try {
+    const updatePromises = updates.map(async (item) => {
+      // 이미 입금완료된 건인지 확인 (보안)
+      if (item.settlement?.is_paid) {
+        throw new Error(`이미 입금 처리된 내역은 수정할 수 없습니다.`)
+      }
+
+      // settlement_details 업데이트
+      const { error: updateError } = await supabase
+        .from('settlement_details')
+        .update({
+          prev_count_bw: item.prev_count_bw,
+          curr_count_bw: item.curr_count_bw,
+          prev_count_col: item.prev_count_col,
+          curr_count_col: item.curr_count_col,
+          usage_bw: item.usage_bw,
+          usage_col: item.usage_col,
+          last_modified_at: new Date().toISOString(),
+          last_modified_by: user.id
+        })
+        .eq('id', item.id)
+        .eq('inventory_id', item.inventory_id)
+
+      if (updateError) throw updateError
+
+      // 수정 이력(Audit) 기록
+      await supabase.from('machine_history').insert({
+        inventory_id: item.inventory_id,
+        organization_id: profile?.organization_id,
+        action_type: 'UPDATE_PAST',
+        memo: `[타임라인 수정] ${item.settlement.billing_year}년 ${item.settlement.billing_month}월 데이터 변경`,
+        bw_count: item.curr_count_bw,
+        col_count: item.curr_count_col,
+        recorded_at: new Date().toISOString()
+      })
+    })
+
+    await Promise.all(updatePromises)
+    
+    revalidatePath('/accounting/history')
+    return { success: true, message: '수정사항이 저장되었습니다.' }
+
+  } catch (e: any) {
+    return { success: false, message: '업데이트 실패: ' + e.message }
+  }
+}
+
+// 9. 특정 거래처의 정산 타임라인 조회 (타임라인 수정용)
+export async function fetchClientTimelineAction(clientId: string, startYear: number, endYear: number) {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.', data: [] }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.', data: [] }
+
+  try {
+    // settlement_details를 조회하되, 부모인 settlements의 정보(년/월, 입금여부)와 
+    // inventory의 정보(기기명, 요금제)를 함께 가져옵니다.
+    const { data, error } = await supabase
+      .from('settlement_details')
+      .select(`
+        *,
+        settlement:settlements!inner (
+          billing_year, billing_month, is_paid, client_id, organization_id
+        ),
+        inventory:inventory (
+          model_name, serial_number, billing_group_id,
+          plan_basic_fee, plan_price_bw, plan_price_col,
+          plan_weight_a3_bw, plan_weight_a3_col,
+          plan_basic_cnt_bw, plan_basic_cnt_col
+        )
+      `)
+      .eq('settlement.organization_id', profile.organization_id)
+      .eq('settlement.client_id', clientId)
+      .gte('settlement.billing_year', startYear)
+      .lte('settlement.billing_year', endYear)
+      .order('id', { ascending: true }) // 1차 정렬 (DB 기준)
+
+    if (error) throw error
+
+    // 날짜순(년->월)으로 JavaScript 정렬 (정산 데이터는 시간 순서가 중요하므로)
+    // @ts-ignore
+    const sortedData = data?.sort((a, b) => {
+        const dateA = a.settlement.billing_year * 100 + a.settlement.billing_month;
+        const dateB = b.settlement.billing_year * 100 + b.settlement.billing_month;
+        return dateA - dateB;
+    }) || [];
+
+    return { success: true, data: sortedData }
+
+  } catch (e: any) {
+    console.error('Timeline Fetch Error:', e)
+    return { success: false, message: '타임라인 조회 실패: ' + e.message, data: [] }
+  }
 }

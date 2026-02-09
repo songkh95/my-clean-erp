@@ -43,9 +43,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           backgroundColor: 'var(--notion-bg)',
           overflowY: 'auto'
         }}>
-          {/* 중앙 집중형 레이아웃으로 시독성 향상 */}
+          {/* [수정됨] 중앙 집중형 레이아웃 제한 해제 
+            기존: maxWidth: '1400px' -> 수정: maxWidth: '100%'
+            이제 각 페이지 컴포넌트에서 원하는 너비를 설정할 수 있습니다.
+          */}
           <div style={{
-            maxWidth: '1400px', 
+            maxWidth: '100%', 
             margin: '0 auto',
             width: '100%'
           }}>

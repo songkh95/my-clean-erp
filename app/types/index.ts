@@ -11,7 +11,9 @@ type MachineHistoryRow = Database['public']['Tables']['machine_history']['Row']
 type OrganizationRow = Database['public']['Tables']['organizations']['Row']
 
 // 2. Client 타입
-export interface Client extends ClientRow {}
+export interface Client extends ClientRow {
+  contract_start_date?: string | null; // ✅ 추가됨
+}
 
 // 3. Organization 타입 (명세서용)
 export interface Organization extends OrganizationRow {
@@ -30,6 +32,8 @@ export interface Inventory extends InventoryRow {
   is_replacement_after?: boolean;
   is_withdrawal?: boolean;
   final_counts?: CounterData;
+  contract_start_date?: string | null; // ✅ 추가됨
+  contract_end_date?: string | null;   // ✅ 추가됨
 }
 
 // 5. 공통 데이터 타입
@@ -124,4 +128,17 @@ export interface SettlementDetail extends SettlementDetailRow {
 
 export interface MachineHistory extends MachineHistoryRow {
   inventory?: Inventory | null;
+}
+
+// 타임라인 수정을 위한 데이터 타입
+export interface TimelineItem extends SettlementDetail {
+  settlement_year: number;
+  settlement_month: number;
+  is_paid: boolean;
+  inventory_model?: string;
+  inventory_sn?: string;
+  billing_group_id?: string | null;
+  // UI 상태 관리용
+  is_modified?: boolean;
+  validation_error?: string;
 }
