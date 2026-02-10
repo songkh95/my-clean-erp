@@ -142,3 +142,43 @@ export interface TimelineItem extends SettlementDetail {
   is_modified?: boolean;
   validation_error?: string;
 }
+
+export interface HistoryItem {
+  id: string
+  settlement_id: string
+  inventory_id: string
+  prev_count_bw: number
+  curr_count_bw: number
+  prev_count_col: number
+  curr_count_col: number
+  prev_count_bw_a3: number
+  curr_count_bw_a3: number
+  prev_count_col_a3: number
+  curr_count_col_a3: number
+
+  usage_bw: number
+  usage_col: number
+  usage_bw_a3: number
+  usage_col_a3: number
+  calculated_amount: number
+
+  is_modified?: boolean
+
+  settlement: {
+    billing_year: number
+    billing_month: number
+    is_paid: boolean
+  }
+  inventory: {
+    id: string
+    model_name: string
+    serial_number: string
+    plan_basic_fee: number
+    plan_price_bw: number
+    plan_price_col: number
+    plan_basic_cnt_bw: number
+    plan_basic_cnt_col: number
+    plan_weight_a3_bw: number
+    plan_weight_a3_col: number
+  } | null
+}

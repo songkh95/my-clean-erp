@@ -2,80 +2,59 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/utils/supabase'
-import { updateBulkSettlementHistoryAction } from '@/app/actions/accounting'
-import { Client } from '@/app/types'
-
-interface HistoryItem {
-    id: string
-    inventory_id: string
-    prev_count_bw: number
-    curr_count_bw: number
-    prev_count_col: number
-    curr_count_col: number
-    prev_count_bw_a3: number
-    curr_count_bw_a3: number
-    prev_count_col_a3: number
-    curr_count_col_a3: number
-
-    usage_bw: number
-    usage_col: number
-    usage_bw_a3: number
-    usage_col_a3: number
-    calculated_amount: number
-
-    is_modified?: boolean
-
-    settlement: {
-        billing_year: number
-        billing_month: number
-        is_paid: boolean
-    }
-    inventory: {
-        model_name: string
-        serial_number: string
-        plan_basic_fee: number
-        plan_price_bw: number
-        plan_price_col: number
-        plan_basic_cnt_bw: number
-        plan_basic_cnt_col: number
-        plan_weight_a3_bw: number
-        plan_weight_a3_col: number
-    } | null
-}
+import { 
+  updateBulkSettlementHistoryAction, 
+  deleteSettlementDetailAction, 
+  rebillSettlementDetailAction 
+} from '@/app/actions/accounting'
+import { Client, Settlement, Organization, HistoryItem } from '@/app/types' 
+import StatementModal from '@/components/accounting/StatementModal'
+import HistoryFilter from '@/components/accounting/HistoryFilter'
+import HistoryTable from '@/components/accounting/HistoryTable' 
 
 export default function AccountingHistoryPage() {
     const supabase = createClient()
 
+    // 상태 관리
     const [clients, setClients] = useState<Client[]>([])
     const [searchTerm, setSearchTerm] = useState('')
     const [showSuggestions, setShowSuggestions] = useState(false)
     const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+    const [myOrg, setMyOrg] = useState<Organization | null>(null)
 
+    // 필터
     const currentYear = new Date().getFullYear()
     const [startMonth, setStartMonth] = useState(`${currentYear}-01`)
     const [endMonth, setEndMonth] = useState(`${currentYear}-12`)
     const [viewMode, setViewMode] = useState<'all' | 'machine'>('all')
 
+    // 데이터
     const [loading, setLoading] = useState(false)
     const [items, setItems] = useState<HistoryItem[]>([])
+    const [originalItems, setOriginalItems] = useState<HistoryItem[]>([]) // 백업용
     const [hasChanges, setHasChanges] = useState(false)
+    const [isEditMode, setIsEditMode] = useState(false)
 
-    const searchRef = useRef<HTMLDivElement>(null)
+    // 모달
+    const [isStatementOpen, setIsStatementOpen] = useState(false)
+    const [statementData, setStatementData] = useState<Settlement | null>(null)
 
+    // 1. 초기 데이터 로드
     useEffect(() => {
-        const fetchClients = async () => {
+        const fetchInitialData = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+            if (profile?.organization_id) {
+                const { data: org } = await supabase.from('organizations').select('*').eq('id', profile.organization_id).single()
+                if (org) setMyOrg(org as Organization)
+            }
+
             const { data } = await supabase.from('clients').select('*').order('name')
             if (data) setClients(data)
         }
-        fetchClients()
-
-        const handleClickOutside = (event: MouseEvent) => {
-            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-                setShowSuggestions(false)
-            }
-        }
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
+        fetchInitialData()
     }, [])
 
     const filteredClients = useMemo(() => {
@@ -86,17 +65,16 @@ export default function AccountingHistoryPage() {
         )
     }, [searchTerm, clients])
 
-    useEffect(() => {
-        if (selectedClient) {
-            fetchHistory()
-        } else {
-            setItems([])
+    // 2. 이력 데이터 조회
+    const fetchHistory = async (targetClient: Client | null = selectedClient) => {
+        if (!targetClient) {
+            alert('거래처를 선택하거나 입력해주세요.')
+            return
         }
-    }, [selectedClient, startMonth, endMonth])
-
-    const fetchHistory = async () => {
-        if (!selectedClient) return
+        
         setLoading(true)
+        setIsEditMode(false) 
+        setHasChanges(false)
 
         const [sYear, sMonth] = startMonth.split('-').map(Number)
         const [eYear, eMonth] = endMonth.split('-').map(Number)
@@ -104,16 +82,16 @@ export default function AccountingHistoryPage() {
         const { data } = await supabase
             .from('settlement_details')
             .select(`
-        *,
-        settlement:settlements!inner(billing_year, billing_month, is_paid),
-        inventory:inventory(
-          model_name, serial_number, 
-          plan_basic_fee, plan_price_bw, plan_price_col, 
-          plan_basic_cnt_bw, plan_basic_cnt_col,
-          plan_weight_a3_bw, plan_weight_a3_col
-        )
-      `)
-            .eq('settlement.client_id', selectedClient.id)
+                *,
+                settlement:settlements!inner(id, billing_year, billing_month, is_paid, total_amount),
+                inventory:inventory(
+                    id, model_name, serial_number, 
+                    plan_basic_fee, plan_price_bw, plan_price_col, 
+                    plan_basic_cnt_bw, plan_basic_cnt_col,
+                    plan_weight_a3_bw, plan_weight_a3_col
+                )
+            `)
+            .eq('settlement.client_id', targetClient.id)
             .gte('settlement.billing_year', sYear)
             .lte('settlement.billing_year', eYear)
 
@@ -134,31 +112,78 @@ export default function AccountingHistoryPage() {
             })) as HistoryItem[]
 
             setItems(filtered)
+            setOriginalItems(JSON.parse(JSON.stringify(filtered))) // 원본 백업
+        } else {
+            setItems([])
+            setOriginalItems([])
         }
         setLoading(false)
     }
 
-    const sortedItems = useMemo(() => {
-        const list = [...items]
-        if (viewMode === 'all') {
-            return list.sort((a, b) => {
-                const da = a.settlement.billing_year * 100 + a.settlement.billing_month
-                const db = b.settlement.billing_year * 100 + b.settlement.billing_month
-                return db - da
-            })
-        } else {
-            return list.sort((a, b) => {
-                if (!a.inventory || !b.inventory) return 0
-                if (a.inventory.serial_number !== b.inventory.serial_number) {
-                    return a.inventory.serial_number.localeCompare(b.inventory.serial_number)
-                }
-                const da = a.settlement.billing_year * 100 + a.settlement.billing_month
-                const db = b.settlement.billing_year * 100 + b.settlement.billing_month
-                return da - db
-            })
+    // 3. 검색 핸들러
+    const handleSearchTrigger = () => {
+        if (selectedClient && selectedClient.name === searchTerm) {
+            fetchHistory(selectedClient)
+            return
         }
-    }, [items, viewMode])
 
+        if (searchTerm) {
+            const exactMatch = clients.find(c => c.name === searchTerm)
+            if (exactMatch) {
+                setSelectedClient(exactMatch)
+                fetchHistory(exactMatch)
+                setShowSuggestions(false)
+            } else {
+                const partialMatch = clients.find(c => c.name.includes(searchTerm))
+                if (partialMatch) {
+                    setSelectedClient(partialMatch)
+                    setSearchTerm(partialMatch.name)
+                    fetchHistory(partialMatch)
+                    setShowSuggestions(false)
+                } else {
+                    alert('일치하는 거래처가 없습니다.')
+                }
+            }
+        } else {
+            alert('거래처명을 입력해주세요.')
+        }
+    }
+
+    // 4. 데이터 정합성 검사 (Error Map 생성)
+    const errorMap = useMemo(() => {
+        const errors = new Map<string, { bw: boolean, col: boolean, bw_a3: boolean, col_a3: boolean }>();
+        const itemLookup = new Map<string, HistoryItem>();
+        
+        items.forEach(item => {
+            const key = `${item.inventory_id}-${item.settlement.billing_year}-${item.settlement.billing_month}`;
+            itemLookup.set(key, item);
+        });
+
+        items.forEach(item => {
+            let prevYear = item.settlement.billing_year;
+            let prevMonth = item.settlement.billing_month - 1;
+            if (prevMonth === 0) { prevMonth = 12; prevYear -= 1; }
+            
+            const prevKey = `${item.inventory_id}-${prevYear}-${prevMonth}`;
+            const prevItem = itemLookup.get(prevKey);
+
+            if (prevItem) {
+                const isBwErr = prevItem.curr_count_bw !== item.prev_count_bw;
+                const isColErr = prevItem.curr_count_col !== item.prev_count_col;
+                const isBwA3Err = prevItem.curr_count_bw_a3 !== item.prev_count_bw_a3;
+                const isColA3Err = prevItem.curr_count_col_a3 !== item.prev_count_col_a3;
+
+                if (isBwErr || isColErr || isBwA3Err || isColA3Err) {
+                    errors.set(item.id, { 
+                        bw: isBwErr, col: isColErr, bw_a3: isBwA3Err, col_a3: isColA3Err 
+                    });
+                }
+            }
+        });
+        return errors;
+    }, [items]);
+
+    // 5. 입력값 변경
     const handleInputChange = (id: string, field: keyof HistoryItem, val: string) => {
         const numVal = Number(val.replace(/[^0-9]/g, ''))
 
@@ -166,7 +191,7 @@ export default function AccountingHistoryPage() {
             if (item.id === id) {
                 const newItem = { ...item, [field]: numVal, is_modified: true }
 
-                if (field.includes('count')) {
+                if ((field as string).includes('count')) {
                     newItem.usage_bw = newItem.curr_count_bw - newItem.prev_count_bw
                     newItem.usage_col = newItem.curr_count_col - newItem.prev_count_col
                     newItem.usage_bw_a3 = newItem.curr_count_bw_a3 - newItem.prev_count_bw_a3
@@ -175,7 +200,6 @@ export default function AccountingHistoryPage() {
 
                 if (newItem.inventory) {
                     const inv = newItem.inventory
-
                     const safeUsageBw = Math.max(0, newItem.usage_bw)
                     const safeUsageCol = Math.max(0, newItem.usage_col)
                     const safeUsageBwA3 = Math.max(0, newItem.usage_bw_a3)
@@ -191,7 +215,6 @@ export default function AccountingHistoryPage() {
                         (extraBw * (inv.plan_price_bw || 0)) +
                         (extraCol * (inv.plan_price_col || 0))
                 }
-
                 return newItem
             }
             return item
@@ -199,12 +222,37 @@ export default function AccountingHistoryPage() {
         setHasChanges(true)
     }
 
+    // 수정 모드 토글 (취소/시작)
+    const handleToggleEditMode = () => {
+        if (isEditMode) {
+            // 수정 취소
+            if (hasChanges) {
+                if (confirm('수정을 취소하시겠습니까? 입력한 내용은 저장되지 않고 이전 상태로 돌아갑니다.')) {
+                    setItems(JSON.parse(JSON.stringify(originalItems)))
+                    setHasChanges(false)
+                    setIsEditMode(false)
+                }
+            } else {
+                setIsEditMode(false)
+            }
+        } else {
+            // 수정 시작
+            setIsEditMode(true)
+        }
+    }
+
+    // 6. 저장 핸들러
     const handleSave = async () => {
+        if (errorMap.size > 0) {
+            alert('⚠️ 데이터 불일치 오류가 발견되었습니다.\n빨간색으로 표시된 칸은 [지난달 당월 지침]과 [이번달 전월 지침]이 다릅니다.\n데이터 무결성을 위해 "지난달 데이터"를 수정하여 숫자를 맞춰주세요.');
+            return;
+        }
+
         if (!confirm('수정된 내역을 저장하시겠습니까?')) return
 
         const hasNegativeUsage = items.some(i => i.is_modified && (i.usage_bw < 0 || i.usage_col < 0 || i.usage_bw_a3 < 0 || i.usage_col_a3 < 0));
         if (hasNegativeUsage) {
-            if (!confirm('⚠️ 일부 사용량이 마이너스(-)입니다. 이대로 저장하시겠습니까? (요금은 0원으로 계산됩니다)')) return;
+            if (!confirm('⚠️ 일부 사용량이 마이너스(-)입니다. 이대로 저장하시겠습니까?')) return;
         }
 
         const updates = items.filter(i => i.is_modified)
@@ -213,195 +261,114 @@ export default function AccountingHistoryPage() {
         if (res.success) {
             alert(res.message)
             setHasChanges(false)
+            setIsEditMode(false) 
             fetchHistory()
         } else {
             alert(res.message)
         }
     }
 
+    const handleDeleteRow = async (item: HistoryItem) => {
+        if (!confirm(`[${item.inventory?.model_name}]의 ${item.settlement.billing_month}월 내역을 정말 삭제하시겠습니까?`)) return
+        const res = await deleteSettlementDetailAction(
+            (item.settlement as any).id, 
+            item.id, 
+            item.calculated_amount
+        )
+        if (res.success) {
+            alert(res.message)
+            fetchHistory()
+        } else {
+            alert('삭제 실패: ' + res.message)
+        }
+    }
+
+    const handleRebillRow = async (item: HistoryItem) => {
+        if (!confirm(`[${item.inventory?.model_name}] 건을 재청구(삭제) 하시겠습니까?`)) return
+        const res = await rebillSettlementDetailAction(
+            (item.settlement as any).id,
+            item.id,
+            item.inventory_id,
+            false,
+            selectedClient!.id
+        )
+        if (res.success) {
+            alert(res.message)
+            fetchHistory()
+        } else {
+            alert('재청구 실패: ' + res.message)
+        }
+    }
+
+    const handleStatement = (item: HistoryItem) => {
+        if (!selectedClient) return
+        const sameSettlementItems = items.filter(i => i.settlement_id === item.settlement_id)
+        const tempSettlement: Settlement = {
+            id: item.settlement_id,
+            billing_year: item.settlement.billing_year,
+            billing_month: item.settlement.billing_month,
+            client_id: selectedClient.id,
+            client: selectedClient,
+            organization_id: '',
+            total_amount: sameSettlementItems.reduce((sum, i) => sum + i.calculated_amount, 0),
+            // @ts-ignore
+            details: sameSettlementItems.map(i => ({ ...i, inventory: i.inventory }))
+        } as unknown as Settlement
+        setStatementData(tempSettlement)
+        setIsStatementOpen(true)
+    }
+
+    const handleSelectClient = (client: Client) => {
+        setSelectedClient(client)
+        setSearchTerm(client.name)
+        fetchHistory(client)
+        setShowSuggestions(false)
+    }
+
     return (
         <div style={{ width: '100%', padding: '20px', fontFamily: 'sans-serif' }}>
+            
+            <HistoryFilter
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                showSuggestions={showSuggestions}
+                setShowSuggestions={setShowSuggestions}
+                filteredClients={filteredClients}
+                onSelectClient={handleSelectClient}
+                onSearchTrigger={handleSearchTrigger}
+                startMonth={startMonth}
+                setStartMonth={setStartMonth}
+                endMonth={endMonth}
+                setEndMonth={setEndMonth}
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+                isEditMode={isEditMode}
+                onToggleEditMode={handleToggleEditMode}
+                // setIsEditMode 제거됨 (에러 해결)
+                hasChanges={hasChanges}
+                onSave={handleSave}
+                totalCount={items.length}
+            />
 
-            {/* 상단 필터 영역 */}
-            <div style={{ backgroundColor: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e5e5e5', marginBottom: '24px', display: 'flex', gap: '24px', alignItems: 'flex-end', flexWrap: 'wrap', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-
-                {/* 거래처 검색 */}
-                <div style={{ position: 'relative', width: '300px' }} ref={searchRef}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#555', marginBottom: '8px' }}>거래처 검색</label>
-                    <input
-                        type="text"
-                        placeholder="거래처명 입력..."
-                        value={searchTerm}
-                        onChange={(e) => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
-                        onFocus={() => setShowSuggestions(true)}
-                        style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '0.95rem' }}
-                    />
-                    {showSuggestions && filteredClients.length > 0 && (
-                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #ccc', borderRadius: '8px', maxHeight: '300px', overflowY: 'auto', zIndex: 1000, boxShadow: '0 4px 15px rgba(0,0,0,0.1)', marginTop: '4px' }}>
-                            {filteredClients.map(client => (
-                                <div
-                                    key={client.id}
-                                    onClick={() => { setSelectedClient(client); setSearchTerm(client.name); setShowSuggestions(false); }}
-                                    style={{ padding: '12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9f9f9'}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                                >
-                                    <div style={{ fontWeight: '600', fontSize: '0.95rem', color: '#333' }}>{client.name}</div>
-                                    <div style={{ fontSize: '0.85rem', color: '#888', marginTop: '2px' }}>{client.representative_name}</div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* 기간 및 보기 방식 */}
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#555', marginBottom: '8px' }}>시작월</label>
-                        <input type="month" value={startMonth} onChange={(e) => setStartMonth(e.target.value)} style={{ padding: '11px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '0.9rem' }} />
-                    </div>
-                    <span style={{ paddingTop: '28px', color: '#888' }}>~</span>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#555', marginBottom: '8px' }}>종료월</label>
-                        <input type="month" value={endMonth} onChange={(e) => setEndMonth(e.target.value)} style={{ padding: '11px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '0.9rem' }} />
-                    </div>
-                </div>
-
-                <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#555', marginBottom: '8px' }}>보기 방식</label>
-                    <div style={{ display: 'flex', border: '1px solid #ccc', borderRadius: '8px', overflow: 'hidden' }}>
-                        <button onClick={() => setViewMode('all')} style={{ padding: '11px 20px', backgroundColor: viewMode === 'all' ? '#0070f3' : '#fff', color: viewMode === 'all' ? '#fff' : '#333', border: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '500' }}>전체 (날짜순)</button>
-                        <button onClick={() => setViewMode('machine')} style={{ padding: '11px 20px', backgroundColor: viewMode === 'machine' ? '#0070f3' : '#fff', color: viewMode === 'machine' ? '#fff' : '#333', border: 'none', cursor: 'pointer', borderLeft: '1px solid #ccc', fontSize: '0.9rem', fontWeight: '500' }}>기계별 (타임라인)</button>
-                    </div>
-                </div>
-
-                {hasChanges && (
-                    <div style={{ marginLeft: 'auto' }}>
-                        <button onClick={handleSave} style={{ padding: '12px 28px', backgroundColor: '#d93025', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px rgba(217,48,37,0.2)', fontSize: '0.95rem' }}>💾 변경사항 저장</button>
-                    </div>
-                )}
-            </div>
-
-            {/* 하단 컨텐츠 */}
             {selectedClient ? (
                 <div style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #ddd', overflow: 'hidden', minHeight: '600px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-
-                    <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', backgroundColor: '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                            <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111', marginRight: '12px' }}>🏢 {selectedClient.name}</span>
-                            <span style={{ color: '#666', fontSize: '0.95rem' }}>| {selectedClient.representative_name} ({selectedClient.phone})</span>
-                        </div>
-                        <div style={{ fontSize: '0.95rem', color: '#555' }}>조회 건수: <b>{items.length}</b>건</div>
+                    
+                    <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', backgroundColor: '#fafafa' }}>
+                        <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111', marginRight: '12px' }}>🏢 {selectedClient.name}</span>
+                        <span style={{ color: '#666', fontSize: '0.95rem' }}>| {selectedClient.representative_name} ({selectedClient.phone})</span>
                     </div>
 
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                            <thead style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ccc', color: '#444' }}>
-                                <tr>
-                                    <th rowSpan={2} style={{ padding: '10px', width: '10px', borderRight: '1px solid #ddd' }}>No.</th>
-                                    {/* 기계명 컬럼 */}
-                                    <th rowSpan={2} style={{ padding: '10px', width: '200px', borderRight: '1px solid #ddd', textAlign: 'left' }}>기계명 (S/N)</th>
-                                    <th rowSpan={2} style={{ padding: '10px', width: '80px', borderRight: '1px solid #ddd' }}>청구월</th>
-
-                                    {/* 입력 섹션 헤더 - 넓이 조절 */}
-                                    <th colSpan={4} style={{ padding: '8px', borderRight: '2px solid #bbb', borderBottom: '1px solid #ddd', backgroundColor: '#f0f0f0' }}>전월 지침 (Editable)</th>
-                                    <th colSpan={4} style={{ padding: '8px', borderRight: '2px solid #bbb', borderBottom: '1px solid #ddd', backgroundColor: '#e3f2fd' }}>당월 지침 (Editable)</th>
-
-                                    <th colSpan={2} style={{ padding: '8px', borderRight: '1px solid #ddd', borderBottom: '1px solid #ddd', width: '110px' }}>실사용 / 추가</th>
-                                    <th rowSpan={2} style={{ padding: '10px', width: '100px', textAlign: 'right' }}>청구금액<br />(VAT포함)</th>
-                                </tr>
-                                <tr>
-                                    {/* 입력창 헤더: 65px 정도로 여유 있게 설정 */}
-                                    <th style={{ fontSize: '0.75rem', padding: '6px', width: '90px', backgroundColor: '#fafafa' }}>흑백</th>
-                                    <th style={{ fontSize: '0.75rem', padding: '6px', width: '90px', color: '#0070f3', backgroundColor: '#fafafa' }}>칼라</th>
-                                    <th style={{ fontSize: '0.75rem', padding: '6px', width: '90px', backgroundColor: '#fafafa' }}>흑A3</th>
-                                    <th style={{ fontSize: '0.75rem', padding: '6px', width: '90px', color: '#0070f3', backgroundColor: '#fafafa', borderRight: '2px solid #bbb' }}>칼A3</th>
-
-                                    {/* 당월 지침 하위 칸도 동일하게 조절 */}
-                                    <th style={{ fontSize: '0.75rem', padding: '6px', width: '90px', backgroundColor: '#f0f8ff' }}>흑백</th>
-                                    <th style={{ fontSize: '0.75rem', padding: '6px', width: '90px', color: '#0070f3', backgroundColor: '#f0f8ff' }}>칼라</th>
-                                    <th style={{ fontSize: '0.75rem', padding: '6px', width: '90px', backgroundColor: '#f0f8ff' }}>흑A3</th>
-                                    <th style={{ fontSize: '0.75rem', padding: '6px', width: '90px', color: '#0070f3', backgroundColor: '#f0f8ff', borderRight: '2px solid #bbb' }}>칼A3</th>
-                                    
-                                    <th style={{ fontSize: '0.75rem', padding: '6px' }}>기본매수</th>
-                                    <th style={{ fontSize: '0.75rem', padding: '6px', borderRight: '1px solid #ddd', color: '#d93025' }}>추가매수</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr><td colSpan={14} style={{ padding: '60px', textAlign: 'center' }}>데이터를 불러오는 중입니다...</td></tr>
-                                ) : items.length === 0 ? (
-                                    <tr><td colSpan={14} style={{ padding: '60px', textAlign: 'center', color: '#888' }}>조회된 청구 이력이 없습니다.</td></tr>
-                                ) : (
-                                    sortedItems.map((item, idx) => {
-                                        const isPaid = item.settlement.is_paid
-                                        const inventory = item.inventory
-                                        const isNewGroup = viewMode === 'machine' && idx > 0 && sortedItems[idx - 1].inventory?.serial_number !== item.inventory?.serial_number
-
-                                        const wBw = inventory?.plan_weight_a3_bw || 1
-                                        const wCol = inventory?.plan_weight_a3_col || 1
-
-                                        const pureTotalBw = item.usage_bw + (item.usage_bw_a3 * wBw)
-                                        const pureTotalCol = item.usage_col + (item.usage_col_a3 * wCol)
-
-                                        const extraBw = Math.max(0, pureTotalBw - (inventory?.plan_basic_cnt_bw || 0))
-                                        const extraCol = Math.max(0, pureTotalCol - (inventory?.plan_basic_cnt_col || 0))
-
-                                        return (
-                                            <React.Fragment key={item.id}>
-                                                {isNewGroup && (
-                                                    <tr><td colSpan={14} style={{ height: '30px', backgroundColor: '#f4f4f4', borderTop: '2px solid #ccc', borderBottom: '1px solid #ccc' }}></td></tr>
-                                                )}
-                                                <tr style={{ backgroundColor: item.is_modified ? '#fffbe6' : '#fff', borderBottom: '1px solid #eee', opacity: isPaid ? 0.7 : 1 }}>
-                                                    <td style={{ textAlign: 'center', color: '#888' }}>{idx + 1}</td>
-                                                    <td style={{ padding: '12px' }}>
-                                                        <div style={{ fontWeight: 'bold', color: '#333', fontSize: '0.9rem' }}>{inventory?.model_name || '-'}</div>
-                                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '2px' }}>{inventory?.serial_number || '-'}</div>
-                                                    </td>
-                                                    <td style={{ textAlign: 'center' }}>
-                                                        <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{item.settlement.billing_year}-{String(item.settlement.billing_month).padStart(2, '0')}</div>
-                                                        {isPaid && <div style={{ fontSize: '0.75rem', color: '#2e7d32', fontWeight: 'bold', marginTop: '2px' }}>[완료]</div>}
-                                                    </td>
-
-                                                    {/* [수정] 입력창 셀의 padding을 조절하여 간격 확보 */}
-                                                    <td style={{ padding: '6px 4px' }}><InputCell value={item.prev_count_bw} disabled={isPaid} onChange={(v) => handleInputChange(item.id, 'prev_count_bw', v)} /></td>
-                                                    <td style={{ padding: '6px 4px' }}><InputCell value={item.prev_count_col} disabled={isPaid} color="#0070f3" onChange={(v) => handleInputChange(item.id, 'prev_count_col', v)} /></td>
-                                                    <td style={{ padding: '6px 4px' }}><InputCell value={item.prev_count_bw_a3} disabled={isPaid} onChange={(v) => handleInputChange(item.id, 'prev_count_bw_a3', v)} /></td>
-                                                    <td style={{ padding: '6px 4px', borderRight: '2px solid #bbb' }}><InputCell value={item.prev_count_col_a3} disabled={isPaid} color="#0070f3" onChange={(v) => handleInputChange(item.id, 'prev_count_col_a3', v)} /></td>
-
-                                                    <td style={{ padding: '6px 4px', backgroundColor: '#f9fcff' }}><InputCell value={item.curr_count_bw} disabled={isPaid} bold onChange={(v) => handleInputChange(item.id, 'curr_count_bw', v)} /></td>
-                                                    <td style={{ padding: '6px 4px', backgroundColor: '#f9fcff' }}><InputCell value={item.curr_count_col} disabled={isPaid} bold color="#0070f3" onChange={(v) => handleInputChange(item.id, 'curr_count_col', v)} /></td>
-                                                    <td style={{ padding: '6px 4px', backgroundColor: '#f9fcff' }}><InputCell value={item.curr_count_bw_a3} disabled={isPaid} bold onChange={(v) => handleInputChange(item.id, 'curr_count_bw_a3', v)} /></td>
-                                                    <td style={{ padding: '6px 4px', backgroundColor: '#f9fcff', borderRight: '2px solid #bbb' }}><InputCell value={item.curr_count_col_a3} disabled={isPaid} bold color="#0070f3" onChange={(v) => handleInputChange(item.id, 'curr_count_col_a3', v)} /></td>
-
-                                                    <td style={{ fontSize: '0.8rem', padding: '10px', lineHeight: '1.5' }}>
-                                                        <div style={{ color: item.usage_bw < 0 ? '#d93025' : 'inherit' }}>흑: {item.usage_bw.toLocaleString()}</div>
-                                                        <div style={{ color: item.usage_col < 0 ? '#d93025' : '#0070f3' }}>칼: {item.usage_col.toLocaleString()}</div>
-                                                        {(item.usage_bw_a3 !== 0 || item.usage_col_a3 !== 0) && (
-                                                            <>
-                                                                <div style={{ color: item.usage_bw_a3 < 0 ? '#d93025' : '#666', fontSize: '0.75rem' }}>흑A3: {item.usage_bw_a3.toLocaleString()}</div>
-                                                                <div style={{ color: item.usage_col_a3 < 0 ? '#d93025' : '#4dabf7', fontSize: '0.75rem' }}>칼A3: {item.usage_col_a3.toLocaleString()}</div>
-                                                            </>
-                                                        )}
-                                                    </td>
-
-                                                    <td style={{ fontSize: '0.8rem', padding: '10px', lineHeight: '1.5', borderRight: '1px solid #ddd', color: '#d93025' }}>
-                                                        {extraBw > 0 && <div>흑: +{extraBw.toLocaleString()}</div>}
-                                                        {extraCol > 0 && <div>칼: +{extraCol.toLocaleString()}</div>}
-                                                        {extraBw === 0 && extraCol === 0 && <div style={{ color: '#ccc' }}>-</div>}
-                                                    </td>
-
-                                                    <td style={{ textAlign: 'right', padding: '12px', fontWeight: 'bold', color: '#171717', fontSize: '0.9rem' }}>
-                                                        {Math.floor(item.calculated_amount * 1.1).toLocaleString()}원
-                                                    </td>
-                                                </tr>
-                                            </React.Fragment>
-                                        )
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    <HistoryTable
+                        loading={loading}
+                        items={items}
+                        viewMode={viewMode}
+                        isEditMode={isEditMode}
+                        errorMap={errorMap}
+                        onInputChange={handleInputChange}
+                        onStatement={handleStatement}
+                        onRebill={handleRebillRow}
+                        onDelete={handleDeleteRow}
+                    />
                 </div>
             ) : (
                 <div style={{ textAlign: 'center', padding: '100px 20px', color: '#999', border: '2px dashed #e0e0e0', borderRadius: '12px', backgroundColor: '#fafafa' }}>
@@ -409,41 +376,14 @@ export default function AccountingHistoryPage() {
                     <p style={{ fontSize: '1.1rem' }}>상단에서 <b>거래처를 검색</b>하여 청구 이력을 조회하세요.</p>
                 </div>
             )}
-        </div>
-    )
-}
 
-function InputCell({ value, onChange, disabled, color = '#333', bold = false }: { value: number, onChange: (val: string) => void, disabled?: boolean, color?: string, bold?: boolean }) {
-    return (
-        <input
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            disabled={disabled}
-            style={{
-                width: '100%',
-                minWidth: '50px', // [수정] 최소 너비를 줄임
-                border: '1px solid #d1d1d1',
-                borderRadius: '4px',
-                padding: '5px 4px', // [수정] 패딩 축소 (컴팩트하게)
-                textAlign: 'right',
-                fontSize: '0.85rem', // [수정] 폰트 크기 축소 (가장 중요)
-                color: color,
-                fontWeight: bold ? '600' : '400', // 두께 조절
-                backgroundColor: disabled ? '#f5f5f5' : '#fff',
-                transition: 'all 0.1s',
-                outline: 'none',
-                boxShadow: disabled ? 'none' : '0 1px 1px rgba(0,0,0,0.05)',
-                boxSizing: 'border-box' // [중요] 테두리 포함 크기 계산
-            }}
-            onFocus={(e) => {
-                e.target.style.border = '1px solid #0070f3';
-                e.target.style.boxShadow = '0 0 0 2px rgba(0,112,243,0.1)';
-            }}
-            onBlur={(e) => {
-                e.target.style.border = '1px solid #d1d1d1';
-                e.target.style.boxShadow = '0 1px 1px rgba(0,0,0,0.05)';
-            }}
-        />
+            {isStatementOpen && statementData && (
+                <StatementModal 
+                    settlement={statementData}
+                    supplier={myOrg}
+                    onClose={() => setIsStatementOpen(false)}
+                />
+            )}
+        </div>
     )
 }
