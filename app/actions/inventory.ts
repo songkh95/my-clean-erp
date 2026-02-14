@@ -137,20 +137,10 @@ export async function withdrawInventoryAction(
     const { error: invError } = await supabase.from('inventory').update({
       status: '창고',
       client_id: null,
-      
-      // [옵션] 철수 시점의 카운터를 초기 카운터로 업데이트 (필요시 주석 해제)
-      /*
-      initial_count_bw: counts.bw,
-      initial_count_col: counts.col,
-      initial_count_bw_a3: counts.bw_a3,
-      initial_count_col_a3: counts.col_a3,
-      */
-     
     }).eq('id', inventoryId)
 
     if (invError) throw new Error('상태 변경 실패: ' + invError.message)
 
-    // 3) 데이터 갱신
     revalidatePath('/clients')
     revalidatePath('/inventory')
     revalidatePath('/accounting')
@@ -164,7 +154,7 @@ export async function withdrawInventoryAction(
 }
 
 // ----------------------------------------------------------------------
-// 5. 기기 교체(맞교환) 처리 액션
+// 5. 기기 교체(맞교환) 처리 액션 (✅ 최종 업데이트: 명시적 Plan 적용)
 // ----------------------------------------------------------------------
 export async function replaceInventoryAction(
   clientId: string,
@@ -173,13 +163,21 @@ export async function replaceInventoryAction(
   data: {
     final_counts: { bw: number; col: number; bw_a3: number; col_a3: number };
     new_initial_counts: { bw: number; col: number; bw_a3: number; col_a3: number };
+    contract: { start_date: string; end_date: string };
+    // ✅ 요금제 정보 전체를 받음
+    plan: {
+      basic_fee: number;
+      basic_cnt_bw: number;
+      basic_cnt_col: number;
+      price_bw: number;
+      price_col: number;
+      weight_a3_bw: number;
+      weight_a3_col: number;
+    };
     memo: string;
-    inheritPlan: boolean; // 요금제 승계 여부
   }
 ) {
   const supabase = await createClient()
-  
-  // 1) 보안 검증
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, message: '로그인이 필요합니다.' }
 
@@ -188,7 +186,7 @@ export async function replaceInventoryAction(
   const orgId = profile.organization_id
 
   try {
-    // 2) 기존 기기 정보 가져오기 (요금제 승계를 위해)
+    // 2) 기존 기기 정보 가져오기 (그룹 ID 확인용)
     const { data: oldAsset } = await supabase
       .from('inventory')
       .select('*')
@@ -199,7 +197,6 @@ export async function replaceInventoryAction(
     if (!oldAsset) throw new Error('기존 기기 정보를 찾을 수 없습니다.')
 
     // [Step 1] 기존 기기 회수 처리
-    
     // 1-1. 회수 이력 기록
     const { error: histErr1 } = await supabase.from('machine_history').insert({
       inventory_id: oldAssetId,
@@ -215,45 +212,52 @@ export async function replaceInventoryAction(
     })
     if (histErr1) throw new Error('회수 이력 기록 실패: ' + histErr1.message)
 
-    // 1-2. 기존 기기 상태 변경 (창고행)
+    // 1-2. 기존 기기 상태 변경 (창고행) & 그룹 설정
+    let groupId = oldAsset.billing_group_id
+    if (!groupId) {
+      groupId = crypto.randomUUID()
+      await supabase.from('inventory').update({ billing_group_id: groupId }).eq('id', oldAssetId)
+    }
+
     const { error: invErr1 } = await supabase.from('inventory').update({
       status: '창고',
       client_id: null,
+      billing_group_id: groupId // 그룹 ID 유지
     }).eq('id', oldAssetId)
+    
     if (invErr1) throw new Error('기존 기기 상태 변경 실패: ' + invErr1.message)
 
 
-    // [Step 2] 새 기기 설치 처리
-
-    // 2-1. 새 기기 업데이트 Payload 구성
-    const newMachinePayload: any = {
+    // [Step 2] 새 기기 설치 처리 (전달받은 Plan 적용)
+    const newMachinePayload = {
       status: '설치',
       client_id: clientId,
       initial_count_bw: data.new_initial_counts.bw,
       initial_count_col: data.new_initial_counts.col,
       initial_count_bw_a3: data.new_initial_counts.bw_a3,
       initial_count_col_a3: data.new_initial_counts.col_a3,
+      contract_start_date: data.contract.start_date || null,
+      contract_end_date: data.contract.end_date || null,
+      billing_group_id: groupId, // ✅ 기존 기기와 연결
+      
+      // ✅ 팝업에서 확정된 요금제 적용 (승계 또는 신규)
+      plan_basic_fee: data.plan.basic_fee,
+      plan_basic_cnt_bw: data.plan.basic_cnt_bw,
+      plan_basic_cnt_col: data.plan.basic_cnt_col,
+      plan_price_bw: data.plan.price_bw,
+      plan_price_col: data.plan.price_col,
+      plan_weight_a3_bw: data.plan.weight_a3_bw,
+      plan_weight_a3_col: data.plan.weight_a3_col,
+      // 기존 기기의 청구일자는 그대로 승계하는 것이 안전함
+      billing_date: oldAsset.billing_date
     }
 
-    // 요금제 승계 로직
-    if (data.inheritPlan) {
-      newMachinePayload.plan_basic_fee = oldAsset.plan_basic_fee;
-      newMachinePayload.plan_basic_cnt_bw = oldAsset.plan_basic_cnt_bw;
-      newMachinePayload.plan_basic_cnt_col = oldAsset.plan_basic_cnt_col;
-      newMachinePayload.plan_price_bw = oldAsset.plan_price_bw;
-      newMachinePayload.plan_price_col = oldAsset.plan_price_col;
-      newMachinePayload.plan_weight_a3_bw = oldAsset.plan_weight_a3_bw;
-      newMachinePayload.plan_weight_a3_col = oldAsset.plan_weight_a3_col;
-      newMachinePayload.billing_group_id = oldAsset.billing_group_id;
-      newMachinePayload.billing_date = oldAsset.billing_date;
-    }
-
-    // 2-2. 새 기기 정보 업데이트
     const { error: invErr2 } = await supabase
       .from('inventory')
       .update(newMachinePayload)
       .eq('id', newAssetId)
       .eq('organization_id', orgId)
+    
     if (invErr2) throw new Error('새 기기 정보 업데이트 실패: ' + invErr2.message)
 
     // 2-3. 새 기기 설치 이력 기록
@@ -271,20 +275,19 @@ export async function replaceInventoryAction(
     })
     if (histErr2) throw new Error('설치 이력 기록 실패: ' + histErr2.message)
 
-    // 3) 데이터 갱신
     revalidatePath('/clients')
     revalidatePath('/inventory')
+    revalidatePath('/accounting')
     
-    return { success: true, message: '기계 교체 처리가 완료되었습니다.' }
+    return { success: true, message: '기계 교체 및 계약 설정이 완료되었습니다.' }
 
   } catch (error: any) {
     console.error(error)
     return { success: false, message: error.message || '교체 처리 중 오류가 발생했습니다.' }
   }
 }
-
 // ----------------------------------------------------------------------
-// 6. 기계 요금제 및 청구 그룹 설정 액션 (NEW)
+// 6. 기계 요금제 및 청구 그룹 설정 액션
 // ----------------------------------------------------------------------
 export async function updateInventoryPlanAction(
   inventoryId: string,
@@ -297,8 +300,8 @@ export async function updateInventoryPlanAction(
     plan_weight_a3_bw: number;
     plan_weight_a3_col: number;
     billing_date: string;
-    contract_start_date?: string | null; // ✅ 추가
-    contract_end_date?: string | null;   // ✅ 추가
+    contract_start_date?: string | null;
+    contract_end_date?: string | null;
   },
   billingGroupId: string | null
 ) {
@@ -329,12 +332,10 @@ export async function updateInventoryPlanAction(
       finalGroupId = newGroupUUID
     }
 
-    // ✅ 계약 기간을 포함하여 업데이트
     const { error } = await supabase
       .from('inventory')
       .update({
         ...planData,
-        // 빈 문자열이 올 경우 null로 처리
         contract_start_date: planData.contract_start_date || null,
         contract_end_date: planData.contract_end_date || null,
         billing_group_id: finalGroupId

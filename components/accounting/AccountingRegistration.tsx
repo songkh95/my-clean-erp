@@ -36,7 +36,6 @@ interface Props {
   calculateSelectedTotal: (targetClients?: Client[]) => number
   handlePreSave: () => void
   onSearch: () => void
-  handleExcludeAsset: (asset: CalculatedAsset) => void
 }
 
 export default function AccountingRegistration({
@@ -44,8 +43,7 @@ export default function AccountingRegistration({
   targetDay, setTargetDay, searchTerm, setSearchTerm, showUnregistered, setShowUnregistered,
   loading, filteredClients, inventoryMap, inputData, prevData, selectedInventories,
   handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk, 
-  calculateClientBill, calculateSelectedTotal, handlePreSave, onSearch,
-  handleExcludeAsset
+  calculateClientBill, calculateSelectedTotal, handlePreSave, onSearch
 }: Props) {
 
   // 계약일 검증 헬퍼 함수
@@ -56,7 +54,6 @@ export default function AccountingRegistration({
 
     const contractDate = new Date(contractDateStr);
     // 비교: (입력 년 * 12 + 입력 월) < (계약 년 * 12 + 계약 월)
-    // 해당 월의 1일 기준으로 비교 (계약 시작월부터 표시)
     const targetTotalMonth = regYear * 12 + (regMonth - 1);
     const contractTotalMonth = contractDate.getFullYear() * 12 + contractDate.getMonth();
     
@@ -101,7 +98,8 @@ export default function AccountingRegistration({
     filteredClients.forEach(client => {
       const billData = calculateClientBill(client);
       billData.details.forEach(d => {
-        if (selectedInventories.has(d.inventory_id) && isContractActive(d) && d.isGroupLeader) {
+        // 리더 여부 상관없이 선택된 모든 기계의 비용 합산
+        if (selectedInventories.has(d.inventory_id) && isContractActive(d)) {
           sum += d.rowCost.total;
         }
       });
@@ -183,14 +181,13 @@ export default function AccountingRegistration({
                 ) : filteredClients.map(client => {
                   const billData = calculateClientBill(client);
                   
-                  // ✅ [수정] 계약일 이전 기계 필터링
+                  // 계약일 이전 기계 필터링
                   const validDetails = billData.details.filter(d => isContractActive(d));
                   
                   // 필터링 후 표시할 기계가 없으면 거래처 행 자체를 숨김
                   if (validDetails.length === 0) return null;
 
-                  // ✅ [수정] 필터링된 기계 기준으로 그룹핑 정보(rowSpan, isGroupLeader) 재계산
-                  // (그룹 멤버 중 일부가 숨겨졌을 때 테이블 깨짐 방지)
+                  // 필터링된 기계 기준으로 그룹핑 정보(rowSpan, isGroupLeader) 재계산
                   const groupCounts: {[key: string]: number} = {};
                   validDetails.forEach(d => {
                     if (d.billing_group_id) {
@@ -201,7 +198,6 @@ export default function AccountingRegistration({
                   const processedDetails = validDetails.map((d, idx, arr) => {
                     if (!d.billing_group_id) return d; // 단독 기계는 그대로
                     
-                    // 현재 보이는 리스트 내에서 해당 그룹의 첫 번째 아이템인지 확인
                     const firstIdx = arr.findIndex(x => x.billing_group_id === d.billing_group_id);
                     const isLeader = firstIdx === idx;
                     
@@ -212,8 +208,8 @@ export default function AccountingRegistration({
                     };
                   });
 
-                  // ✅ [수정] 필터링된 기계 기준으로 합계 재계산
-                  const clientSupply = processedDetails.reduce((sum, d) => sum + (d.isGroupLeader ? d.rowCost.total : 0), 0);
+                  // 거래처별 합계 재계산 (리더 여부 상관없이 합산)
+                  const clientSupply = processedDetails.reduce((sum, d) => sum + d.rowCost.total, 0);
                   const clientVat = Math.floor(clientSupply * 0.1);
                   const clientTotal = clientSupply + clientVat;
                   
@@ -222,7 +218,6 @@ export default function AccountingRegistration({
                   return processedDetails.map((calc, idx) => {
                     const isItemSelected = selectedInventories.has(calc.inventory_id);
                     const isWithdrawn = calc.is_replacement_before || calc.is_withdrawal; 
-                    const showExcludeBtn = calc.is_replacement_before || calc.is_withdrawal;
 
                     let badgeLabel = calc.status;
                     let badgeStyle = { backgroundColor: '#f1f1f0', color: '#37352f' };
@@ -246,6 +241,8 @@ export default function AccountingRegistration({
                         {idx === 0 && (
                           <td className={styles.clientInfoCell} rowSpan={rowSpan}>
                             <div className={styles.clientName}>{client.name}</div>
+                            {/* calc.inv.billing_date -> calc.billing_date 수정됨 */}
+                            <div className={styles.clientMeta}>청구일: {calc.billing_date}</div>
                           </td>
                         )}
 
@@ -256,7 +253,7 @@ export default function AccountingRegistration({
                            </div>
                            <div style={{ fontWeight: '600' }}>{calc.model_name}</div>
                            <div style={{ fontSize: '0.75rem', color: '#999' }}>{calc.serial_number}</div>
-                           {showExcludeBtn && <button onClick={(e) => { e.stopPropagation(); handleExcludeAsset(calc); }} style={{ marginTop: '6px', fontSize: '0.7rem' }}>🚫 제외</button>}
+                           {/* 제외 버튼 제거됨 */}
                         </td>
 
                         <td className={styles.td}>
@@ -280,7 +277,7 @@ export default function AccountingRegistration({
                           </div>
                         </td>
                         
-                        {/* 실사용량 컬럼: 그룹합산 / 단독 기계 분기 처리 */}
+                        {/* 실사용량 컬럼 */}
                         {shouldRenderUsageCell && (
                           <td className={styles.td} rowSpan={calc.isGroupLeader ? calc.groupSpan : 1} style={{ padding: '12px', textAlign: 'left', verticalAlign: 'top', backgroundColor: calc.billing_group_id ? '#fbfbff' : 'inherit' }}>
                             {calc.billing_group_id && calc.groupUsageBreakdown ? (

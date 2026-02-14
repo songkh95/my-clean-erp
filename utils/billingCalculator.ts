@@ -15,11 +15,12 @@ export const calculateClientBill = (
   let tempCalculations: CalculatedAsset[] = assets.map(inv => {
     const p = prevData[inv.id] || { bw: 0, col: 0, bw_a3: 0, col_a3: 0 };
     
-    // 철수/교체 기기 대응
+    // ✅ [수정 1] 입력 데이터 우선순위 변경
+    // 사용자가 입력한 값(inputData)이 있으면 그것을 쓰고, 없으면 DB의 final_counts를 씁니다.
     const isWithdrawn = inv.is_replacement_before || inv.is_withdrawal;
-    const c = isWithdrawn && inv.final_counts 
-      ? inv.final_counts 
-      : (inputData[inv.id] || { bw: 0, col: 0, bw_a3: 0, col_a3: 0 });
+    const c = inputData[inv.id] 
+      ? inputData[inv.id] 
+      : (isWithdrawn && inv.final_counts ? inv.final_counts : { bw: 0, col: 0, bw_a3: 0, col_a3: 0 });
 
     const usageRawBW = Math.max(0, (c.bw || 0) - (p.bw || 0));
     const usageRawCol = Math.max(0, (c.col || 0) - (p.col || 0));
@@ -64,6 +65,21 @@ export const calculateClientBill = (
 
   // 3. 그룹별 요금 계산 및 배분
   Object.values(groups).forEach(groupAssets => {
+    
+    // ✅ [수정 2] 교체 로직 적용: 그룹 내에 '교체전' 기계가 있다면 요금제를 0으로 무력화
+    // (사용량은 유지하되, 기본료와 무료매수는 새 기계(Leader)의 것만 사용하도록 함)
+    const hasActiveMachine = groupAssets.some(a => !a.is_replacement_before && !a.is_withdrawal);
+    
+    if (hasActiveMachine) {
+      groupAssets.forEach(asset => {
+        if (asset.is_replacement_before || asset.is_withdrawal) {
+          asset.plan.basic_fee = 0;
+          asset.plan.free_bw = 0;
+          asset.plan.free_col = 0;
+        }
+      });
+    }
+
     // 3.1 그룹 전체 합산 데이터 계산
     const groupTotalFreeBW = groupAssets.reduce((sum, item) => sum + item.plan.free_bw, 0);
     const groupTotalFreeCol = groupAssets.reduce((sum, item) => sum + item.plan.free_col, 0);
@@ -79,7 +95,7 @@ export const calculateClientBill = (
     const groupBasicUsageBW = Math.min(groupTotalUsageBW, groupTotalFreeBW);
     const groupBasicUsageCol = Math.min(groupTotalUsageCol, groupTotalFreeCol);
 
-    // 단가 (그룹 내 첫번째 기계 기준)
+    // 단가 (그룹 내 첫번째 기계 기준 - 보통 새 기계가 Leader가 됨)
     const unitPriceBW = groupAssets[0].plan.price_bw;
     const unitPriceCol = groupAssets[0].plan.price_col;
 
@@ -123,8 +139,7 @@ export const calculateClientBill = (
         };
       }
 
-      // 3.4.3 개별 기계 사용량 Breakdown (단독 기계 UI 표시용)
-      // (그룹 기계여도 개별 데이터는 가지고 있어야 함)
+      // 3.4.3 개별 기계 사용량 Breakdown
       asset.usageBreakdown = { 
         basicBW: Math.min(asset.converted.bw, asset.plan.free_bw),
         extraBW: Math.max(0, asset.converted.bw - asset.plan.free_bw),
@@ -139,7 +154,6 @@ export const calculateClientBill = (
       let myExtraFee = 0;
       const myIndiv = indivExcessMap.find(x => x.id === asset.id)!;
       
-      // 기여도를 금액 가치로 환산하여 비율 계산
       const myExcessValue = (myIndiv.excessBW * unitPriceBW) + (myIndiv.excessCol * unitPriceCol);
       const totalExcessValue = (totalIndivExcessBW * unitPriceBW) + (totalIndivExcessCol * unitPriceCol);
 

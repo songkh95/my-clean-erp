@@ -179,8 +179,11 @@ export function useAccounting() {
       })
     }
 
+    const initialInputData: {[key: string]: CounterData} = {}
+    
     const allInventories: Inventory[] = Object.values(invMap).flat();
     allInventories.forEach(inv => {
+      // 1. 전월 데이터가 없으면 기계의 초기값으로 세팅
       if (inv && !prevMap[inv.id]) {
         prevMap[inv.id] = { 
           bw: inv.initial_count_bw || 0, 
@@ -189,8 +192,22 @@ export function useAccounting() {
           col_a3: inv.initial_count_col_a3 || 0 
         }
       }
+
+      // 2. 철수/교체전 기계라면, 저장된 '마감 카운터(final_counts)'를 당월 입력값으로 자동 세팅
+      if (inv.is_replacement_before || inv.is_withdrawal) {
+        if (inv.final_counts) {
+          initialInputData[inv.id] = {
+            bw: inv.final_counts.bw,
+            col: inv.final_counts.col,
+            bw_a3: inv.final_counts.bw_a3,
+            col_a3: inv.final_counts.col_a3
+          }
+        }
+      }
     })
+    
     setPrevData(prevMap)
+    setInputData(initialInputData) // 초기값 적용
     setLoading(false)
   }, [filterConfig, supabase])
 
@@ -203,7 +220,6 @@ export function useAccounting() {
     const orgId = profile?.organization_id
     if (!orgId) return
 
-    // ✅ [수정] inventory의 billing_group_id 및 요금제 정보(plan_*)를 함께 가져옵니다.
     const { data, error } = await supabase
       .from('settlements')
       .select(`
@@ -477,11 +493,7 @@ export function useAccounting() {
     } catch (e: any) { alert('오류: ' + e.message); }
   }
 
-  const handleExcludeAsset = async (asset: CalculatedAsset) => {
-    if (!confirm(`[${asset.model_name}] 기계를 이번 달 청구 목록에서 제외하시겠습니까?`)) return;
-    alert('제외되었습니다.');
-    await fetchRegistrationData();
-  }
+  // ❌ [삭제] handleExcludeAsset 함수 제거
 
   const togglePaymentStatus = async (id: string, currentStatus: boolean) => {
     const result = await toggleSettlementPaymentAction(id, currentStatus);
@@ -530,7 +542,7 @@ export function useAccounting() {
     isHistOpen, setIsHistOpen, monthMachineHistory, clients,
     handleSearch, handleHistSearch, handleInputChange, toggleInventorySelection, setSelectedInventoriesBulk,
     calculateClientBillFiltered, calculateSelectedTotal, handlePreSave, handleFinalSave,
-    handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail, handleExcludeAsset, 
+    handleRebillHistory, handleDeleteHistory, handleDetailRebill, handleDeleteDetail,
     togglePaymentStatus, toggleDetailPaymentStatus,
     handleBatchDeleteHistory, handleBatchRebillHistory,
     
