@@ -5,22 +5,14 @@ import { createClient } from '@/utils/supabase'
 import styles from './InventoryList.module.css'
 import Button from './../ui/Button'
 import { Inventory, Client } from '@/app/types'
-// ✅ [최적화] Server Actions 임포트
-import { deleteInventoryAction, updateInventoryAction } from '@/app/actions/inventory'
+// ✅ Server Actions 임포트
+import { deleteInventoryAction } from '@/app/actions/inventory'
+// ✅ 팝업 컴포넌트 재사용
+import InventoryForm from './InventoryForm'
 
 interface InventoryListProps {
   type: string
   refreshTrigger: number
-}
-
-interface EditableFieldProps {
-  label: string
-  name: keyof Inventory
-  val: string | number | undefined | null
-  isEdit: boolean
-  editData: Inventory | null
-  setEditData: (data: Inventory) => void
-  type?: 'text' | 'number' | 'date'
 }
 
 export default function InventoryList({ type, refreshTrigger }: InventoryListProps) {
@@ -29,16 +21,16 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
   const [searchTerm, setSearchTerm] = useState('')
   const [isListOpen, setIsListOpen] = useState(true)
 
+  // 상세 보기 상태 (단순 조회용)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editData, setEditData] = useState<Inventory | null>(null)
-  const [clients, setClients] = useState<Client[]>([])
-
-  const [clientSearchTerm, setClientSearchTerm] = useState('')
-  const [showClientList, setShowClientList] = useState(false)
+  
+  // ✅ 팝업(모달) 수정용 상태
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<Inventory | null>(null)
 
   const supabase = createClient()
 
+  // 데이터 불러오기
   const fetchItems = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -46,7 +38,6 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
       const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
       
       if (profile?.organization_id) {
-        // 클라이언트 사이드 조회는 허용 (단순 조회이므로)
         const { data } = await supabase
           .from('inventory')
           .select('*, client:client_id(name)')
@@ -56,16 +47,13 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
         
         if (data) setItems(data as Inventory[])
       }
-
-      const { data: cData } = await supabase.from('clients').select('*').eq('status', 'active')
-      if (cData) setClients(cData as Client[])
     }
     setLoading(false)
   }
 
   useEffect(() => { fetchItems() }, [type, refreshTrigger])
 
-  // ✅ [최적화] Server Action으로 삭제 (보안 강화)
+  // 삭제 액션
   const handleDelete = async (id: string) => {
     if (confirm('정말 삭제하시겠습니까? 복구할 수 없습니다.')) {
       try {
@@ -82,51 +70,22 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
     }
   }
 
-  const startEditing = (item: Inventory) => {
-    setEditingId(item.id)
-    setEditData({ ...item })
-    setClientSearchTerm(item.client?.name || '')
+  // ✅ [수정] 버튼 클릭 시 모달 열기
+  const handleEditClick = (e: React.MouseEvent, item: Inventory) => {
+    e.stopPropagation(); // 행 클릭(상세보기) 이벤트 방지
+    setSelectedItem(item);
+    setIsModalOpen(true);
   }
 
-  // ✅ [최적화] Server Action으로 수정 (데이터 무결성 보장)
-  const handleUpdate = async () => {
-    if (!editData || !editingId) return;
+  // 모달 닫기
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedItem(null);
+  }
 
-    // Server Action에 보낼 데이터 정제
-    const payload: Partial<Inventory> = { ...editData };
-    
-    // 관계형 데이터나 불필요한 필드 제거
-    delete payload.client;
-    delete payload.created_at;
-    
-    // 유효성 검사
-    if (payload.status === '설치' && !payload.client_id) {
-      alert("⚠️ 상태가 '설치'일 경우, 설치처를 반드시 입력(선택)해야 합니다.")
-      return
-    }
-
-    try {
-      // payload에서 필요한 값만 추출하여 전송
-      const updateData = {
-        ...payload,
-        client_id: payload.client_id || null,
-        purchase_price: payload.purchase_price === undefined || payload.purchase_price === null ? null : Number(payload.purchase_price),
-        purchase_date: payload.purchase_date === '' ? null : payload.purchase_date,
-      }
-
-      const result = await updateInventoryAction(editingId, updateData);
-
-      if (result.success) {
-        alert(result.message);
-        setEditingId(null);
-        setExpandedId(null);
-        fetchItems();
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (e: any) {
-      alert('수정 실패: ' + e.message);
-    }
+  // 모달 저장 성공 시 목록 새로고침
+  const handleModalSuccess = () => {
+    fetchItems();
   }
 
   const filteredItems = items.filter(item => {
@@ -177,19 +136,21 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                   <th className={styles.th}>상태</th>
                   <th className={styles.th}>설치처</th>
                   <th className={styles.th}>매입가</th>
+                  {/* 관리 컬럼 추가 */}
+                  <th className={styles.th} style={{textAlign: 'center'}}>관리</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredItems.length === 0 ? (
-                  <tr><td colSpan={8} className={styles.noDataRow}>검색 결과가 없습니다.</td></tr>
+                  <tr><td colSpan={9} className={styles.noDataRow}>검색 결과가 없습니다.</td></tr>
                 ) : (
                   filteredItems.map((item, index) => {
                     const isExpanded = expandedId === item.id
-                    const isEditing = editingId === item.id
+                    
                     return (
                       <React.Fragment key={item.id}>
                         <tr 
-                          onClick={() => { if (!editingId) setExpandedId(isExpanded ? null : item.id) }}
+                          onClick={() => setExpandedId(isExpanded ? null : item.id)}
                           className={`${styles.dataRow} ${isExpanded ? styles.dataRowExpanded : ''}`}
                         >
                           <td className={styles.td}>{index + 1}</td>
@@ -204,93 +165,63 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                           </td>
                           <td className={styles.td}>{item.client?.name || '-'}</td>
                           <td className={styles.td}>{item.purchase_price?.toLocaleString()}원</td>
+                          
+                          {/* ✅ 관리 버튼 (수정/삭제) */}
+                          <td className={styles.td} style={{textAlign: 'center'}}>
+                             <div style={{display:'flex', gap:'6px', justifyContent:'center'}}>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={(e) => handleEditClick(e, item)}
+                                  style={{padding: '4px 8px', fontSize: '0.75rem'}}
+                                >
+                                  수정
+                                </Button>
+                                <Button 
+                                  variant="danger" 
+                                  size="sm" 
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                                  style={{padding: '4px 8px', fontSize: '0.75rem'}}
+                                >
+                                  삭제
+                                </Button>
+                             </div>
+                          </td>
                         </tr>
 
+                        {/* ✅ 상세 보기 영역 (수정 기능 제거 -> 순수 조회용, 누락 정보 표시) */}
                         {isExpanded && (
                           <tr className={styles.expandedRow}>
-                            <td colSpan={8} className={styles.expandedCell}>
+                            <td colSpan={9} className={styles.expandedCell}>
                               <div className={styles.formGrid}>
-                                <EditableField label="분류" name="category" val={item.category} isEdit={isEditing} editData={editData} setEditData={setEditData} />
-                                <EditableField label="브랜드" name="brand" val={item.brand} isEdit={isEditing} editData={editData} setEditData={setEditData} />
-                                <EditableField label="모델명" name="model_name" val={item.model_name} isEdit={isEditing} editData={editData} setEditData={setEditData} />
-                                <EditableField label="S/N" name="serial_number" val={item.serial_number} isEdit={isEditing} editData={editData} setEditData={setEditData} />
-                                <EditableField label="매입가" name="purchase_price" val={item.purchase_price} isEdit={isEditing} editData={editData} setEditData={setEditData} type="number" />
-                                <EditableField label="매입일" name="purchase_date" val={item.purchase_date} isEdit={isEditing} editData={editData} setEditData={setEditData} type="date" />
+                                <DetailField label="종류" value={item.type} />
+                                <DetailField label="제품 상태" value={item.product_condition} />
+                                <DetailField label="매입일" value={item.purchase_date} />
+                                <DetailField label="매입가" value={item.purchase_price?.toLocaleString() + '원'} />
+                                <DetailField label="메모" value={item.memo} fullWidth />
                                 
-                                <div className={styles.editableItem}>
-                                  <span className={styles.editableLabel}>설치처</span>
-                                  {isEditing && editData ? (
-                                    <div className={styles.dropdownContainer}>
-                                      <input
-                                        placeholder="거래처 검색..."
-                                        value={clientSearchTerm}
-                                        className={styles.formInput}
-                                        onChange={e => {
-                                          setClientSearchTerm(e.target.value)
-                                          setEditData({ ...editData, client_id: null }) 
-                                          setShowClientList(true)
-                                        }}
-                                        onFocus={() => setShowClientList(true)}
-                                        onBlur={() => setTimeout(() => setShowClientList(false), 200)}
-                                      />
-                                      {showClientList && (
-                                        <div className={styles.dropdownMenu}>
-                                          {clients.filter(c => c.name.includes(clientSearchTerm)).map(c => (
-                                            <div key={c.id} onClick={() => {
-                                              setClientSearchTerm(c.name)
-                                              setEditData({ ...editData, client_id: c.id, status: '설치' })
-                                              setShowClientList(false)
-                                            }} className={styles.dropdownItem}>
-                                              {c.name}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className={styles.editableValue}>{item.client?.name || '-'}</span>
-                                  )}
+                                {/* 초기 카운터 정보 */}
+                                <div className={styles.fullWidthItem} style={{marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #ddd'}}>
+                                   <span className={styles.editableLabel} style={{color: '#0070f3', fontWeight:'bold'}}>🔢 초기 카운터</span>
+                                   <div style={{display:'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginTop: '4px'}}>
+                                      <DetailField label="흑백(A4)" value={item.initial_count_bw?.toLocaleString()} />
+                                      <DetailField label="칼라(A4)" value={item.initial_count_col?.toLocaleString()} />
+                                      <DetailField label="흑백(A3)" value={item.initial_count_bw_a3?.toLocaleString()} />
+                                      <DetailField label="칼라(A3)" value={item.initial_count_col_a3?.toLocaleString()} />
+                                   </div>
                                 </div>
 
-                                <div className={styles.editableItem}>
-                                  <span className={styles.editableLabel}>상태</span>
-                                  {isEditing && editData ? (
-                                    <select 
-                                      value={editData.status} 
-                                      onChange={e => setEditData({ ...editData, status: e.target.value, client_id: e.target.value === '설치' ? editData.client_id : null })}
-                                      className={styles.formInput}
-                                    >
-                                      <option value="창고">창고</option>
-                                      <option value="설치">설치</option>
-                                      <option value="수리중">수리중</option>
-                                      <option value="폐기">폐기</option>
-                                    </select>
-                                  ) : (
-                                    <span className={styles.editableValue}>{item.status}</span>
-                                  )}
-                                </div>
-
-                                <div className={styles.fullWidthItem}>
-                                  <span className={styles.editableLabel}>메모</span>
-                                  {isEditing && editData ? (
-                                    <input value={editData.memo || ''} onChange={e => setEditData({ ...editData, memo: e.target.value })} className={styles.formInput} />
-                                  ) : (
-                                    <span className={styles.editableValue}>{item.memo || '-'}</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className={styles.buttonArea}>
-                                {isEditing ? (
-                                  <>
-                                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>취소</Button>
-                                    <Button variant="primary" size="sm" onClick={handleUpdate}>💾 저장</Button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Button variant="outline" size="sm" onClick={() => startEditing(item)}>✏️ 수정</Button>
-                                    <Button variant="danger" size="sm" onClick={() => handleDelete(item.id)}>🗑️ 삭제</Button>
-                                  </>
+                                {/* 설치 상태일 때 요금제 정보 표시 */}
+                                {item.status === '설치' && (
+                                  <div className={styles.fullWidthItem} style={{marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #ddd'}}>
+                                      <span className={styles.editableLabel} style={{color: '#0070f3', fontWeight:'bold'}}>📅 요금제 정보 (수정은 '수정' 버튼 이용)</span>
+                                      <div style={{display:'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginTop: '4px'}}>
+                                          <DetailField label="기본료" value={item.plan_basic_fee?.toLocaleString() + '원'} />
+                                          <DetailField label="청구일" value={item.billing_date ? `매월 ${item.billing_date}일` : '-'} />
+                                          <DetailField label="무료(흑/칼)" value={`${item.plan_basic_cnt_bw?.toLocaleString()} / ${item.plan_basic_cnt_col?.toLocaleString()}`} />
+                                          <DetailField label="초과단가(흑/칼)" value={`${item.plan_price_bw}원 / ${item.plan_price_col}원`} />
+                                      </div>
+                                  </div>
                                 )}
                               </div>
                             </td>
@@ -305,24 +236,24 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
           </div>
         </>
       )}
+
+      {/* ✅ 수정용 팝업 (InventoryForm 재사용) */}
+      <InventoryForm 
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        onSuccess={handleModalSuccess}
+        editData={selectedItem}
+      />
     </div>
   )
 }
 
-function EditableField({ label, name, val, isEdit, editData, setEditData, type = "text" }: EditableFieldProps) {
+// 단순 조회용 필드 컴포넌트
+function DetailField({ label, value, fullWidth = false }: { label: string, value: any, fullWidth?: boolean }) {
   return (
-    <div className={styles.editableItem}>
+    <div className={styles.editableItem} style={fullWidth ? { gridColumn: '1 / -1' } : {}}>
       <span className={styles.editableLabel}>{label}</span>
-      {isEdit && editData ? (
-        <input 
-          type={type}
-          value={(editData[name] as string | number) ?? ''} 
-          onChange={e => setEditData({ ...editData, [name]: type === "number" ? Number(e.target.value) : e.target.value })} 
-          className={styles.formInput} 
-        />
-      ) : (
-        <span className={styles.editableValue}>{type === "number" ? (val as number)?.toLocaleString() + '원' : (val || '-')}</span>
-      )}
+      <span className={styles.editableValue}>{value || '-'}</span>
     </div>
   )
 }

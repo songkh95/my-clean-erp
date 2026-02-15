@@ -10,9 +10,9 @@ type SettlementDetailRow = Database['public']['Tables']['settlement_details']['R
 type MachineHistoryRow = Database['public']['Tables']['machine_history']['Row']
 type OrganizationRow = Database['public']['Tables']['organizations']['Row']
 
-// 2. Client 타입
+// 2. Client 타입 (DB Row 상속)
 export interface Client extends ClientRow {
-  contract_start_date?: string | null; // ✅ 추가됨
+  // DB 스키마에 이미 contract_start_date가 있으므로 별도 선언 불필요
 }
 
 // 3. Organization 타입 (명세서용)
@@ -24,7 +24,7 @@ export interface Organization extends OrganizationRow {
   phone?: string;
 }
 
-// 4. Inventory 타입
+// 4. Inventory 타입 (DB Row 상속)
 export interface Inventory extends InventoryRow {
   client?: { name: string } | null; 
   is_active?: boolean;
@@ -32,8 +32,7 @@ export interface Inventory extends InventoryRow {
   is_replacement_after?: boolean;
   is_withdrawal?: boolean;
   final_counts?: CounterData;
-  contract_start_date?: string | null; // ✅ 추가됨
-  contract_end_date?: string | null;   // ✅ 추가됨
+  // DB 스키마에 이미 contract_start_date, contract_end_date가 있으므로 별도 선언 불필요
 }
 
 // 5. 공통 데이터 타입
@@ -86,6 +85,10 @@ export interface CalculatedAsset {
   is_replacement_before?: boolean;
   is_replacement_after?: boolean;
   is_withdrawal?: boolean;
+  
+  // CalculatedAsset은 DB Row를 직접 상속받지 않는 UI용 타입이므로 명시적으로 선언 가능
+  contract_start_date?: string | null;
+  contract_end_date?: string | null;
 }
 
 export interface BillCalculationResult {
@@ -113,12 +116,12 @@ export interface SettlementDetail extends SettlementDetailRow {
     status: string;
     billing_date: string | null;
     billing_group_id?: string | null; // 그룹 ID 추가
-    // ✅ [수정] 아래 두 필드 추가 (AccountingHistory에서 사용됨)
+    // AccountingHistory에서 사용됨
     plan_basic_cnt_bw?: number | null;
     plan_basic_cnt_col?: number | null;
   } | null;
   
-  // ✅ [수정] UI용 임시 속성 추가 (AccountingHistory에서 계산 후 사용됨)
+  // UI용 임시 속성
   _ui?: {
     rowSpan: number;
     isHidden: boolean;
@@ -181,4 +184,44 @@ export interface HistoryItem {
     plan_weight_a3_bw: number
     plan_weight_a3_col: number
   } | null
+}
+
+// [추가] 서비스 일지 및 소모품 관련 타입
+export interface Consumable {
+  id: string;
+  organization_id: string;
+  category: string;
+  model_name: string;
+  code: string | null;
+  current_stock: number;
+  unit_price: number;
+}
+
+export interface ServicePartUsage {
+  id: string;
+  service_log_id: string;
+  consumable_id: string;
+  quantity: number;
+  consumable?: Consumable;
+}
+
+export interface ServiceLog {
+  id: string;
+  organization_id: string;
+  client_id: string;
+  inventory_id: string | null;
+  status: '접수' | '완료' | '보류' | '미방문'; // '미방문' 추가됨
+  service_type: string;
+  visit_date: string;
+  symptom: string | null;
+  action_detail: string | null;
+  meter_bw: number;
+  meter_col: number;
+  manager_id: string | null;
+  created_at: string;
+  
+  client?: { name: string };
+  inventory?: { model_name: string; serial_number: string };
+  manager?: { name: string };
+  parts_usage?: ServicePartUsage[];
 }

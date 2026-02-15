@@ -13,7 +13,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
   const pathname = usePathname()
 
   const getNavStyle = (path: string) => {
-    // 하위 경로까지 포함하여 활성화 상태 체크 (예: /accounting/registration)
+    // 하위 경로까지 포함하여 활성화 상태 체크
     const isActive = pathname === path || (pathname.startsWith(path) && path !== '/');
 
     return {
@@ -22,7 +22,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
       justifyContent: isCollapsed ? 'center' : 'flex-start',
       padding: '8px 12px',
       borderRadius: 'var(--radius-sm)',
-      marginBottom: '4px', // 간격 약간 조정
+      marginBottom: '4px',
       textDecoration: 'none',
       fontSize: '0.9rem',
       fontWeight: isActive ? '600' : '500',
@@ -36,12 +36,12 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     }
   }
 
-  // ✅ 메뉴 구조 업데이트
+  // ✅ 메뉴 구조 업데이트: 서비스 일지 추가
   const navItems = [
     { name: '홈 (대시보드)', path: '/', icon: '🏠' },
     { name: '거래처 관리', path: '/clients', icon: '👥' },
     { name: '자산 및 재고', path: '/inventory', icon: '📦' },
-    // 정산 메뉴 분리
+    { name: '서비스 일지', path: '/service', icon: '🛠️' }, // ✨ 추가됨
     { name: '월 정산 등록', path: '/accounting/registration', icon: '📝' },
     { name: '청구 이력/수정', path: '/accounting/history', icon: '🕒' },
   ]
@@ -143,7 +143,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           color: 'var(--notion-sub-text)',
           borderTop: '1px solid var(--notion-border)'
         }}>
-          v0.2.0-beta
+          v0.2.1-beta
         </div>
       )}
     </aside>

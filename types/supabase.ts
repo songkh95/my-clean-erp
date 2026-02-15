@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
@@ -35,6 +33,7 @@ export type Database = {
           representative_name: string | null
           status: string | null
           updated_at: string | null
+          contract_start_date: string | null
         }
         Insert: {
           address?: string | null
@@ -56,6 +55,7 @@ export type Database = {
           representative_name?: string | null
           status?: string | null
           updated_at?: string | null
+          contract_start_date?: string | null
         }
         Update: {
           address?: string | null
@@ -77,6 +77,7 @@ export type Database = {
           representative_name?: string | null
           status?: string | null
           updated_at?: string | null
+          contract_start_date?: string | null
         }
         Relationships: [
           {
@@ -93,6 +94,47 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      consumables: {
+        Row: {
+          category: string
+          code: string | null
+          created_at: string | null
+          current_stock: number | null
+          id: string
+          model_name: string
+          organization_id: string
+          unit_price: number | null
+        }
+        Insert: {
+          category: string
+          code?: string | null
+          created_at?: string | null
+          current_stock?: number | null
+          id?: string
+          model_name: string
+          organization_id: string
+          unit_price?: number | null
+        }
+        Update: {
+          category?: string
+          code?: string | null
+          created_at?: string | null
+          current_stock?: number | null
+          id?: string
+          model_name?: string
+          organization_id?: string
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumables_org_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
         ]
       }
       inventory: {
@@ -125,6 +167,8 @@ export type Database = {
           serial_number: string
           status: string
           type: string
+          contract_start_date: string | null
+          contract_end_date: string | null
         }
         Insert: {
           billing_date?: string | null
@@ -155,6 +199,8 @@ export type Database = {
           serial_number: string
           status?: string
           type: string
+          contract_start_date?: string | null
+          contract_end_date?: string | null
         }
         Update: {
           billing_date?: string | null
@@ -185,6 +231,8 @@ export type Database = {
           serial_number?: string
           status?: string
           type?: string
+          contract_start_date?: string | null
+          contract_end_date?: string | null
         }
         Relationships: [
           {
@@ -326,6 +374,125 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      service_logs: {
+        Row: {
+          action_detail: string | null
+          client_id: string
+          created_at: string | null
+          id: string
+          inventory_id: string | null
+          manager_id: string | null
+          meter_bw: number | null
+          meter_col: number | null
+          organization_id: string
+          service_type: string
+          status: string
+          symptom: string | null
+          updated_at: string | null
+          visit_date: string
+        }
+        Insert: {
+          action_detail?: string | null
+          client_id: string
+          created_at?: string | null
+          id?: string
+          inventory_id?: string | null
+          manager_id?: string | null
+          meter_bw?: number | null
+          meter_col?: number | null
+          organization_id: string
+          service_type: string
+          status?: string
+          symptom?: string | null
+          updated_at?: string | null
+          visit_date?: string
+        }
+        Update: {
+          action_detail?: string | null
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          inventory_id?: string | null
+          manager_id?: string | null
+          meter_bw?: number | null
+          meter_col?: number | null
+          organization_id?: string
+          service_type?: string
+          status?: string
+          symptom?: string | null
+          updated_at?: string | null
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_logs_client_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_logs_inventory_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_logs_manager_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_logs_org_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      service_parts_usage: {
+        Row: {
+          consumable_id: string
+          created_at: string | null
+          id: string
+          quantity: number | null
+          service_log_id: string
+        }
+        Insert: {
+          consumable_id: string
+          created_at?: string | null
+          id?: string
+          quantity?: number | null
+          service_log_id: string
+        }
+        Update: {
+          consumable_id?: string
+          created_at?: string | null
+          id?: string
+          quantity?: number | null
+          service_log_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parts_usage_consumable_fkey"
+            columns: ["consumable_id"]
+            isOneToOne: false
+            referencedRelation: "consumables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_usage_log_fkey"
+            columns: ["service_log_id"]
+            isOneToOne: false
+            referencedRelation: "service_logs"
+            referencedColumns: ["id"]
+          }
         ]
       }
       settlement_details: {
@@ -483,15 +650,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_my_org_id: { Args: never; Returns: string }, // 콤마 추가
-      
-      // ✅ [추가] 정산 저장 함수 정의
+      get_my_org_id: { Args: never; Returns: string }
       save_monthly_settlement: {
         Args: {
           p_year: number
           p_month: number
           p_org_id: string
-          p_items: Json  // 맨 위에 정의된 'Json' 타입을 사용합니다.
+          p_items: Json
+        }
+        Returns: void
+      }
+      decrement_stock: {
+        Args: {
+          row_id: string
+          amount: number
         }
         Returns: void
       }
