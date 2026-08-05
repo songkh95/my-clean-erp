@@ -385,7 +385,7 @@ export async function upsertConsumableAction(formData: any) {
 
   const { data: saved, error } = await supabase
     .from('consumables')
-    .upsert(payload)
+    .upsert(payload as any)
     .select('*')
     .single()
 

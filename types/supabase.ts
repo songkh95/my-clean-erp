@@ -100,36 +100,87 @@ export type Database = {
         Row: {
           category: string
           code: string | null
+          color: string | null
           created_at: string | null
           current_stock: number | null
           id: string
+          is_active: boolean | null
+          is_regenerated: boolean | null
           model_name: string
           organization_id: string
+          product_group: string | null
           unit_price: number | null
         }
         Insert: {
           category: string
           code?: string | null
+          color?: string | null
           created_at?: string | null
           current_stock?: number | null
           id?: string
+          is_active?: boolean | null
+          is_regenerated?: boolean | null
           model_name: string
           organization_id: string
+          product_group?: string | null
           unit_price?: number | null
         }
         Update: {
           category?: string
           code?: string | null
+          color?: string | null
           created_at?: string | null
           current_stock?: number | null
           id?: string
+          is_active?: boolean | null
+          is_regenerated?: boolean | null
           model_name?: string
           organization_id?: string
+          product_group?: string | null
           unit_price?: number | null
         }
         Relationships: [
           {
             foreignKeyName: "consumables_org_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      consumable_compatible_models: {
+        Row: {
+          consumable_id: string
+          created_at: string | null
+          id: string
+          machine_model: string
+          organization_id: string
+        }
+        Insert: {
+          consumable_id: string
+          created_at?: string | null
+          id?: string
+          machine_model: string
+          organization_id: string
+        }
+        Update: {
+          consumable_id?: string
+          created_at?: string | null
+          id?: string
+          machine_model?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumable_compatible_models_consumable_id_fkey"
+            columns: ["consumable_id"]
+            isOneToOne: false
+            referencedRelation: "consumables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consumable_compatible_models_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -461,6 +512,48 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      service_log_images: {
+        Row: {
+          created_at: string | null
+          file_name: string | null
+          id: string
+          organization_id: string
+          service_log_id: string
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string | null
+          file_name?: string | null
+          id?: string
+          organization_id: string
+          service_log_id: string
+          storage_path: string
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string | null
+          id?: string
+          organization_id?: string
+          service_log_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_log_images_org_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_log_images_service_log_id_fkey"
+            columns: ["service_log_id"]
+            isOneToOne: false
+            referencedRelation: "service_logs"
             referencedColumns: ["id"]
           }
         ]

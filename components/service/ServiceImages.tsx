@@ -50,7 +50,7 @@ export default function ServiceImages({
       if (cancelled) return
       const supabase = createClient()
       const withUrl: SavedImage[] = []
-      for (const row of rows as SavedImage[]) {
+      for (const row of rows as unknown as SavedImage[]) {
         const { data } = await supabase.storage
           .from('service-attachments')
           .createSignedUrl(row.storage_path, 3600)

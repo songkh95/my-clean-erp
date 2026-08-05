@@ -51,7 +51,7 @@ export default function ServiceImageGallery({
         if (cancelled) return
         const supabase = createClient()
         const withUrl: GalleryImage[] = []
-        for (const row of rows as GalleryImage[]) {
+        for (const row of rows as unknown as GalleryImage[]) {
           const { data } = await supabase.storage
             .from('service-attachments')
             .createSignedUrl(row.storage_path, 3600)

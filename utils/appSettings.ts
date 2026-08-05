@@ -82,7 +82,7 @@ function mergeSettings(base: AppSettings, patch: unknown): AppSettings {
   for (const section of Object.keys(base) as (keyof AppSettings)[]) {
     const incoming = patch[section]
     if (!isPlainObject(incoming)) continue
-    out[section] = { ...base[section], ...incoming } as AppSettings[typeof section]
+    ;(out as any)[section] = { ...(base as any)[section], ...incoming }
   }
   // 배열 필드는 통째로 교체
   if (isPlainObject(patch.stock)) {

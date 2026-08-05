@@ -515,7 +515,7 @@ export async function getServiceLogsAction() {
       .eq('organization_id', orgId)
       .order('visit_date', { ascending: false })
       .order('created_at', { ascending: false })
-    logs = retry.data
+    logs = retry.data as typeof logs
     error = retry.error
   }
 
@@ -538,7 +538,7 @@ export async function getServiceLogsAction() {
 
     if (imgRows && imgRows.length > 0) {
       const byLog = new Map<string, { id: string }[]>()
-      for (const row of imgRows as { id: string; service_log_id: string }[]) {
+      for (const row of imgRows as unknown as { id: string; service_log_id: string }[]) {
         const list = byLog.get(row.service_log_id) || []
         list.push({ id: row.id })
         byLog.set(row.service_log_id, list)

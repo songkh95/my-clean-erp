@@ -196,7 +196,7 @@ export default function HomePage() {
             .from('consumables')
             .select('id, model_name, category, color, current_stock, is_active')
             .eq('organization_id', orgId)
-          consumables = (fallback.data || []).filter((c: any) => c.is_active !== false)
+          consumables = (fallback.data || []).filter((c: any) => c.is_active !== false) as typeof consumables
         }
 
         const lowStock = (consumables as any[])
