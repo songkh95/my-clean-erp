@@ -160,4 +160,27 @@
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .partRow,
+  .selectedRow {
+    gap: 8px;
+  }
+
+  .select,
+  .qty,
+  .addBtn {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .colorBtn {
+    min-height: 56px;
+  }
+
+  .removeBtn {
+    min-width: 36px;
+    min-height: 36px;
+    font-size: 0.9rem;
+  }
 }
+

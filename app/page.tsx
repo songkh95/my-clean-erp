@@ -299,7 +299,7 @@ export default function HomePage() {
   return (
     <div className={`pageShell ${styles.wrap}`}>
       <section className={styles.header}>
-        <h1 className={styles.title}>안녕하세요, {userName}님</h1>
+        <h1 className={styles.title}>안녕하세요{userName ? `, ${userName}` : ''}님</h1>
         <p className={styles.sub}>
           <strong style={{ color: '#0070f3' }}>{orgName}</strong>
           {' · '}

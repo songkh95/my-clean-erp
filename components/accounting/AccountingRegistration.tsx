@@ -127,8 +127,10 @@ export default function AccountingRegistration({
 
       {/* ✅ [수정] 아코디언 기능 삭제 (onClick 제거, 화살표 제거, cursor: default 적용) */}
       <div className={styles.header} style={{ cursor: 'default' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>📝 사용매수 등록 및 청구 ({regYear}년 {regMonth}월)</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            사용매수·청구 ({regYear}.{regMonth})
+          </span>
         </span>
       </div>
 

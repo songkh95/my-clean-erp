@@ -1,0 +1,275 @@
+/* Shared layout — desktop sidebar + mobile drawer */
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--notion-bg);
+}
+
+.content {
+  margin-left: var(--shell-offset, var(--sidebar-width));
+  transition: margin-left 0.3s ease;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.main {
+  flex: 1;
+  padding: var(--main-pad-top) var(--main-pad-right) var(--main-pad-bottom) var(--main-pad-left);
+  background-color: var(--notion-bg);
+  overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.overlay {
+  display: none;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  height: 100dvh;
+  border-right: 1px solid var(--notion-border);
+  padding: 8px;
+  background-color: var(--notion-bg);
+  position: fixed;
+  left: 0;
+  top: 0;
+  transition: width 0.3s ease, transform 0.3s ease;
+  z-index: 200;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.sidebarCollapsed {
+  width: var(--sidebar-collapsed);
+}
+
+.header {
+  height: var(--header-height);
+  min-height: var(--header-height);
+  max-height: var(--header-height);
+  background-color: var(--notion-bg);
+  border-bottom: 1px solid var(--notion-border);
+  color: var(--notion-main-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 var(--main-pad-right) 0 var(--main-pad-left);
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.menuBtn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  background: var(--notion-soft-bg);
+  color: var(--notion-main-text);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pageTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  max-width: 55%;
+}
+
+.userMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--notion-sub-text);
+  min-width: 0;
+  max-width: 200px;
+  overflow: hidden;
+}
+
+.userAvatar {
+  width: 24px;
+  height: 24px;
+  background-color: var(--notion-soft-bg);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  border: 1px solid var(--notion-border);
+  flex-shrink: 0;
+}
+
+.userName {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.userEmail {
+  color: var(--notion-sub-text);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logoutBtn {
+  font-weight: 500 !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 10px !important;
+  font-size: 0.78rem !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.userLoading {
+  font-size: 0.8rem;
+  color: var(--notion-sub-text);
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.2s;
+  color: var(--notion-sub-text);
+  white-space: nowrap;
+  overflow: hidden;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+.navLinkActive {
+  font-weight: 600;
+  background-color: var(--notion-soft-bg);
+  color: var(--notion-main-text);
+}
+
+.navLinkCollapsed {
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .content {
+    margin-left: 0 !important;
+  }
+
+  .main {
+    padding: 8px 10px 16px;
+  }
+
+  .header {
+    padding: 0 10px;
+    gap: 6px;
+  }
+
+  .menuBtn {
+    display: inline-flex;
+  }
+
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    z-index: 150;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .sidebar {
+    width: min(280px, 86vw) !important;
+    transform: translateX(-105%);
+    box-shadow: 8px 0 28px rgba(15, 23, 42, 0.12);
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .sidebarCollapsed {
+    width: min(280px, 86vw) !important;
+  }
+
+  .pageTitle {
+    font-size: 0.92rem;
+  }
+
+  .userEmail,
+  .userName {
+    display: none;
+  }
+
+  .userMeta {
+    max-width: 28px;
+  }
+
+  .headerRight {
+    gap: 6px;
+    max-width: none;
+  }
+
+  .logoutBtn {
+    min-height: 28px !important;
+    height: 28px !important;
+    padding: 0 8px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .navLink {
+    min-height: 44px;
+    font-size: 0.95rem;
+    padding: 10px 12px;
+  }
+}
+

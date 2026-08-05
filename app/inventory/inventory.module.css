@@ -14,7 +14,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: var(--page-title-mb);
+  min-width: 0;
 }
 
 .title {
@@ -22,6 +24,43 @@
   font-weight: 700;
   color: #171717;
   margin: 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabs {
+  border-bottom: 1px solid #e5e5e5;
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--page-title-mb);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 500;
+  color: #666;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 0.88rem;
+}
+
+.tabActive {
+  font-weight: 700;
+  color: #0070f3;
+  border-bottom-color: #0070f3;
 }
 
 /* 검색 및 필터 컨트롤 영역 */
@@ -226,3 +265,101 @@
   font-size: 1rem;
   color: #171717;
 }
+
+@media (max-width: 768px) {
+  .headerSection {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .title {
+    font-size: 0.95rem;
+  }
+
+  .tabs {
+    margin-bottom: 8px;
+    gap: 2px;
+  }
+
+  .tab {
+    padding: 6px 8px;
+    font-size: 0.75rem;
+  }
+
+  .controls {
+    flex-wrap: nowrap;
+    width: auto;
+    gap: 6px;
+    overflow-x: auto;
+  }
+
+  .controls > * {
+    flex: 0 0 auto;
+  }
+
+  .input {
+    width: 140px;
+    min-width: 100px;
+    flex: 0 1 auto;
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+
+  .select {
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+
+  .primaryBtn {
+    width: auto;
+    justify-content: center;
+    min-height: 32px;
+    height: 32px;
+    padding: 0 10px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .table {
+    min-width: 720px;
+  }
+
+  .th,
+  .td {
+    padding: 10px 8px;
+  }
+
+  .detailContent {
+    padding: 16px;
+  }
+
+  .detailGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .counterGrid {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .secondaryBtn,
+  .deleteBtn {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+}
+

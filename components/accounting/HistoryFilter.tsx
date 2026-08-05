@@ -140,23 +140,27 @@ export default function HistoryFilter({
   }
 
   return (
-    <div style={{ 
+    <div
+      className="historyFilterBar"
+      style={{ 
       backgroundColor: '#fff', 
-      padding: '12px 16px', 
+      padding: '8px 10px', 
       borderRadius: '8px', 
       border: '1px solid #e5e5e5', 
-      marginBottom: '16px', 
+      marginBottom: '12px', 
       display: 'flex', 
-      gap: '12px', 
+      gap: '8px', 
       alignItems: 'flex-end', 
-      flexWrap: 'wrap', 
+      flexWrap: 'nowrap',
+      overflowX: 'auto',
+      WebkitOverflowScrolling: 'touch',
       boxShadow: '0 1px 3px rgba(0,0,0,0.02)' 
     }}
     lang="ko"
     >
       
       {/* 1. 거래처 검색 */}
-      <div style={{ position: 'relative', width: '240px' }} ref={searchRef}>
+      <div style={{ position: 'relative', width: 'min(200px, 55vw)', flexShrink: 0 }} ref={searchRef}>
         <label style={labelStyle}>거래처 검색</label>
         <div style={{ display: 'flex', gap: '4px' }}>
           <input

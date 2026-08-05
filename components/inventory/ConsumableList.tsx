@@ -154,25 +154,47 @@ export default function ConsumableList({ tab }: Props) {
       )}
 
       <div className={styles.header} style={{ cursor: 'default' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>📋 {config[tab].title} 목록 ({filteredItems.length}개)</span>
-          <label style={{ fontSize: '0.78rem', color: '#666', fontWeight: 500, display: 'flex', gap: 4, alignItems: 'center' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {config[tab].title} ({filteredItems.length})
+          </span>
+          <label
+            style={{
+              fontSize: '0.72rem',
+              color: '#666',
+              fontWeight: 500,
+              display: 'flex',
+              gap: 4,
+              alignItems: 'center',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+            }}
+          >
             <input
               type="checkbox"
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
             />
-            숨긴 항목 포함
+            숨김포함
           </label>
         </span>
         <button
           onClick={() => { setSelectedItem(null); setIsModalOpen(true); }}
           style={{
-            padding: '6px 12px', backgroundColor: '#0070f3', color: 'white',
-            border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem'
+            padding: '0 10px',
+            height: 30,
+            backgroundColor: '#0070f3',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: '0.78rem',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
           }}
         >
-          + 자재 등록
+          + 등록
         </button>
       </div>
 

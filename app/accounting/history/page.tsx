@@ -455,7 +455,7 @@ function AccountingHistoryContent() {
 
     return (
         <div className="pageShell" style={{ fontFamily: 'sans-serif' }}>
-            <h1 className="pageTitle">청구 이력 / 수정</h1>
+            <h1 className="pageTitle">청구 이력</h1>
             
             <HistoryFilter
                 searchTerm={searchTerm}

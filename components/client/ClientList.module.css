@@ -203,3 +203,80 @@
   color: var(--notion-sub-text);
   font-size: 0.9rem;
 }
+
+@media (max-width: 768px) {
+  .header {
+    padding: 10px 12px;
+    min-height: 40px;
+    height: auto;
+    font-size: 0.9rem;
+    gap: 8px;
+  }
+
+  .header span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .header button {
+    flex-shrink: 0;
+    min-height: 30px !important;
+    height: 30px !important;
+    padding: 0 10px !important;
+    font-size: 0.75rem !important;
+  }
+
+  .searchContainer {
+    padding: 8px 12px;
+  }
+
+  .searchInput {
+    min-height: 34px;
+    font-size: 16px;
+    padding: 6px 10px;
+  }
+
+  .listHeader {
+    display: none;
+  }
+
+  .clientSummary {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 12px 14px;
+  }
+
+  .clientSummary > *:nth-child(n + 2) {
+    font-size: 0.82rem;
+    color: var(--notion-sub-text);
+  }
+
+  .clientSummary > *:last-child {
+    justify-content: flex-start !important;
+    margin-top: 4px;
+    gap: 8px !important;
+  }
+
+  .clientSummary > *:last-child button {
+    min-height: 36px;
+    padding: 0 12px;
+  }
+
+  .detailsContainer {
+    padding: 14px;
+  }
+
+  .gridForm {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .assetTable {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+

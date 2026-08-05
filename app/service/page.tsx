@@ -878,7 +878,7 @@ export default function ServicePage() {
       ) : null}
       <div className={styles.headerSection}>
         <div className={styles.headerLeft}>
-          <h2 className={styles.title}>서비스 / A.S 일지</h2>
+          <h2 className={styles.title}>서비스 일지</h2>
           <p className={styles.hint}>
             {orgLabel ? <>현재 회사: <strong>{orgLabel}</strong> · </> : null}
             {locked

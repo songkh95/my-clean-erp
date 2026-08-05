@@ -276,7 +276,7 @@ export default function ServiceForm({ isOpen, onClose, onSuccess, editData }: Pr
 
   return (
     <div className={styles.modalOverlay}>
-      <div className={styles.modal} style={{ width: 760, maxWidth: '96vw' }}>
+      <div className={styles.modal} style={{ width: 760, maxWidth: '100%' }}>
         <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '20px' }}>
           {editData ? '서비스 일지 수정' : '서비스 일지 작성'}
         </h2>

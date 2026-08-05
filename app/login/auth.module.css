@@ -176,3 +176,30 @@
   color: #111827;
   line-height: 1.6;
 }
+
+@media (max-width: 480px) {
+  .shell {
+    padding: 16px 12px;
+    align-items: flex-start;
+  }
+
+  .card {
+    padding: 22px 16px 18px;
+    border-radius: 10px;
+  }
+
+  .title {
+    font-size: 1.3rem;
+  }
+
+  .input,
+  .submit,
+  .modeBtn {
+    font-size: 16px;
+  }
+
+  .submit {
+    min-height: 48px;
+  }
+}
+

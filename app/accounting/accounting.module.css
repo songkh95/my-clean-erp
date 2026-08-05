@@ -142,24 +142,29 @@
   color: var(--notion-sub-text);
 }
 
-/* 분할 셀 컨테이너: 외곽선 제거 */
+/* 분할 셀 컨테이너: 4행 높이 고정 → 구분/전월/당월 가로선 정렬 */
 .splitCellContainer {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 96px;
+  display: grid;
+  grid-template-rows: repeat(4, 28px);
+  height: 112px;
+  min-height: 112px;
   border: none;
+  box-sizing: border-box;
 }
 
 /* 내부 행 스타일: 가로 선만 유지 */
-.rowGray, .rowBlue {
-  flex: 1;
+.rowGray,
+.rowBlue {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 0 2px;
   font-size: 0.8rem;
-  min-height: 32px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .rowGray {
@@ -178,10 +183,12 @@
   border-bottom: none;
 }
 
-/* 입력 필드 */
+/* 입력 필드 — 행 높이를 넘지 않도록 */
 .numberInput {
   width: 100%;
   height: 100%;
+  min-height: 0 !important;
+  max-height: 100%;
   border: none;
   background: transparent;
   text-align: center;
@@ -189,10 +196,17 @@
   outline: none;
   font-weight: 500;
   color: var(--notion-main-text);
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  line-height: 1;
+  -moz-appearance: textfield;
 }
 
-.numberInput::placeholder {
-  color: #d9d9d9;
+.numberInput::-webkit-outer-spin-button,
+.numberInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* 뱃지 */
@@ -275,3 +289,123 @@
 .modalActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
 .btnConfirm { background-color: var(--notion-blue); color: white; padding: 8px 16px; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 500; }
 .btnCancel { background-color: transparent; border: 1px solid var(--notion-border); color: var(--notion-main-text); padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; }
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 1rem;
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header {
+    padding: 10px 12px;
+    font-size: 0.88rem;
+    min-height: 40px;
+  }
+
+  .header span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .controls {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .controlItem {
+    flex-wrap: nowrap;
+    width: auto;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    gap: 4px;
+  }
+
+  .input {
+    min-height: 32px;
+    height: 32px;
+    padding: 0 8px;
+    font-size: 0.8rem;
+  }
+
+  .tableContainer {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    min-width: 860px;
+    table-layout: auto;
+  }
+
+  .th {
+    font-size: 0.75rem;
+    padding: 10px 6px;
+  }
+
+  /* 모바일에서도 구분/전월/당월 4행 높이 동일 */
+  .splitCellContainer {
+    grid-template-rows: repeat(4, 34px);
+    height: 136px;
+    min-height: 136px;
+  }
+
+  .rowGray,
+  .rowBlue {
+    height: 34px;
+    min-height: 34px;
+    max-height: 34px;
+    font-size: 0.75rem;
+  }
+
+  .numberInput {
+    min-height: 0 !important;
+    height: 100% !important;
+    font-size: 16px; /* iOS 줌 방지 + 행 높이 안에 맞춤 */
+    line-height: 34px;
+  }
+
+  .td {
+    vertical-align: top;
+  }
+
+  .modalOverlay {
+    align-items: flex-end;
+  }
+
+  .modalContent {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: 16px 16px 0 0;
+    padding: 18px 14px 24px;
+  }
+
+  .modalActions {
+    flex-wrap: wrap;
+  }
+
+  .btnConfirm,
+  .btnCancel {
+    flex: 1;
+    min-height: 40px;
+  }
+
+  .saveBtn {
+    min-height: 32px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+}
+

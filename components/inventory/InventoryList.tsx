@@ -122,7 +122,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span>{isListOpen ? '▼' : '▶'}</span>
-          📋 전체 자산 목록 ({filteredItems.length}개)
+          자산 목록 ({filteredItems.length})
         </span>
       </div>
       

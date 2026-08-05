@@ -50,3 +50,67 @@ body {
   margin: 0 0 var(--page-title-mb);
   line-height: 1.3;
 }
+
+/* 페이지 상단 헤더 줄 — 제목+버튼 한 줄 유지 */
+.pageHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: var(--page-title-mb);
+  min-width: 0;
+}
+
+.pageHeaderRow .pageTitle,
+.pageHeaderRow h1,
+.pageHeaderRow h2 {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 가로 스크롤이 필요한 표 공통 */
+.tableScroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --main-pad-top: 8px;
+    --main-pad-right: 10px;
+    --main-pad-bottom: 16px;
+    --main-pad-left: 10px;
+    --page-title-mb: 8px;
+    --header-height: 44px;
+  }
+
+  .pageTitle {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.25;
+  }
+
+  /* iOS 줌 방지: 입력만 16px (버튼 전체 확대 금지) */
+  input[type='text'],
+  input[type='number'],
+  input[type='date'],
+  input[type='email'],
+  input[type='password'],
+  input[type='search'],
+  input:not([type]),
+  select,
+  textarea {
+    font-size: 16px;
+    min-height: 36px;
+  }
+}

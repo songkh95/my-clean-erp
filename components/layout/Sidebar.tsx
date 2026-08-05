@@ -5,13 +5,23 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Button from './../ui/Button'
 import { loadAppSettings } from '@/utils/appSettings'
+import styles from './layout.module.css'
 
 type SidebarProps = {
-  isCollapsed: boolean;
-  toggleSidebar: () => void;
+  isCollapsed: boolean
+  isMobile?: boolean
+  mobileOpen?: boolean
+  toggleSidebar: () => void
+  onNavigate?: () => void
 }
 
-export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
+export default function Sidebar({
+  isCollapsed,
+  isMobile = false,
+  mobileOpen = false,
+  toggleSidebar,
+  onNavigate,
+}: SidebarProps) {
   const pathname = usePathname()
   const [appName, setAppName] = useState('My Clean ERP')
 
@@ -21,30 +31,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     window.addEventListener('app-settings-changed', sync)
     return () => window.removeEventListener('app-settings-changed', sync)
   }, [])
-
-  const getNavStyle = (path: string) => {
-    // 하위 경로까지 포함하여 활성화 상태 체크
-    const isActive = pathname === path || (pathname.startsWith(path) && path !== '/');
-
-    return {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: isCollapsed ? 'center' : 'flex-start',
-      padding: '8px 12px',
-      borderRadius: 'var(--radius-sm)',
-      marginBottom: '4px',
-      textDecoration: 'none',
-      fontSize: '0.9rem',
-      fontWeight: isActive ? '600' : '500',
-      transition: 'background 0.2s',
-      backgroundColor: isActive ? 'var(--notion-soft-bg)' : 'transparent',
-      color: isActive ? 'var(--notion-main-text)' : 'var(--notion-sub-text)',
-      whiteSpace: 'nowrap' as const,
-      overflow: 'hidden',
-      height: '36px',
-      boxSizing: 'border-box' as const
-    }
-  }
 
   const navItems = [
     { name: '홈 (대시보드)', path: '/', icon: '🏠' },
@@ -56,104 +42,105 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     { name: '설정', path: '/settings', icon: '⚙️' },
   ]
 
+  const asideClass = [
+    styles.sidebar,
+    !isMobile && isCollapsed ? styles.sidebarCollapsed : '',
+    isMobile && mobileOpen ? styles.sidebarOpen : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <aside style={{
-      width: isCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
-      height: '100vh',
-      borderRight: '1px solid var(--notion-border)',
-      padding: '8px',
-      backgroundColor: 'var(--notion-bg)',
-      position: 'fixed',
-      left: 0,
-      top: 0,
-      transition: 'width 0.3s ease',
-      zIndex: 100,
-      overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column',
-      boxSizing: 'border-box'
-    }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: isCollapsed ? 'center' : 'space-between', 
-        alignItems: 'center', 
-        marginBottom: '16px',
-        padding: '0 2px',
-        height: '36px'
-      }}>
-        {!isCollapsed && (
-          <h2 style={{ 
-            fontSize: '1rem', 
-            margin: 0, 
-            whiteSpace: 'nowrap', 
-            fontWeight: '700', 
-            color: 'var(--notion-main-text)',
-            letterSpacing: '-0.02em'
-          }}>
+    <aside className={asideClass} aria-hidden={isMobile && !mobileOpen}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: isCollapsed && !isMobile ? 'center' : 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px',
+          padding: '0 2px',
+          minHeight: '40px',
+        }}
+      >
+        {(!isCollapsed || isMobile) && (
+          <h2
+            style={{
+              fontSize: '1rem',
+              margin: 0,
+              whiteSpace: 'nowrap',
+              fontWeight: 700,
+              color: 'var(--notion-main-text)',
+              letterSpacing: '-0.02em',
+            }}
+          >
             🧼 {appName}
           </h2>
         )}
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
+
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={toggleSidebar}
-          style={{ 
-            padding: '4px', 
-            minWidth: '28px', 
-            height: '28px',
-            color: 'var(--notion-sub-text)' 
+          aria-label={isMobile ? (mobileOpen ? '메뉴 닫기' : '메뉴 열기') : '사이드바 접기'}
+          style={{
+            padding: '8px',
+            minWidth: '40px',
+            height: '40px',
+            color: 'var(--notion-sub-text)',
           }}
         >
-          {isCollapsed ? '☰' : '◀'}
+          {isMobile ? '✕' : isCollapsed ? '☰' : '◀'}
         </Button>
       </div>
-      
-      <nav style={{ flex: 1 }}>
-        {navItems.map((item) => (
-          <Link 
-            key={item.path} 
-            href={item.path} 
-            style={getNavStyle(item.path)}
-            title={isCollapsed ? item.name : ''}
-            onMouseOver={(e) => {
-              const isActive = pathname === item.path || (pathname.startsWith(item.path) && item.path !== '/');
-              if (!isActive) e.currentTarget.style.backgroundColor = 'var(--notion-soft-bg)'
-            }}
-            onMouseOut={(e) => {
-              const isActive = pathname === item.path || (pathname.startsWith(item.path) && item.path !== '/');
-              if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'
-            }}
-          >
-            <span style={{ 
-              fontSize: '1.1rem', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              width: '24px'
-            }}>
-              {item.icon}
-            </span>
-            
-            {!isCollapsed && (
-              <span style={{ 
-                marginLeft: '10px',
-                transition: 'opacity 0.2s'
-              }}>
-                {item.name}
+
+      <nav style={{ flex: 1, overflowY: 'auto' }}>
+        {navItems.map((item) => {
+          const isActive =
+            pathname === item.path || (pathname.startsWith(item.path) && item.path !== '/')
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={[
+                styles.navLink,
+                isActive ? styles.navLinkActive : '',
+                isCollapsed && !isMobile ? styles.navLinkCollapsed : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              title={isCollapsed && !isMobile ? item.name : undefined}
+              onClick={() => onNavigate?.()}
+            >
+              <span
+                style={{
+                  fontSize: '1.1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '24px',
+                  flexShrink: 0,
+                }}
+              >
+                {item.icon}
               </span>
-            )}
-          </Link>
-        ))}
+
+              {(!isCollapsed || isMobile) && (
+                <span style={{ marginLeft: '10px' }}>{item.name}</span>
+              )}
+            </Link>
+          )
+        })}
       </nav>
 
-      {!isCollapsed && (
-        <div style={{ 
-          padding: '12px 4px', 
-          fontSize: '0.75rem', 
-          color: 'var(--notion-sub-text)',
-          borderTop: '1px solid var(--notion-border)'
-        }}>
+      {(!isCollapsed || isMobile) && (
+        <div
+          style={{
+            padding: '12px 4px',
+            fontSize: '0.75rem',
+            color: 'var(--notion-sub-text)',
+            borderTop: '1px solid var(--notion-border)',
+          }}
+        >
           v0.2.1-beta
         </div>
       )}

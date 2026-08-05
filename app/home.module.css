@@ -273,3 +273,84 @@
 .statLine strong {
   color: #171717;
 }
+
+@media (max-width: 640px) {
+  .header {
+    margin-bottom: 12px;
+  }
+
+  .title {
+    font-size: 1.05rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sub {
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  .cardValue {
+    font-size: 1.25rem;
+  }
+
+  .alerts {
+    flex-direction: column;
+  }
+
+  .alert {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 40px;
+  }
+
+  .sectionHead {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .sectionTitle {
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .row {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .shortcuts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .shortcut {
+    padding: 14px 12px;
+    min-height: 72px;
+  }
+}
+
+@media (max-width: 400px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shortcuts {
+    grid-template-columns: 1fr;
+  }
+}
+
+

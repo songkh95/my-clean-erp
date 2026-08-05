@@ -4,15 +4,41 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import Button from './../ui/Button'
+import styles from './layout.module.css'
 
-export default function Header() {
+type HeaderProps = {
+  onMenuClick?: () => void
+  showMenuButton?: boolean
+}
+
+function getPageTitle(path: string, compact: boolean) {
+  if (path === '/') return compact ? '홈' : '홈 (대시보드)'
+  if (path.startsWith('/clients')) return compact ? '거래처' : '거래처 관리'
+  if (path.startsWith('/inventory')) return compact ? '재고' : '자산 및 재고 관리'
+  if (path.startsWith('/service')) return compact ? '일지' : '서비스 일지'
+  if (path.startsWith('/accounting/registration')) return compact ? '정산' : '월 정산 등록'
+  if (path.startsWith('/accounting/history')) return compact ? '청구' : '청구 이력/수정'
+  if (path.startsWith('/accounting')) return compact ? '정산' : '정산 및 회계 관리'
+  if (path.startsWith('/settings')) return '설정'
+  return 'My Clean ERP'
+}
+
+export default function Header({ onMenuClick, showMenuButton = false }: HeaderProps) {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
+  const [compact, setCompact] = useState(false)
   const supabase = createClient()
   const router = useRouter()
   const pathname = usePathname()
 
-  // 유저 정보 가져오기 (기능 보존)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const sync = () => setCompact(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -29,91 +55,52 @@ export default function Header() {
     getUser()
   }, [pathname])
 
-  // 로그아웃 로직 (기능 보존)
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
-  // 경로에 따른 제목 생성 (기능 보존)
-  const getPageTitle = (path: string) => {
-    if (path === '/') return '홈 (대시보드)'
-    if (path.startsWith('/clients')) return '거래처 관리'
-    if (path.startsWith('/inventory')) return '자산 및 재고 관리'
-    if (path.startsWith('/service')) return '서비스 일지'
-    if (path.startsWith('/accounting')) return '정산 및 회계 관리'
-    if (path.startsWith('/settings')) return '설정'
-    return 'My Clean ERP'
-  }
+  const displayName = userName || userEmail || ''
 
   return (
-    <header style={{
-      height: 'var(--header-height)',
-      backgroundColor: 'var(--notion-bg)',
-      borderBottom: '1px solid var(--notion-border)',
-      color: 'var(--notion-main-text)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 var(--main-pad-right) 0 var(--main-pad-left)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 90
-    }}>
-      {/* 왼쪽: 현재 페이지 타이틀 */}
-      <h2 style={{ 
-        fontSize: '1.1rem', 
-        fontWeight: '600', 
-        margin: 0,
-        letterSpacing: '-0.01em'
-      }}>
-        {getPageTitle(pathname)}
-      </h2>
+    <header className={styles.header}>
+      <div className={styles.headerLeft}>
+        {showMenuButton ? (
+          <button
+            type="button"
+            className={styles.menuBtn}
+            aria-label="메뉴 열기"
+            onClick={onMenuClick}
+          >
+            ☰
+          </button>
+        ) : null}
+        <h2 className={styles.pageTitle}>{getPageTitle(pathname, compact)}</h2>
+      </div>
 
-      {/* 오른쪽: 유저 정보 및 로그아웃 버튼 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className={styles.headerRight}>
         {userEmail ? (
           <>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              fontSize: '0.85rem',
-              color: 'var(--notion-sub-text)'
-            }}>
-              <span style={{ 
-                width: '24px', 
-                height: '24px', 
-                backgroundColor: 'var(--notion-soft-bg)', 
-                borderRadius: '50%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                fontSize: '0.7rem',
-                border: '1px solid var(--notion-border)'
-              }}>
-                👤
-              </span>
-              <span style={{ fontWeight: '500' }}>{userName || userEmail}</span>
+            <div className={styles.userMeta} title={userEmail}>
+              <span className={styles.userAvatar} aria-hidden>👤</span>
+              <span className={styles.userName}>{displayName}</span>
               {userName && userEmail ? (
-                <span style={{ color: 'var(--notion-sub-text)', fontWeight: 400 }}>({userEmail})</span>
+                <span className={styles.userEmail}>({userEmail})</span>
               ) : null}
             </div>
-            
-            {/* 공통 Button 컴포넌트 적용 */}
-            <Button 
-              variant="outline" 
-              size="sm" 
+
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleLogout}
-              style={{ fontWeight: '500' }}
+              className={styles.logoutBtn}
+              aria-label="로그아웃"
             >
-              로그아웃
+              {compact ? '나가기' : '로그아웃'}
             </Button>
           </>
         ) : (
-          <span style={{ fontSize: '0.85rem', color: 'var(--notion-sub-text)' }}>
-            사용자 확인 중...
-          </span>
+          <span className={styles.userLoading}>…</span>
         )}
       </div>
     </header>

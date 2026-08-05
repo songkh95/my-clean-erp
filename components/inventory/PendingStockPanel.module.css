@@ -121,3 +121,23 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+@media (max-width: 768px) {
+  .head,
+  .groupHead,
+  .item {
+    flex-wrap: wrap;
+  }
+
+  .confirmBtn,
+  .refresh,
+  .smallBtn {
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .item {
+    align-items: flex-start;
+  }
+}
+

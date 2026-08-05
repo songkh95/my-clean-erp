@@ -130,7 +130,7 @@ export default function ClientList() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <span>🏢 거래처 관리</span>
+        <span>거래처</span>
         <Button variant="primary" size="sm" onClick={() => { setSelectedClient(null); setIsRegModalOpen(true); }}>
           + 등록
         </Button>

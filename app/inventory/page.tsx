@@ -13,31 +13,39 @@ export default function InventoryPage() {
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
-  // 탭 스타일링 헬퍼
-  const getTabStyle = (tabName: string) => ({
-    padding: '10px 20px',
-    cursor: 'pointer',
-    fontWeight: activeTab === tabName ? '700' : '500',
-    color: activeTab === tabName ? '#0070f3' : '#666',
-    borderBottom: activeTab === tabName ? '2px solid #0070f3' : '2px solid transparent',
-    transition: 'all 0.2s'
-  })
-
   return (
     <div className={styles.container}>
-      {/* 상단 탭 메뉴 */}
-      <div style={{ borderBottom: '1px solid #e5e5e5', display: 'flex', gap: '8px', marginBottom: 'var(--page-title-mb)' }}>
-        <div onClick={() => setActiveTab('machines')} style={getTabStyle('machines')}>🖨️ 기기(Assets)</div>
-        <div onClick={() => setActiveTab('consumables')} style={getTabStyle('consumables')}>🧴 소모품(토너/드럼)</div>
-        <div onClick={() => setActiveTab('parts')} style={getTabStyle('parts')}>⚙️ 부품(Parts)</div>
-        <div onClick={() => setActiveTab('others')} style={getTabStyle('others')}>🔧 기타 자재</div>
+      <div className={styles.tabs}>
+        <div
+          className={`${styles.tab} ${activeTab === 'machines' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('machines')}
+        >
+          🖨️ 기기
+        </div>
+        <div
+          className={`${styles.tab} ${activeTab === 'consumables' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('consumables')}
+        >
+          🧴 소모품
+        </div>
+        <div
+          className={`${styles.tab} ${activeTab === 'parts' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('parts')}
+        >
+          ⚙️ 부품
+        </div>
+        <div
+          className={`${styles.tab} ${activeTab === 'others' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('others')}
+        >
+          🔧 기타
+        </div>
       </div>
 
-      {/* 탭 컨텐츠 */}
       {activeTab === 'machines' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 className={styles.title}>📦 전체 자산 목록</h2>
+          <div className={styles.headerSection}>
+            <h2 className={styles.title}>전체 자산 목록</h2>
             <button 
               onClick={() => setIsMachineModalOpen(true)} 
               className={styles.primaryBtn}
@@ -45,7 +53,6 @@ export default function InventoryPage() {
               + 기기 추가
             </button>
           </div>
-          {/* 기존 InventoryList에 refreshTrigger 전달하여 업데이트 시 목록 갱신 */}
           <InventoryList type="all" refreshTrigger={refreshTrigger} />
           
           <InventoryForm 

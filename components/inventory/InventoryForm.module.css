@@ -97,3 +97,38 @@
   background: var(--notion-border);
   border-radius: 10px;
 }
+
+@media (max-width: 768px) {
+  .overlay {
+    align-items: flex-end;
+  }
+
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: 16px 16px 0 0;
+    padding: 18px 14px 24px;
+  }
+
+  .title {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+
+  .grid3,
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+
+  .footer {
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+
+  .footer > * {
+    flex: 1;
+    min-height: 44px;
+  }
+}
