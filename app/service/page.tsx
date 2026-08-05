@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button'
 import ServiceForm from '@/components/service/ServiceForm'
 import PartsEditModal from '@/components/service/PartsEditModal'
 import ServiceImageGallery from '@/components/service/ServiceImageGallery'
+import ServiceExcelModal from '@/components/service/ServiceExcelModal'
 import EditableCell from '@/components/service/EditableCell'
 import ResizableTh from '@/components/service/ResizableTh'
 import styles from './service.module.css'
@@ -15,6 +16,7 @@ import {
   createServiceLogAction,
   getEmployeesAction,
   getClientMachinesAction,
+  checkServiceSchemaAction,
 } from '@/app/actions/service'
 import { ServiceLog } from '@/app/types'
 import { useAppSettings } from '@/hooks/useAppSettings'
@@ -135,6 +137,7 @@ export default function ServicePage() {
   const [query, setQuery] = useState('')
   const [locked, setLocked] = useState(false)
   const [clientSort, setClientSort] = useState<'asc' | 'desc'>('asc')
+  const [visitPin, setVisitPin] = useState<'none' | 'visited' | 'unvisited'>('none')
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('all')
   const [periodYear, setPeriodYear] = useState(() => new Date().getFullYear())
   const [periodMonth, setPeriodMonth] = useState(() => new Date().getMonth() + 1)
@@ -145,6 +148,9 @@ export default function ServicePage() {
   const [galleryLog, setGalleryLog] = useState<ServiceLog | null>(null)
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({})
   const [orgLabel, setOrgLabel] = useState('')
+  const [myUserId, setMyUserId] = useState<string | null>(null)
+  const [schemaWarning, setSchemaWarning] = useState<string | null>(null)
+  const [excelOpen, setExcelOpen] = useState(false)
   const widthsReady = useRef(false)
   const machineCache = React.useRef<Record<string, { value: string; label: string }[]>>({})
 
@@ -175,14 +181,17 @@ export default function ServicePage() {
     setColWidths((prev) => ({ ...prev, [key]: next }))
   }
 
-  const fetchLogs = useCallback(async () => {
+  const fetchLogs = useCallback(async (opts?: { clearPending?: boolean }) => {
     setLoading(true)
     const result = await getServiceLogsAction()
     if (result.success) {
       setLogs(result.data as unknown as ServiceLog[])
-      setPending({})
+      if (opts?.clearPending !== false) {
+        setPending({})
+      }
     }
     setLoading(false)
+    return result.success
   }, [])
 
   useEffect(() => {
@@ -192,7 +201,12 @@ export default function ServicePage() {
       if (res.success && res.profile) {
         const label = res.profile.organizationName || res.email || ''
         setOrgLabel(label)
+        setMyUserId(res.profile.id)
       }
+    })
+    checkServiceSchemaAction().then((res) => {
+      if (res.success && !res.ok) setSchemaWarning(res.message)
+      else setSchemaWarning(null)
     })
   }, [fetchLogs])
 
@@ -327,12 +341,36 @@ export default function ServicePage() {
     })
   }, [sortedLogs])
 
+  const currentMonthPrefix = useMemo(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  }, [])
+
+  const isMonthUnvisitedLog = (log: ServiceLog) =>
+    log.status === '미방문' || isDummyId(log.id) || !log.visit_date
+
+  const isMonthVisitedLog = (log: ServiceLog) =>
+    !isMonthUnvisitedLog(log) && String(log.visit_date || '').startsWith(currentMonthPrefix)
+
+  /** 이번 달 방문/미방문 클릭 시 해당 그룹을 위로 */
+  const displayRowGroups = useMemo(() => {
+    if (visitPin === 'none') return rowGroups
+    const scored = rowGroups.map((g, index) => {
+      const unvisited = isMonthUnvisitedLog(g.primary)
+      const visited = isMonthVisitedLog(g.primary)
+      let rank = 1
+      if (visitPin === 'visited') rank = visited ? 0 : 1
+      if (visitPin === 'unvisited') rank = unvisited ? 0 : 1
+      return { g, index, rank }
+    })
+    scored.sort((a, b) => (a.rank - b.rank) || (a.index - b.index))
+    return scored.map((s) => s.g)
+  }, [rowGroups, visitPin, currentMonthPrefix])
+
   const summaryStats = useMemo(() => {
     const source = periodLogs
     const clientIds = new Set<string>()
     const machineIds = new Set<string>()
-    const now = new Date()
-    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
     let monthVisited = 0
     let monthUnvisited = 0
@@ -341,11 +379,11 @@ export default function ServicePage() {
       if (log.client_id) clientIds.add(log.client_id)
       if (log.inventory_id) machineIds.add(log.inventory_id)
 
-      if (log.status === '미방문' || isDummyId(log.id)) {
+      if (isMonthUnvisitedLog(log)) {
         monthUnvisited += 1
         continue
       }
-      if (log.visit_date && String(log.visit_date).startsWith(monthPrefix)) {
+      if (isMonthVisitedLog(log)) {
         monthVisited += 1
       }
     }
@@ -357,7 +395,7 @@ export default function ServicePage() {
       monthUnvisited,
       rowCount: rowGroups.length,
     }
-  }, [periodLogs, rowGroups.length])
+  }, [periodLogs, rowGroups.length, currentMonthPrefix])
 
   const toggleExpand = (key: string) => {
     setExpandedKeys((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -412,19 +450,29 @@ export default function ServicePage() {
     if (dirtyCount === 0) return alert('저장할 변경 사항이 없습니다.')
 
     setSaving(true)
+    const savedIds: string[] = []
+    const errors: string[] = []
+
     try {
       for (const [id, fields] of Object.entries(pending)) {
         const base = logs.find((l) => l.id === id)
-        if (!base) continue
+        if (!base) {
+          errors.push('일부 행을 찾을 수 없습니다. 새로고침 후 다시 시도하세요.')
+          continue
+        }
 
         if (isDummyId(id)) {
           const merged = { ...base, ...fields } as ServiceLog
           if (!merged.client_id) {
-            alert(`${merged.client?.name || '거래처'}: 거래처 정보가 없습니다.`)
+            errors.push(`${merged.client?.name || '거래처'}: 거래처 정보가 없습니다.`)
             continue
           }
+          // 담당자 미선택 시 로그인 사용자로 자동 지정
           if (!merged.manager_id) {
-            alert(`${merged.client?.name || '거래처'}: 담당자를 선택해주세요.`)
+            merged.manager_id = myUserId || employees[0]?.id || null
+          }
+          if (!merged.manager_id) {
+            errors.push(`${merged.client?.name || '거래처'}: 담당자를 선택해 주세요.`)
             continue
           }
           const status = merged.status === '미방문' ? '접수' : merged.status
@@ -447,19 +495,39 @@ export default function ServicePage() {
             []
           )
           if (!result.success) {
-            alert(`등록 실패 (${merged.client?.name}): ${result.message}`)
+            errors.push(`등록 실패 (${merged.client?.name}): ${result.message}`)
             continue
           }
+          savedIds.push(id)
         } else {
           const result = await patchServiceLogAction(id, fields)
           if (!result.success) {
-            alert(`수정 실패: ${result.message}`)
+            errors.push(result.message)
             continue
           }
+          savedIds.push(id)
         }
       }
-      alert('저장되었습니다.')
-      await fetchLogs()
+
+      // 성공한 항목만 pending에서 제거 (실패분은 화면 내용 유지)
+      if (savedIds.length > 0) {
+        setPending((prev) => {
+          const next = { ...prev }
+          for (const id of savedIds) delete next[id]
+          return next
+        })
+        await fetchLogs({ clearPending: false })
+      }
+
+      if (errors.length > 0 && savedIds.length > 0) {
+        alert(`일부만 저장되었습니다.\n\n${errors.join('\n')}`)
+      } else if (errors.length > 0) {
+        alert(`저장되지 않았습니다.\n\n${errors.join('\n')}`)
+      } else if (savedIds.length > 0) {
+        alert('저장되었습니다.')
+      } else {
+        alert('저장할 수 있는 항목이 없습니다.')
+      }
     } finally {
       setSaving(false)
     }
@@ -556,7 +624,7 @@ export default function ServicePage() {
     return (
       <tr
         key={log.id}
-        className={`${styles.tr} ${completed ? styles.trCompleted : ''} ${dummy ? styles.trDummy : ''} ${dirty ? styles.trDirty : ''} ${opts.isHistory ? styles.trHistory : ''}`}
+        className={`${styles.tr} ${completed ? styles.trCompleted : styles.trNormal} ${dirty ? styles.trDirty : ''}`}
       >
         <td
           className={`${styles.td} ${styles.tdCenter} ${styles.tdNo}`}
@@ -789,6 +857,25 @@ export default function ServicePage() {
 
   return (
     <div className={styles.container}>
+      {schemaWarning ? (
+        <div
+          style={{
+            marginBottom: 10,
+            padding: '10px 12px',
+            borderRadius: 8,
+            border: '1px solid #fcd34d',
+            background: '#fffbeb',
+            color: '#92400e',
+            fontSize: '0.82rem',
+            lineHeight: 1.45,
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          <strong>DB 설정 필요</strong>
+          {'\n'}
+          {schemaWarning}
+        </div>
+      ) : null}
       <div className={styles.headerSection}>
         <div className={styles.headerLeft}>
           <h2 className={styles.title}>서비스 / A.S 일지</h2>
@@ -842,6 +929,13 @@ export default function ServicePage() {
             disabled={locked}
           >
             + 일지 작성
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExcelOpen(true)}
+          >
+            엑셀
           </Button>
           <Button
             variant="outline"
@@ -944,21 +1038,39 @@ export default function ServicePage() {
         </div>
 
         <div className={styles.statsBar}>
-          <span className={styles.statItem}>
+          <button
+            type="button"
+            className={`${styles.statBtn} ${visitPin === 'none' ? styles.statBtnActive : ''}`}
+            title="클릭: 거래처끼리 묶인 기본 정렬로"
+            onClick={() => {
+              setVisitPin('none')
+              setClientSort('asc')
+            }}
+          >
             거래처 <strong>{summaryStats.clientCount}</strong>
-          </span>
+          </button>
           <span className={styles.statDivider} />
           <span className={styles.statItem}>
             기계 <strong>{summaryStats.machineCount}</strong>
           </span>
           <span className={styles.statDivider} />
-          <span className={styles.statItem}>
+          <button
+            type="button"
+            className={`${styles.statBtn} ${visitPin === 'visited' ? styles.statBtnActive : ''}`}
+            title="클릭: 이번 달 방문한 거래처를 위로"
+            onClick={() => setVisitPin((v) => (v === 'visited' ? 'none' : 'visited'))}
+          >
             이번 달 방문 <strong>{summaryStats.monthVisited}</strong>
-          </span>
+          </button>
           <span className={styles.statDivider} />
-          <span className={styles.statItem}>
-            이번 달 미방문 <strong className={styles.statWarn}>{summaryStats.monthUnvisited}</strong>
-          </span>
+          <button
+            type="button"
+            className={`${styles.statBtn} ${styles.statWarnBtn} ${visitPin === 'unvisited' ? styles.statBtnActiveWarn : ''}`}
+            title="클릭: 이번 달 미방문을 위로"
+            onClick={() => setVisitPin((v) => (v === 'unvisited' ? 'none' : 'unvisited'))}
+          >
+            이번 달 미방문 <strong>{summaryStats.monthUnvisited}</strong>
+          </button>
           <span className={styles.statDivider} />
           <span className={styles.statItem}>
             표시 행 <strong>{summaryStats.rowCount}</strong>
@@ -1006,7 +1118,7 @@ export default function ServicePage() {
                   <div className={styles.emptyResult}>로딩 중...</div>
                 </td>
               </tr>
-            ) : rowGroups.length === 0 ? (
+            ) : displayRowGroups.length === 0 ? (
               <tr>
                 <td colSpan={13} className={styles.td}>
                   <div className={styles.emptyResult}>
@@ -1024,7 +1136,7 @@ export default function ServicePage() {
                 </td>
               </tr>
             ) : (
-              rowGroups.flatMap((group, index) => {
+              displayRowGroups.flatMap((group, index) => {
                 const expanded = Boolean(expandedKeys[group.key])
                 const rows = [
                   renderLogRow(group.primary, index + 1, {
@@ -1052,6 +1164,15 @@ export default function ServicePage() {
           </tbody>
         </table>
       </div>
+
+      <ServiceExcelModal
+        isOpen={excelOpen}
+        onClose={() => setExcelOpen(false)}
+        logs={logs}
+        onImported={() => {
+          fetchLogs()
+        }}
+      />
 
       <ServiceForm
         isOpen={isModalOpen}

@@ -198,6 +198,12 @@ export interface Consumable {
   unit_price: number;
   color?: string | null;
   is_regenerated?: boolean | null;
+  /** 호환 기기 모델명 목록 */
+  compatible_models?: string[] | null;
+  /** @deprecated 호환 기기 테이블로 이전 */
+  product_group?: string | null;
+  /** false면 목록에서 숨김 */
+  is_active?: boolean | null;
 }
 
 export interface ServiceLogImage {

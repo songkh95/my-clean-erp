@@ -1,0 +1,275 @@
+.wrap {
+  max-width: 1100px;
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--notion-main-text, #171717);
+}
+
+.sub {
+  margin: 0;
+  color: var(--notion-sub-text, #666);
+  font-size: 0.92rem;
+}
+
+.note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--notion-soft-bg, #f5f5f5);
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.86rem;
+  color: var(--notion-main-text, #171717);
+  white-space: pre-wrap;
+}
+
+.alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.alertWarn {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+}
+
+.alertDanger {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.alertInfo {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.cardLabel {
+  font-size: 0.78rem;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.cardValue {
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: #171717;
+  line-height: 1.2;
+}
+
+.cardUnit {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.cardHint {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+
+.cardLink:hover {
+  border-color: #93c5fd;
+}
+
+.section {
+  margin-bottom: 22px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #171717;
+}
+
+.sectionMore {
+  font-size: 0.8rem;
+  color: #0070f3;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.85rem;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowMain {
+  min-width: 0;
+  flex: 1;
+}
+
+.rowTitle {
+  font-weight: 600;
+  color: #171717;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowMeta {
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.badgeDone {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.badgeOpen {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.badgeHold {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.empty {
+  padding: 16px;
+  color: #9ca3af;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 800px) {
+  .twoCol {
+    grid-template-columns: 1fr;
+  }
+}
+
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.shortcut {
+  display: block;
+  text-decoration: none;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 14px 12px;
+  color: #171717;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.shortcut:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.shortcutTitle {
+  display: block;
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.shortcutDesc {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.statLine {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  margin-top: 4px;
+  color: #4b5563;
+}
+
+.statLine strong {
+  color: #171717;
+}

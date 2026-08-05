@@ -238,6 +238,47 @@
   color: #b45309 !important;
 }
 
+.statBtn {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.statBtn strong {
+  color: #1f2937;
+  font-weight: 700;
+  margin-left: 3px;
+}
+
+.statBtn:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.statBtnActive {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.statWarnBtn strong {
+  color: #b45309;
+}
+
+.statBtnActiveWarn {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+  font-weight: 600;
+}
+
 .statDivider {
   width: 1px;
   height: 12px;
@@ -434,37 +475,38 @@
 }
 
 .tr:nth-child(even) {
-  background-color: #fafafa;
+  background-color: transparent;
 }
 
 .tr:hover {
-  background-color: #f0f7ff;
+  filter: brightness(0.98);
 }
 
-/* 미방문 행: 기본 옅은 회색 */
-.trDummy {
-  background-color: #fafafa;
+/* 기본(미완료·미방문·접수·보류): 회색 */
+.trNormal {
+  background-color: #f3f4f6 !important;
 }
 
-.trDummy:hover {
-  background-color: #f3f4f6;
+.trNormal:hover {
+  background-color: #e5e7eb !important;
 }
 
-/* 완료 상태만 노란색 */
+/* 완료만 노란색 */
 .trCompleted {
-  background-color: #fffbeb;
+  background-color: #fef08a !important;
 }
 
 .trCompleted:hover {
-  background-color: #fef3c7;
+  background-color: #fde047 !important;
 }
 
 .trCompleted:nth-child(even) {
-  background-color: #fef9c3;
+  background-color: #fef08a !important;
 }
 
-.trDirty td {
-  background-color: #fff7ed;
+/* 미저장 표시는 왼쪽 보더만 (배경색은 완료/회색 유지) */
+.trDirty td:first-child {
+  box-shadow: inset 3px 0 0 #f97316;
 }
 
 .symptomCell {
@@ -702,18 +744,6 @@
 .historyNo {
   color: #9ca3af;
   font-size: 0.68rem;
-}
-
-.trHistory {
-  background: #f3f4f6 !important;
-}
-
-.trHistory:hover {
-  background: #e5e7eb !important;
-}
-
-.trHistory td {
-  color: #4b5563;
 }
 
 .clientWarn {

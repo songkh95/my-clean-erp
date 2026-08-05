@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/utils/supabase'
 import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/Input'
@@ -17,8 +17,10 @@ import {
   updateServiceLogAction,
   getEmployeesAction,
 } from '@/app/actions/service'
+import { rollbackDraftConsumablesAction } from '@/app/actions/consumable'
 import { loadAppSettings } from '@/utils/appSettings'
 import { useAppSettings } from '@/hooks/useAppSettings'
+import { toMachineModelName } from '@/utils/suggestMatch'
 
 interface Props {
   isOpen: boolean
@@ -56,6 +58,8 @@ export default function ServiceForm({ isOpen, onClose, onSuccess, editData }: Pr
   const [formData, setFormData] = useState(buildInitialServiceForm)
   const [usedParts, setUsedParts] = useState<UsedPartRow[]>([])
   const [pendingImages, setPendingImages] = useState<LocalFile[]>([])
+  const sessionCreatedRef = useRef<string[]>([])
+  const savedRef = useRef(false)
 
   const supabase = createClient()
   const serviceTypes = settings.service.serviceTypes.length > 0
@@ -75,8 +79,18 @@ export default function ServiceForm({ isOpen, onClose, onSuccess, editData }: Pr
     return map
   }, [editData])
 
+  const productGroup = useMemo(() => {
+    const m = machines.find((x) => x.id === formData.inventory_id)
+    const name = m?.model_name || editData?.inventory?.model_name || ''
+    return toMachineModelName(String(name)).trim() || null
+  }, [machines, formData.inventory_id, editData?.inventory?.model_name])
+
+  const machineModel = productGroup
+
   useEffect(() => {
     if (!isOpen) return
+    savedRef.current = false
+    sessionCreatedRef.current = []
 
     const loadData = async () => {
       const { data: clientData } = await supabase
@@ -225,6 +239,9 @@ export default function ServiceForm({ isOpen, onClose, onSuccess, editData }: Pr
       return
     }
 
+    savedRef.current = true
+    sessionCreatedRef.current = []
+
     const logId = editData?.id || result.id
     if (logId && pendingImages.length > 0) {
       const up = await uploadPendingServiceImages(logId, pendingImages)
@@ -241,6 +258,18 @@ export default function ServiceForm({ isOpen, onClose, onSuccess, editData }: Pr
     onSuccess()
     onClose()
     setLoading(false)
+  }
+
+  const handleCancel = async () => {
+    if (!savedRef.current && sessionCreatedRef.current.length > 0) {
+      const remove = confirm(
+        `이번 화면에서 새로 등록한 소모품 ${sessionCreatedRef.current.length}건이 있습니다.\n` +
+          `일지를 저장하지 않고 닫습니다. 방금 등록한 소모품도 삭제할까요?\n\n` +
+          `「확인」= 소모품도 삭제 · 「취소」= 소모품은 재고에 남김`
+      )
+      if (remove) await rollbackDraftConsumablesAction([...sessionCreatedRef.current])
+    }
+    onClose()
   }
 
   if (!isOpen) return null
@@ -388,8 +417,12 @@ export default function ServiceForm({ isOpen, onClose, onSuccess, editData }: Pr
               usedParts={usedParts}
               onChange={setUsedParts}
               onConsumablesChange={setConsumables}
+              machineModel={machineModel}
               status={formData.status}
               creditById={creditById}
+              onSessionCreated={(id) => {
+                sessionCreatedRef.current = [...sessionCreatedRef.current, id]
+              }}
             />
             {formData.status === '완료' && usedParts.some((p) => p.consumable_id) && settings.service.showStockDeductHint && (
               <p style={{ fontSize: '0.75rem', color: '#b45309', marginTop: 8 }}>
@@ -411,7 +444,7 @@ export default function ServiceForm({ isOpen, onClose, onSuccess, editData }: Pr
           />
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
-            <Button variant="ghost" onClick={onClose} type="button">취소</Button>
+            <Button variant="ghost" onClick={handleCancel} type="button">취소</Button>
             <Button variant="primary" type="submit" disabled={loading}>
               {loading ? '저장 중…' : editData ? '수정완료' : '저장하기'}
             </Button>
