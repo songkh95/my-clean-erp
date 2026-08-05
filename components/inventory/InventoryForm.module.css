@@ -1,0 +1,99 @@
+/* components/InventoryForm.module.css */
+
+/* 모달 배경 오버레이 */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* 모달 본체: 노션 특유의 화이트 배경과 부드러운 그림자 */
+.modal {
+  background-color: var(--notion-bg);
+  padding: 32px;
+  border-radius: 12px;
+  width: 650px;
+  max-width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1);
+}
+
+/* 제목 영역 */
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: var(--notion-main-text);
+  border-bottom: 1px solid var(--notion-border);
+  padding-bottom: 16px;
+}
+
+/* 입력 필드 배치용 그리드 */
+.grid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* 강조 섹션 (설치 거래처, 카운터 입력부 등) */
+.highlightBox {
+  padding: 16px;
+  border: 1px solid var(--notion-border);
+  border-radius: 8px;
+  background-color: var(--notion-soft-bg);
+  margin-bottom: 20px;
+  transition: all 0.2s;
+}
+
+/* 설치 상태일 때 파란색으로 강조되는 스타일 */
+.activeBox {
+  border-color: var(--notion-blue);
+  background-color: var(--notion-blue-light);
+}
+
+/* 섹션 내 소제목 */
+.sectionTitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--notion-main-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 하단 버튼 영역 */
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--notion-border);
+}
+
+/* 스크롤바 커스텀 (노션 스타일) */
+.modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal::-webkit-scrollbar-thumb {
+  background: var(--notion-border);
+  border-radius: 10px;
+}

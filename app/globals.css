@@ -1,0 +1,52 @@
+/* app/globals.css */
+:root {
+  /* 배경 및 기본색 */
+  --notion-bg: #FFFFFF;
+  --notion-main-text: #171717;
+  --notion-sub-text: #666666;
+  --notion-border: #E5E5E5;
+  --notion-soft-bg: #F5F5F5;
+
+  /* 포인트 컬러 */
+  --notion-blue: #0070f3;
+  --notion-blue-light: rgba(0, 112, 243, 0.1);
+
+  /* 노션 특유의 둥근 모서리 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  /* 공통 레이아웃 여백 (전 페이지 통일) */
+  --sidebar-width: 220px;
+  --sidebar-collapsed: 64px;
+  --header-height: 52px;
+  /* 사이드바 오른쪽(본문 왼쪽) 여백을 특히 좁게 */
+  --main-pad-top: 16px;
+  --main-pad-right: 16px;
+  --main-pad-bottom: 16px;
+  --main-pad-left: 10px;
+  --page-title-mb: 14px;
+}
+
+body {
+  background-color: var(--notion-bg);
+  color: var(--notion-main-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 페이지 공통 래퍼 — 추가 바깥 여백 없이 MainLayout 패딩만 사용 */
+.pageShell {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.pageTitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--notion-main-text);
+  margin: 0 0 var(--page-title-mb);
+  line-height: 1.3;
+}

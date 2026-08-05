@@ -1,0 +1,205 @@
+/* components/ClientList.module.css */
+
+/* 전체 컨테이너: 노션 스타일의 얇은 테두리와 여백 */
+.container {
+  width: 100%;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  margin-bottom: 16px;
+}
+
+/* 아코디언 헤더: 구획을 명확히 나누되 배경은 깔끔하게 */
+.header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background-color: var(--notion-bg);
+  border-bottom: 1px solid var(--notion-border);
+  font-weight: 600;
+  color: var(--notion-main-text);
+  transition: background-color 0.2s;
+}
+
+.header:hover {
+  background-color: var(--notion-soft-bg);
+}
+
+.headerClosed {
+  border-bottom: none;
+}
+
+/* 검색창 영역: 인풋 포커스 시 노션 블루 포인트 적용 */
+.searchContainer {
+  padding: 12px 20px;
+  background-color: var(--notion-bg);
+  border-bottom: 1px solid var(--notion-border);
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--notion-border);
+  font-size: 0.9rem;
+  outline: none;
+  background-color: var(--notion-soft-bg);
+  transition: all 0.2s;
+}
+
+.searchInput:focus {
+  background-color: var(--notion-bg);
+  border-color: var(--notion-blue);
+  box-shadow: 0 0 0 2px var(--notion-blue-light);
+}
+
+/* 리스트 헤더 (컬럼명): 청구일 제외 4개 컬럼으로 조정 */
+.listHeader {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1.5fr;
+  padding: 10px 20px;
+  background-color: var(--notion-bg);
+  border-bottom: 1px solid var(--notion-border);
+  font-size: 0.75rem;
+  color: var(--notion-sub-text);
+  font-weight: 500;
+}
+
+/* 거래처 행 (Row) */
+.clientRow {
+  border-bottom: 1px solid var(--notion-border);
+}
+
+/* 요약 영역: 청구일 제외 4개 컬럼으로 조정 */
+.clientSummary {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1.5fr;
+  padding: 14px 20px;
+  cursor: pointer;
+  align-items: center;
+  background-color: var(--notion-bg);
+  transition: background-color 0.2s;
+}
+
+.clientSummary:hover {
+  background-color: var(--notion-soft-bg);
+}
+
+.clientSummarySelected {
+  background-color: var(--notion-blue-light);
+}
+
+/* 본사/지사 뱃지: 노션의 멀티 셀렉트 태그 스타일 */
+.badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-right: 8px;
+  font-weight: 500;
+}
+
+.badgeHead {
+  background-color: #d3e5ef; /* 노션 파란색 태그 */
+  color: #18445a;
+}
+
+.badgeBranch {
+  background-color: #e8e8e8; /* 노션 회색 태그 */
+  color: #474747;
+}
+
+/* 상세 정보 영역: 펼쳐졌을 때 배경색 차별화 */
+.detailsContainer {
+  padding: 24px;
+  background-color: #fafafa;
+  border-top: 1px solid var(--notion-border);
+}
+
+.sectionTitle {
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--notion-main-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 정보 그리드 */
+.gridForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--notion-border);
+  margin: 20px 0;
+}
+
+/* 자산 리스트 테이블: 노션 데이터베이스 인라인 스타일 */
+.assetTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+}
+
+.assetTh {
+  padding: 8px 12px;
+  text-align: left;
+  color: var(--notion-sub-text);
+  font-size: 0.75rem;
+  background-color: var(--notion-soft-bg);
+  border-bottom: 1px solid var(--notion-border);
+}
+
+.assetTd {
+  padding: 10px 12px;
+  color: var(--notion-main-text);
+  border-bottom: 1px solid var(--notion-border);
+}
+
+.assetEmpty {
+  padding: 30px;
+  background-color: var(--notion-soft-bg);
+  border-radius: var(--radius-md);
+  color: var(--notion-sub-text);
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* 필드 표시 컴포넌트용 */
+.fieldContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  color: var(--notion-sub-text);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.valueText {
+  color: var(--notion-main-text);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+/* 결과 없음 공지 */
+.noResult {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--notion-sub-text);
+  font-size: 0.9rem;
+}

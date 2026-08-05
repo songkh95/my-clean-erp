@@ -1,0 +1,99 @@
+[서비스 일지]
+
+
+# 역할
+당신은 Next.js(App Router), Supabase, TypeScript 전문 풀스택 개발자입니다.
+
+# 목표
+복합기 렌탈 ERP 시스템에 **'서비스 일지(Service Log)'** 페이지와 **'일지 등록/수정 팝업(Modal)'** 기능을 구현해주세요.
+이 기능은 현장 기사들이 A/S나 정기점검 내역을 기록하고, 사용된 부품(소모품) 재고를 관리하기 위함입니다.
+
+# 기술 스택
+- Framework: Next.js 14+ (App Router)
+- DB: Supabase (PostgreSQL)
+- Styling: CSS Modules (`*.module.css`) - **엑셀 스타일 구현 필수**
+- Language: TypeScript
+
+---
+
+## 1. 데이터베이스 설계 (SQL 및 타입 정의)
+기존 `clients`, `inventory`, `profiles` 테이블과 연동되는 아래 테이블들을 생성하고, `types/supabase.ts` 및 `app/types/index.ts`에 타입을 추가해주세요.
+
+### A. 테이블 스키마
+1. **`consumables` (소모품/부품 관리)**
+   - `id` (uuid), `organization_id` (uuid)
+   - `category` (text: '토너', '드럼', '부품' 등)
+   - `model_name` (text: 부품명), `code` (text: 관리코드)
+   - `current_stock` (int: 현재 재고), `unit_price` (int: 단가)
+
+2. **`service_logs` (서비스 일지 메인)**
+   - `id` (uuid), `organization_id` (uuid)
+   - `client_id` (uuid: FK `clients`), `inventory_id` (uuid: FK `inventory`)
+   - `status` (text: '접수', '완료', '보류')
+   - `service_type` (text: 'A/S', '정기점검', '설치', '철수', '배송')
+   - `visit_date` (date: 방문일)
+   - `symptom` (text: 증상/요청), `action_detail` (text: 조치내용)
+   - `meter_bw` (int), `meter_col` (int): 방문 시 카운터
+   - `manager_id` (uuid: FK `profiles`)
+
+3. **`service_parts_usage` (사용 부품 연결)**
+   - `id` (uuid), `service_log_id` (uuid: FK `service_logs`)
+   - `consumable_id` (uuid: FK `consumables`)
+   - `quantity` (int: 사용 수량)
+
+---
+
+## 2. 페이지 구현 (`app/service/page.tsx`)
+**엑셀(Spreadsheet)과 유사한 고밀도 테이블 디자인**으로 구현해주세요.
+
+- **스타일링 (`service.module.css`):**
+  - `table-layout: fixed` 사용, `overflow-x: auto`로 가로 스크롤 허용.
+  - 헤더(`th`)는 스크롤 시 상단 고정 (`position: sticky`).
+  - 폰트 크기는 `0.85rem` 정도로 작게 설정하여 정보 밀도를 높임.
+  - 셀 테두리(`border`)를 명확하게 표시.
+
+- **테이블 컬럼 순서:**
+  1. **상태**: 뱃지 형태 (접수:회색, 완료:파랑, 보류:빨강)
+  2. **방문일자**: YYYY-MM-DD
+  3. **구분**: 서비스 타입 텍스트
+  4. **거래처명**: 클릭 시 거래처 상세 페이지로 이동 링크
+  5. **기기정보**: 모델명 (S/N)
+  6. **증상/요청**: 긴 내용은 `text-overflow: ellipsis` 처리
+  7. **조치내용**: 긴 내용은 말줄임표 처리
+  8. **교체/배송**: 사용된 부품명 나열 (예: "검정토너(1), 드럼(1)")
+  9. **담당자**: 담당 직원 이름
+
+---
+
+## 3. 등록/수정 팝업 컴포넌트 (`components/service/ServiceForm.tsx`)
+모달 형태로 구현하며, 다음 비즈니스 로직을 포함해야 합니다.
+
+- **입력 폼 구성:**
+  - **거래처 선택**: 드롭다운 (검색 가능).
+  - **기기 선택**: **선택한 거래처에 소속된 기기(Inventory)만** 필터링해서 드롭다운에 표시. (모델명 + S/N 조합)
+  - **기본 정보**: 방문일, 구분, 상태, 담당자.
+  - **내용**: 증상(Textarea), 조치내용(Textarea).
+  - **카운터 입력**: 흑백/칼라 카운터 (선택 사항).
+  
+- **부품 사용 등록 (동적 리스트):**
+  - [+ 부품 추가] 버튼을 누르면 행이 추가됨.
+  - `consumables` 테이블의 부품을 검색/선택하고 수량 입력.
+  - **현재 재고**를 옆에 표시하여 재고 부족 시 경고.
+
+---
+
+## 4. Server Actions (`app/actions/service.ts`)
+데이터 무결성을 보장하는 서버 액션을 작성해주세요.
+
+1. **`createServiceLogAction` / `updateServiceLogAction`**
+   - 일지 저장 시 `service_logs`와 `service_parts_usage`를 트랜잭션 처럼 저장.
+   - **중요:** 상태가 '완료'로 저장될 때, 사용된 부품 수량만큼 `consumables` 테이블의 `current_stock`을 **자동 차감**하는 로직 포함.
+   - (수정 시에는 기존 차감된 재고를 복구하고 다시 차감하는 복잡한 로직이 필요할 수 있으므로, 우선 단순 차감 로직만 구현하거나 주석으로 처리 방안 명시).
+
+2. **`getServiceLogsAction`**
+   - 페이지네이션 및 필터링(날짜, 거래처명, 담당자) 기능을 포함하여 데이터 조회.
+
+---
+
+## 5. 결과물 요청
+- 위 내용을 바탕으로 **DB SQL 쿼리**, **타입 정의 파일**, **Server Actions 파일**, **페이지 및 컴포넌트 코드**, **CSS 모듈 파일**을 작성해 주세요.
