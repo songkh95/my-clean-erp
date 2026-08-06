@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { loadAppSettings } from '@/utils/appSettings'
 import { getPendingPartsAction } from '@/app/actions/service'
+import DashboardPlanner from '@/components/home/DashboardPlanner'
+import ClientsMap from '@/components/home/ClientsMap'
 import styles from './home.module.css'
 
 type RecentLog = {
@@ -400,6 +402,8 @@ export default function HomePage() {
         </Link>
       </section>
 
+      <DashboardPlanner />
+
       <section className={styles.twoCol}>
         <div className={styles.section} style={{ marginBottom: 0 }}>
           <div className={styles.sectionHead}>
@@ -464,6 +468,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <ClientsMap />
 
       <section className={styles.section}>
         <div className={styles.sectionHead}>

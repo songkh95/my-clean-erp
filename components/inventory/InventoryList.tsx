@@ -107,6 +107,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
       (item.model_name?.toLowerCase().includes(term)) ||
       (item.brand?.toLowerCase().includes(term)) ||
       (item.serial_number?.toLowerCase().includes(term)) ||
+      ((item as any).department?.toLowerCase().includes(term)) ||
       (item.client?.name?.toLowerCase().includes(term)) ||
       (item.status?.includes(term))
     )
@@ -142,6 +143,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
               <thead>
                 <tr className={styles.theadTr}>
                   <th className={styles.th}>번호</th>
+                  <th className={styles.th}>부서</th>
                   <th className={styles.th}>분류</th>
                   <th className={styles.th}>브랜드</th>
                   <th className={styles.th}>제품명</th>
@@ -155,7 +157,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
               </thead>
               <tbody>
                 {filteredItems.length === 0 ? (
-                  <tr><td colSpan={9} className={styles.noDataRow}>검색 결과가 없습니다.</td></tr>
+                  <tr><td colSpan={10} className={styles.noDataRow}>검색 결과가 없습니다.</td></tr>
                 ) : (
                   filteredItems.map((item, index) => {
                     const isExpanded = expandedId === item.id
@@ -167,6 +169,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                           className={`${styles.dataRow} ${isExpanded ? styles.dataRowExpanded : ''}`}
                         >
                           <td className={styles.td}>{index + 1}</td>
+                          <td className={styles.td}>{(item as any).department || '-'}</td>
                           <td className={styles.td}>{item.category}</td>
                           <td className={styles.td}>{item.brand}</td>
                           <td className={`${styles.td} ${styles.modelName}`}>{item.model_name}</td>
@@ -205,8 +208,9 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                         {/* ✅ 상세 보기 영역 (수정 기능 제거 -> 순수 조회용, 누락 정보 표시) */}
                         {isExpanded && (
                           <tr className={styles.expandedRow}>
-                            <td colSpan={9} className={styles.expandedCell}>
+                            <td colSpan={10} className={styles.expandedCell}>
                               <div className={styles.formGrid}>
+                                <DetailField label="부서" value={(item as any).department} />
                                 <DetailField label="종류" value={item.type} />
                                 <DetailField label="제품 상태" value={item.product_condition} />
                                 <DetailField label="매입일" value={item.purchase_date} />

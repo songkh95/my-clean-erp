@@ -158,6 +158,7 @@ export type NewMachineDraft = {
   brand?: string
   model_name: string
   serial_number: string
+  department?: string
   billing_date?: string
   plan_basic_fee?: number
   initial_count_bw?: number
@@ -273,6 +274,7 @@ export async function attachMachinesToClientAction(
           serial_number: draft.serial_number.trim(),
           status: '설치',
           client_id: clientId,
+          department: draft.department?.trim() || null,
           product_condition: '새제품',
           billing_date: draft.billing_date || '말일',
           plan_basic_fee: draft.plan_basic_fee ?? 0,

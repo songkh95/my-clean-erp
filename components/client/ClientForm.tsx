@@ -67,6 +67,7 @@ function emptyNewMachine(): NewMachineDraft {
     brand: '',
     model_name: '',
     serial_number: '',
+    department: '',
     billing_date: inv.defaultBillingDate,
     plan_basic_fee: 0,
     initial_count_bw: 0,
@@ -447,6 +448,9 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                     <span>
                       <strong>{m.model_name}</strong>
                       <span style={{ color: '#888', marginLeft: 8 }}>{m.serial_number}</span>
+                      {m.department ? (
+                        <span style={{ color: '#0070f3', fontSize: '0.75rem', marginLeft: 8 }}>{m.department}</span>
+                      ) : null}
                       <span style={{ color: '#666', fontSize: '0.75rem', marginLeft: 8 }}>{m.type}</span>
                     </span>
                     <button
@@ -518,6 +522,12 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                   value={draftMachine.serial_number}
                   suggestions={machineSnSuggestions}
                   onChange={(v) => setDraftMachine({ ...draftMachine, serial_number: v })}
+                />
+                <InputField
+                  label="부서 (호출명)"
+                  placeholder="예: 총무팀, 1층 데스크"
+                  value={draftMachine.department || ''}
+                  onChange={(e) => setDraftMachine({ ...draftMachine, department: e.target.value })}
                 />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <InputField

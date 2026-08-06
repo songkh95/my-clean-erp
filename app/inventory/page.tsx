@@ -4,13 +4,14 @@ import React, { useState } from 'react'
 import InventoryList from '@/components/inventory/InventoryList'
 import ConsumableList from '@/components/inventory/ConsumableList'
 import InventoryForm from '@/components/inventory/InventoryForm'
+import ClientExcelModal from '@/components/client/ClientExcelModal'
 import styles from './inventory.module.css'
 
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<'machines' | 'consumables' | 'parts' | 'others'>('machines')
-  
-  // 기기 등록용 모달 상태 (기존 코드 유지)
+
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false)
+  const [excelModalOpen, setExcelModalOpen] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   return (
@@ -46,19 +47,34 @@ export default function InventoryPage() {
         <div>
           <div className={styles.headerSection}>
             <h2 className={styles.title}>전체 자산 목록</h2>
-            <button 
-              onClick={() => setIsMachineModalOpen(true)} 
-              className={styles.primaryBtn}
-            >
-              + 기기 추가
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setExcelModalOpen(true)}
+                className={styles.secondaryBtn}
+              >
+                엑셀
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsMachineModalOpen(true)}
+                className={styles.primaryBtn}
+              >
+                + 기기 추가
+              </button>
+            </div>
           </div>
           <InventoryList type="all" refreshTrigger={refreshTrigger} />
-          
-          <InventoryForm 
+
+          <InventoryForm
             isOpen={isMachineModalOpen}
             onClose={() => setIsMachineModalOpen(false)}
-            onSuccess={() => setRefreshTrigger(prev => prev + 1)}
+            onSuccess={() => setRefreshTrigger((prev) => prev + 1)}
+          />
+          <ClientExcelModal
+            isOpen={excelModalOpen}
+            onClose={() => setExcelModalOpen(false)}
+            onImported={() => setRefreshTrigger((prev) => prev + 1)}
           />
         </div>
       )}

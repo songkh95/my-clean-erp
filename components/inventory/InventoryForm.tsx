@@ -28,6 +28,7 @@ interface InventoryFormState {
   product_condition: string
   status: string
   client_id: string
+  department: string
   purchase_date: string
   purchase_price: number
   initial_count_bw: number
@@ -56,6 +57,7 @@ function buildInitialInventoryForm(): InventoryFormState {
     product_condition: '새제품',
     status: s.defaultStatus,
     client_id: '',
+    department: '',
     purchase_date: new Date().toISOString().split('T')[0],
     purchase_price: 0,
     initial_count_bw: 0,
@@ -398,6 +400,13 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
               </div>
             )}
           </div>
+
+          <InputField
+            label="부서 (호출명)"
+            placeholder="예: 총무팀, 1층 데스크"
+            value={formData.department}
+            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+          />
 
           <div className={styles.highlightBox}>
             <div className={styles.sectionTitle}>🔢 초기 카운터</div>

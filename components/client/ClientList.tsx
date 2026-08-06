@@ -13,6 +13,7 @@ import styles from './ClientList.module.css'
 import { Client, Inventory } from '@/app/types'
 // ✅ [추가] 서버 액션 임포트
 import { deleteClientAction } from '@/app/actions/client'
+import ClientExcelModal from './ClientExcelModal'
 
 export default function ClientList() {
   const supabase = createClient()
@@ -36,6 +37,7 @@ export default function ClientList() {
   const [selectedAssetForReplace, setSelectedAssetForReplace] = useState<Inventory | null>(null)
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false)
   const [selectedAssetForWithdraw, setSelectedAssetForWithdraw] = useState<Inventory | null>(null)
+  const [excelModalOpen, setExcelModalOpen] = useState(false)
 
   useEffect(() => { fetchClients() }, [])
 
@@ -131,9 +133,14 @@ export default function ClientList() {
     <div className={styles.container}>
       <div className={styles.header}>
         <span>거래처</span>
-        <Button variant="primary" size="sm" onClick={() => { setSelectedClient(null); setIsRegModalOpen(true); }}>
-          + 등록
-        </Button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Button variant="outline" size="sm" onClick={() => setExcelModalOpen(true)}>
+            엑셀
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => { setSelectedClient(null); setIsRegModalOpen(true); }}>
+            + 등록
+          </Button>
+        </div>
       </div>
 
       <div className={styles.searchContainer}>
@@ -247,6 +254,7 @@ export default function ClientList() {
                     <thead>
                       <tr>
                         <th className={styles.assetTh}>종류</th>
+                        <th className={styles.assetTh}>부서</th>
                         <th className={styles.assetTh}>모델명 / S.N</th>
                         <th className={styles.assetTh}>청구일</th>
                         <th className={styles.assetTh}>기본료</th>
@@ -257,6 +265,9 @@ export default function ClientList() {
                       {assets.map((asset) => (
                         <tr key={asset.id}>
                           <td className={styles.assetTd}>[{asset.type}]</td>
+                          <td className={styles.assetTd}>
+                            {(asset as any).department || '-'}
+                          </td>
                           <td className={styles.assetTd}>
                             <div style={{ fontWeight: '600' }}>{asset.model_name}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--notion-sub-text)' }}>{asset.serial_number}</div>
@@ -300,6 +311,11 @@ export default function ClientList() {
       {addMachineModalOpen && clientForMachineAdd && <InventoryForm isOpen={addMachineModalOpen} onClose={() => { setAddMachineModalOpen(false); setClientForMachineAdd(null) }} onSuccess={fetchClients} editData={{ status: '설치', client_id: clientForMachineAdd.id }} />}
       {replaceModalOpen && selectedAssetForReplace && selectedAssetForReplace.client_id && <MachineReplaceModal oldAsset={selectedAssetForReplace} clientId={selectedAssetForReplace.client_id} onClose={() => { setReplaceModalOpen(false); setSelectedAssetForReplace(null) }} onSuccess={fetchClients} />}
       {withdrawModalOpen && selectedAssetForWithdraw && selectedAssetForWithdraw.client_id && <MachineWithdrawModal asset={selectedAssetForWithdraw} clientId={selectedAssetForWithdraw.client_id} onClose={() => { setWithdrawModalOpen(false); setSelectedAssetForWithdraw(null) }} onSuccess={fetchClients} />}
+      <ClientExcelModal
+        isOpen={excelModalOpen}
+        onClose={() => setExcelModalOpen(false)}
+        onImported={fetchClients}
+      />
     </div>
   )
 }

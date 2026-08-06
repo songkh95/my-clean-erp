@@ -34,6 +34,7 @@ export type Database = {
           status: string | null
           updated_at: string | null
           contract_start_date: string | null
+          job_title: string | null
         }
         Insert: {
           address?: string | null
@@ -56,6 +57,7 @@ export type Database = {
           status?: string | null
           updated_at?: string | null
           contract_start_date?: string | null
+          job_title?: string | null
         }
         Update: {
           address?: string | null
@@ -78,6 +80,7 @@ export type Database = {
           status?: string | null
           updated_at?: string | null
           contract_start_date?: string | null
+          job_title?: string | null
         }
         Relationships: [
           {
@@ -220,6 +223,11 @@ export type Database = {
           type: string
           contract_start_date: string | null
           contract_end_date: string | null
+          contract_type: string | null
+          deposit: number | null
+          sale_price: number | null
+          contract_years: number | null
+          department: string | null
         }
         Insert: {
           billing_date?: string | null
@@ -252,6 +260,11 @@ export type Database = {
           type: string
           contract_start_date?: string | null
           contract_end_date?: string | null
+          contract_type?: string | null
+          deposit?: number | null
+          sale_price?: number | null
+          contract_years?: number | null
+          department?: string | null
         }
         Update: {
           billing_date?: string | null
@@ -284,6 +297,11 @@ export type Database = {
           type?: string
           contract_start_date?: string | null
           contract_end_date?: string | null
+          contract_type?: string | null
+          deposit?: number | null
+          sale_price?: number | null
+          contract_years?: number | null
+          department?: string | null
         }
         Relationships: [
           {
