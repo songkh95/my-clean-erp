@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/Input'
 import { Inventory } from '@/app/types'
 import { updateInventoryPlanAction } from '@/app/actions/inventory'
+import { calcContractEndDate } from '@/utils/clientInventoryExcel'
 
 interface Props {
   inventoryId: string
@@ -33,7 +34,11 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
     billing_group_id: null as string | null,
     billing_date: '말일',
     contract_start_date: '',
-    contract_end_date: ''
+    contract_end_date: '',
+    contract_type: '',
+    deposit: 0,
+    sale_price: 0,
+    contract_years: 0,
   })
 
   const [siblings, setSiblings] = useState<Inventory[]>([])
@@ -72,7 +77,11 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
         billing_group_id: item.billing_group_id,
         billing_date: item.billing_date || '말일',
         contract_start_date: item.contract_start_date || '',
-        contract_end_date: item.contract_end_date || ''
+        contract_end_date: item.contract_end_date || '',
+        contract_type: item.contract_type || '',
+        deposit: item.deposit || 0,
+        sale_price: item.sale_price || 0,
+        contract_years: item.contract_years || 0,
       })
 
       if (item.billing_group_id) {
@@ -267,7 +276,11 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
           plan_weight_a3_col: formData.plan_weight_a3_col,
           billing_date: formData.billing_date,
           contract_start_date: formData.contract_start_date, 
-          contract_end_date: formData.contract_end_date       
+          contract_end_date: formData.contract_end_date,
+          contract_type: formData.contract_type || null,
+          deposit: formData.deposit || 0,
+          sale_price: formData.sale_price || 0,
+          contract_years: formData.contract_years || null,
         },
         formData.billing_group_id
       )
@@ -336,13 +349,66 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
         )}
 
         <div style={{ marginBottom: '20px', padding: '16px', border: '1px solid var(--notion-border)', borderRadius: '8px', backgroundColor: '#fff' }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '10px', color: '#171717' }}>계약 기간 설정</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '10px', color: '#171717' }}>계약 정보</div>
           <div style={{ display: 'flex', gap: '12px' }}>
+            <InputField
+              label="계약구분"
+              as="select"
+              value={formData.contract_type}
+              onChange={e => setFormData({ ...formData, contract_type: e.target.value })}
+              style={{ marginBottom: 0 }}
+            >
+              <option value="">선택</option>
+              <option value="임대">임대</option>
+              <option value="판매">판매</option>
+              <option value="유지보수">유지보수</option>
+            </InputField>
+            <InputField
+              label="보증금"
+              type="number"
+              value={formData.deposit}
+              onChange={e => setFormData({ ...formData, deposit: Number(e.target.value) })}
+              style={{ marginBottom: 0 }}
+            />
+            <InputField
+              label="판매금액"
+              type="number"
+              value={formData.sale_price}
+              onChange={e => setFormData({ ...formData, sale_price: Number(e.target.value) })}
+              style={{ marginBottom: 0 }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '12px', marginTop: 12 }}>
             <InputField 
               label="계약 시작일" 
               type="date" 
               value={formData.contract_start_date} 
-              onChange={e => setFormData({ ...formData, contract_start_date: e.target.value })} 
+              onChange={e => {
+                const start = e.target.value
+                const years = formData.contract_years
+                const end = years > 0 ? calcContractEndDate(start, years) : null
+                setFormData({
+                  ...formData,
+                  contract_start_date: start,
+                  ...(end ? { contract_end_date: end } : {}),
+                })
+              }} 
+              style={{ marginBottom: 0 }}
+            />
+            <InputField
+              label="계약년수"
+              type="number"
+              step="0.5"
+              value={formData.contract_years}
+              onChange={e => {
+                const years = Number(e.target.value)
+                const end = calcContractEndDate(formData.contract_start_date, years)
+                setFormData({
+                  ...formData,
+                  contract_years: years,
+                  ...(end ? { contract_end_date: end } : {}),
+                })
+              }}
               style={{ marginBottom: 0 }}
             />
             <InputField 

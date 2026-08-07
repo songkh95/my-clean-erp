@@ -11,6 +11,7 @@ import { createInventoryAction, updateInventoryAction, normalizeInventoryModelNa
 import { loadAppSettings } from '@/utils/appSettings'
 import SuggestInput from '@/components/ui/SuggestInput'
 import { toMachineModelName } from '@/utils/suggestMatch'
+import { calcContractEndDate } from '@/utils/clientInventoryExcel'
 
 interface Props {
   isOpen: boolean
@@ -44,6 +45,12 @@ interface InventoryFormState {
   plan_price_col: number
   plan_weight_a3_bw: number
   plan_weight_a3_col: number
+  contract_type: string
+  deposit: number
+  sale_price: number
+  contract_start_date: string
+  contract_years: number
+  contract_end_date: string
 }
 
 function buildInitialInventoryForm(): InventoryFormState {
@@ -72,7 +79,13 @@ function buildInitialInventoryForm(): InventoryFormState {
     plan_price_bw: 10,
     plan_price_col: 100,
     plan_weight_a3_bw: 1,
-    plan_weight_a3_col: 2
+    plan_weight_a3_col: 2,
+    contract_type: '',
+    deposit: 0,
+    sale_price: 0,
+    contract_start_date: '',
+    contract_years: 0,
+    contract_end_date: '',
   }
 }
 
@@ -159,7 +172,13 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
           plan_price_bw: editData.plan_price_bw ?? 0,
           plan_price_col: editData.plan_price_col ?? 0,
           plan_weight_a3_bw: editData.plan_weight_a3_bw ?? 1,
-          plan_weight_a3_col: editData.plan_weight_a3_col ?? 1
+          plan_weight_a3_col: editData.plan_weight_a3_col ?? 1,
+          contract_type: editData.contract_type || '',
+          deposit: editData.deposit ?? 0,
+          sale_price: editData.sale_price ?? 0,
+          contract_start_date: editData.contract_start_date || '',
+          contract_years: editData.contract_years ?? 0,
+          contract_end_date: editData.contract_end_date || '',
         })
       } else {
         setFormData(initialData)
@@ -239,6 +258,12 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
         plan_price_col: Number(formData.plan_price_col),
         plan_weight_a3_bw: Number(formData.plan_weight_a3_bw),
         plan_weight_a3_col: Number(formData.plan_weight_a3_col),
+        contract_type: formData.contract_type || null,
+        deposit: Number(formData.deposit) || 0,
+        sale_price: Number(formData.sale_price) || 0,
+        contract_years: formData.contract_years > 0 ? Number(formData.contract_years) : null,
+        contract_start_date: formData.contract_start_date === '' ? null : formData.contract_start_date,
+        contract_end_date: formData.contract_end_date === '' ? null : formData.contract_end_date,
       }
 
       if (!payload.model_name) {
@@ -308,7 +333,74 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
 
             {formData.status === '설치' && (
               <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px dashed #0070f3' }}>
-                <div className={styles.sectionTitle} style={{ color: '#0070f3' }}>📅 요금제 설정</div>
+                <div className={styles.sectionTitle} style={{ color: '#0070f3' }}>📅 계약 · 요금제 설정</div>
+
+                <div className={styles.grid2} style={{ marginBottom: 0 }}>
+                  <InputField
+                    label="계약구분"
+                    as="select"
+                    value={formData.contract_type}
+                    onChange={e => setFormData({ ...formData, contract_type: e.target.value })}
+                  >
+                    <option value="">선택</option>
+                    <option value="임대">임대</option>
+                    <option value="판매">판매</option>
+                    <option value="유지보수">유지보수</option>
+                  </InputField>
+                  <InputField
+                    label="보증금"
+                    type="number"
+                    value={formData.deposit}
+                    onChange={e => setFormData({ ...formData, deposit: Number(e.target.value) })}
+                  />
+                </div>
+                <div className={styles.grid2} style={{ marginBottom: 0 }}>
+                  <InputField
+                    label="판매금액"
+                    type="number"
+                    value={formData.sale_price}
+                    onChange={e => setFormData({ ...formData, sale_price: Number(e.target.value) })}
+                  />
+                  <InputField
+                    label="계약년수"
+                    type="number"
+                    step="0.5"
+                    value={formData.contract_years}
+                    onChange={e => {
+                      const years = Number(e.target.value)
+                      const end = calcContractEndDate(formData.contract_start_date, years)
+                      setFormData({
+                        ...formData,
+                        contract_years: years,
+                        ...(end ? { contract_end_date: end } : {}),
+                      })
+                    }}
+                  />
+                </div>
+                <div className={styles.grid2} style={{ marginBottom: 0 }}>
+                  <InputField
+                    label="계약 시작일"
+                    type="date"
+                    value={formData.contract_start_date}
+                    onChange={e => {
+                      const start = e.target.value
+                      const end = formData.contract_years > 0
+                        ? calcContractEndDate(start, formData.contract_years)
+                        : null
+                      setFormData({
+                        ...formData,
+                        contract_start_date: start,
+                        ...(end ? { contract_end_date: end } : {}),
+                      })
+                    }}
+                  />
+                  <InputField
+                    label="계약 종료일"
+                    type="date"
+                    value={formData.contract_end_date}
+                    onChange={e => setFormData({ ...formData, contract_end_date: e.target.value })}
+                  />
+                </div>
                 
                 <InputField 
                   label="매월 청구일" 

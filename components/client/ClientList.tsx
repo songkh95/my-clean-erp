@@ -124,10 +124,61 @@ export default function ClientList() {
     setIsRegModalOpen(true)
   }
 
-  const filteredClients = clients.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.address && c.address.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  /** 본사 바로 아래에 소속 자사(지사)가 오도록 정렬 */
+  const sortClientsByHierarchy = (list: Client[]): Client[] => {
+    const byId = new Map(list.map((c) => [c.id, c]))
+    const childrenMap = new Map<string, Client[]>()
+    const roots: Client[] = []
+
+    for (const c of list) {
+      if (c.parent_id && byId.has(c.parent_id)) {
+        const kids = childrenMap.get(c.parent_id) || []
+        kids.push(c)
+        childrenMap.set(c.parent_id, kids)
+      } else {
+        roots.push(c)
+      }
+    }
+
+    const byName = (a: Client, b: Client) =>
+      (a.name || '').localeCompare(b.name || '', 'ko')
+
+    roots.sort(byName)
+    for (const kids of childrenMap.values()) kids.sort(byName)
+
+    const ordered: Client[] = []
+    const walk = (node: Client) => {
+      ordered.push(node)
+      for (const child of childrenMap.get(node.id) || []) walk(child)
+    }
+    for (const root of roots) walk(root)
+    return ordered
+  }
+
+  const filteredClients = (() => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return sortClientsByHierarchy(clients)
+
+    const matched = new Set(
+      clients
+        .filter(
+          (c) =>
+            c.name.toLowerCase().includes(q) ||
+            (c.address && c.address.toLowerCase().includes(q))
+        )
+        .map((c) => c.id)
+    )
+
+    // 검색된 본사의 자사, 검색된 자사의 본사도 함께 보이게
+    for (const c of clients) {
+      if (matched.has(c.id) && c.parent_id) matched.add(c.parent_id)
+    }
+    for (const c of clients) {
+      if (c.parent_id && matched.has(c.parent_id)) matched.add(c.id)
+    }
+
+    return sortClientsByHierarchy(clients.filter((c) => matched.has(c.id)))
+  })()
 
   return (
     <div className={styles.container}>
@@ -171,9 +222,16 @@ export default function ClientList() {
               className={`${styles.clientSummary} ${isExpanded ? styles.clientSummarySelected : ''}`}
               onClick={() => toggleExpand(client.id)}
             >
-              <div style={{ display: 'flex', alignItems: 'center', fontWeight: '600' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontWeight: '600',
+                  paddingLeft: client.parent_id ? 20 : 0,
+                }}
+              >
                 {client.parent_id ? (
-                  <span className={`${styles.badge} ${styles.badgeBranch}`}>지사</span>
+                  <span className={`${styles.badge} ${styles.badgeBranch}`}>자사</span>
                 ) : (
                   <span className={`${styles.badge} ${styles.badgeHead}`}>본사</span>
                 )}
@@ -207,11 +265,15 @@ export default function ClientList() {
                     <span className={styles.valueText}>{client.contact_person || '-'}</span>
                   </div>
                   <div className={styles.fieldContainer}>
-                    <span className={styles.label}>연락처 (휴대폰)</span>
+                    <span className={styles.label}>직책</span>
+                    <span className={styles.valueText}>{client.job_title || '-'}</span>
+                  </div>
+                  <div className={styles.fieldContainer}>
+                    <span className={styles.label}>담당자 연락처</span>
                     <span className={styles.valueText}>{client.phone || '-'}</span>
                   </div>
                   <div className={styles.fieldContainer}>
-                    <span className={styles.label}>사무실 전화</span>
+                    <span className={styles.label}>일반 연락처</span>
                     <span className={styles.valueText}>{client.office_phone || '-'}</span>
                   </div>
                   <div className={styles.fieldContainer}>

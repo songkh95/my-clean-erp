@@ -30,6 +30,7 @@ interface ClientFormState {
   business_number: string
   representative_name: string
   contact_person: string
+  job_title: string
   phone: string
   office_phone: string
   email: string
@@ -54,7 +55,7 @@ type WarehouseMachine = {
 function buildInitialClientForm(): ClientFormState {
   return {
     name: '', business_number: '', representative_name: '', contact_person: '',
-    phone: '', office_phone: '', email: '', address: '', memo: '', parent_id: '',
+    job_title: '', phone: '', office_phone: '', email: '', address: '', memo: '', parent_id: '',
     status: loadAppSettings().clients.defaultStatus,
   }
 }
@@ -97,6 +98,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
   const [clientNameSuggestions, setClientNameSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
   const [machineModelSuggestions, setMachineModelSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
   const [machineSnSuggestions, setMachineSnSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
+  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false)
 
   const fetchPotentialParents = useCallback(async () => {
     const supabase = createClient()
@@ -171,6 +173,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
     setMachineSearch('')
     setShowNewMachineForm(false)
     setDraftMachine(emptyNewMachine())
+    setConfirmSaveOpen(false)
 
     if (editData) {
       setFormData({
@@ -178,6 +181,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
         business_number: editData.business_number || '',
         representative_name: editData.representative_name || '',
         contact_person: editData.contact_person || '',
+        job_title: editData.job_title || '',
         phone: editData.phone || '',
         office_phone: editData.office_phone || '',
         email: editData.email || '',
@@ -235,8 +239,14 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
     setNewMachines((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return
+    setConfirmSaveOpen(true)
+  }
+
+  const performSave = async () => {
+    setConfirmSaveOpen(false)
     setLoading(true)
     try {
       const payload = {
@@ -331,10 +341,23 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <InputField label="담당자" value={formData.contact_person} onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })} />
-            <InputField label="연락처" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="010-0000-0000" />
+            <InputField label="직책" value={formData.job_title} onChange={(e) => setFormData({ ...formData, job_title: e.target.value })} placeholder="예: 과장, 팀장" />
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <InputField label="담당자 연락처" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="010-0000-0000" />
+            <InputField label="일반 연락처" value={formData.office_phone} onChange={(e) => setFormData({ ...formData, office_phone: e.target.value })} placeholder="02-000-0000" />
           </div>
           <InputField label="이메일" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
           <InputField label="주소" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
+          <InputField
+            label="상태"
+            as="select"
+            value={formData.status}
+            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+          >
+            <option value="active">활성</option>
+            <option value="inactive">비활성</option>
+          </InputField>
           <InputField label="메모" as="textarea" value={formData.memo} onChange={(e) => setFormData({ ...formData, memo: e.target.value })} style={{ height: '70px' }} />
 
           {/* 기계 연결 섹션 */}
@@ -559,6 +582,59 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
           </div>
         </form>
       </div>
+
+      {confirmSaveOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => !loading && setConfirmSaveOpen(false)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 12,
+              padding: '24px 28px',
+              width: 'min(360px, 92vw)',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: 8 }}>
+              정말로 저장하시겠습니까?
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: 20, lineHeight: 1.5 }}>
+              {editData ? '거래처 정보가 수정됩니다.' : '새 거래처가 등록됩니다.'}
+              {selectedCount > 0 ? ` 기계 ${selectedCount}대도 함께 연결됩니다.` : ''}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmSaveOpen(false)}
+                disabled={loading}
+              >
+                아니오
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={performSave}
+                disabled={loading}
+              >
+                {loading ? '저장 중…' : '예'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

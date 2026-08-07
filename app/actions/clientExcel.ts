@@ -10,6 +10,8 @@ import {
   type MachineExcelRow,
 } from '@/utils/clientInventoryExcel'
 
+export type ClientImportResolution = 'keep' | 'overwrite'
+
 async function requireOrg() {
   const supabase = await createClient()
   const {
@@ -45,9 +47,28 @@ function normalizeContractType(raw: string): string | null {
   return s
 }
 
+function clientPayloadFromExcel(row: ClientExcelRow, orgId: string) {
+  return {
+    name: row.회사명?.trim() || '',
+    contact_person: row.담당자?.trim() || null,
+    job_title: row.직책?.trim() || null,
+    phone: row.담당자연락처?.trim() || null,
+    office_phone: row.일반연락처?.trim() || null,
+    address: row.주소?.trim() || null,
+    business_number: row.사업자번호?.trim() || null,
+    representative_name: row.대표자명?.trim() || null,
+    email: row.이메일?.trim() || null,
+    memo: row.메모?.trim() || null,
+    status: normalizeStatus(row.상태),
+    organization_id: orgId,
+    is_deleted: false,
+  }
+}
+
 export async function importClientsMachinesFromExcelAction(
   clients: ClientExcelRow[],
-  machines: MachineExcelRow[]
+  machines: MachineExcelRow[],
+  clientResolutions: Record<string, ClientImportResolution> = {}
 ) {
   const { supabase, error: authErr, orgId } = await requireOrg()
   if (authErr || !orgId) {
@@ -57,6 +78,7 @@ export async function importClientsMachinesFromExcelAction(
   const errors: string[] = []
   let clientCreated = 0
   let clientSkipped = 0
+  let clientUpdated = 0
   let machineCreated = 0
   let machineSkipped = 0
 
@@ -82,25 +104,55 @@ export async function importClientsMachinesFromExcelAction(
         continue
       }
       const key = name.toLowerCase()
-      if (clientIdByName.has(key)) {
-        clientSkipped += 1
+      const existingId = clientIdByName.get(key)
+
+      if (existingId) {
+        const resolution = clientResolutions[key] || 'keep'
+        if (resolution === 'keep') {
+          clientSkipped += 1
+          const parentName = row.소속본사?.trim()
+          if (parentName) pendingParent.push({ name, parentName })
+          continue
+        }
+
+        const payload = clientPayloadFromExcel(row, orgId)
+        const { error } = await supabase
+          .from('clients')
+          .update({
+            contact_person: payload.contact_person,
+            job_title: payload.job_title,
+            phone: payload.phone,
+            office_phone: payload.office_phone,
+            address: payload.address,
+            business_number: payload.business_number,
+            representative_name: payload.representative_name,
+            email: payload.email,
+            memo: payload.memo,
+            status: payload.status,
+          })
+          .eq('id', existingId)
+          .eq('organization_id', orgId)
+
+        if (error) {
+          const msg = error.message || '수정 실패'
+          if (msg.includes('job_title') || msg.includes('schema cache')) {
+            errors.push(
+              `거래처 "${name}": DB에 job_title 컬럼이 없습니다. supabase/migrations/add_excel_contract_fields.sql 을 실행하세요.`
+            )
+          } else {
+            errors.push(`거래처 "${name}" 덮어쓰기 실패: ${msg}`)
+          }
+          continue
+        }
+
+        clientUpdated += 1
+        const parentName = row.소속본사?.trim()
+        if (parentName) pendingParent.push({ name, parentName })
         continue
       }
 
-      const payload: Record<string, unknown> = {
-        name,
-        contact_person: row.담당자?.trim() || null,
-        job_title: row.직책?.trim() || null,
-        phone: row.담당자연락처?.trim() || null,
-        office_phone: row.일반연락처?.trim() || null,
-        address: row.주소?.trim() || null,
-        business_number: row.사업자번호?.trim() || null,
-        representative_name: row.대표자명?.trim() || null,
-        email: row.이메일?.trim() || null,
-        memo: row.메모?.trim() || null,
-        status: normalizeStatus(row.상태),
-        organization_id: orgId,
-        is_deleted: false,
+      const payload = {
+        ...clientPayloadFromExcel(row, orgId),
         parent_id: null,
       }
 
@@ -261,17 +313,19 @@ export async function importClientsMachinesFromExcelAction(
     revalidatePath('/inventory')
     revalidatePath('/')
 
-    const message =
-      `거래처 등록 ${clientCreated}건` +
-      (clientSkipped ? ` (기존 스킵 ${clientSkipped})` : '') +
-      ` · 기기 등록 ${machineCreated}건` +
-      (machineSkipped ? ` (시리얼 중복 스킵 ${machineSkipped})` : '')
+    const parts = [`거래처 신규 ${clientCreated}건`]
+    if (clientUpdated) parts.push(`덮어쓰기 ${clientUpdated}건`)
+    if (clientSkipped) parts.push(`기존 유지 ${clientSkipped}건`)
+    parts.push(`기기 등록 ${machineCreated}건`)
+    if (machineSkipped) parts.push(`시리얼 중복 스킵 ${machineSkipped}건`)
 
     return {
       success: true,
-      message,
+      message: parts.join(' · '),
       errors,
       clientCreated,
+      clientUpdated,
+      clientSkipped,
       machineCreated,
     }
   } catch (e: any) {

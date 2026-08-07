@@ -316,6 +316,10 @@ export async function updateInventoryPlanAction(
     billing_date: string;
     contract_start_date?: string | null;
     contract_end_date?: string | null;
+    contract_type?: string | null;
+    deposit?: number | null;
+    sale_price?: number | null;
+    contract_years?: number | null;
   },
   billingGroupId: string | null
 ) {
