@@ -284,10 +284,11 @@ BEGIN
   END LOOP;
 END $$;
 
--- 관리코드 유니크: 활성 품목만
+-- 관리코드 유니크: 활성 품목 + 정품/재생 구분 (같은 코드로 재생품 별도 등록 가능)
 DROP INDEX IF EXISTS consumables_org_code_uidx;
-CREATE UNIQUE INDEX IF NOT EXISTS consumables_org_code_uidx
-  ON consumables (organization_id, code)
+DROP INDEX IF EXISTS consumables_org_code_regen_uidx;
+CREATE UNIQUE INDEX IF NOT EXISTS consumables_org_code_regen_uidx
+  ON consumables (organization_id, code, (COALESCE(is_regenerated, false)))
   WHERE code IS NOT NULL AND btrim(code) <> ''
     AND COALESCE(is_active, true) = true;
 

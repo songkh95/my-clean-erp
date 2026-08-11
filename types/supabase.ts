@@ -191,6 +191,47 @@ export type Database = {
           }
         ]
       }
+      dashboard_todos: {
+        Row: {
+          id: string
+          organization_id: string
+          user_id: string
+          text: string
+          due_date: string | null
+          done: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          user_id: string
+          text: string
+          due_date?: string | null
+          done?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          user_id?: string
+          text?: string
+          due_date?: string | null
+          done?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_todos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           billing_date: string | null

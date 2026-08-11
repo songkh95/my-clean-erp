@@ -10,7 +10,7 @@ import {
   getConsumablesAction,
   getMachineModelOptionsAction,
 } from '@/app/actions/consumable'
-import { toMachineModelName } from '@/utils/suggestMatch'
+import { toMachineModelName, toManagementCode, toConsumableModelName } from '@/utils/suggestMatch'
 import { standardConsumableName, type TonerDrumColor } from '@/utils/consumableMatch'
 
 export type ConsumableFormPreset = {
@@ -99,12 +99,17 @@ export default function ConsumableForm({
         (color && (cat === '토너' || cat === '드럼')
           ? standardConsumableName(cat as '토너' | '드럼', color, regen)
           : '')
+      const defaultCode =
+        preset?.code ||
+        (color && (cat === '토너' || cat === '드럼')
+          ? `${cat}-${color}${regen ? '-R' : ''}`
+          : '')
       setFormData({
         id: '',
         category: cat,
         model_name: defaultName,
-        code: preset?.code || '',
-        current_stock: preset?.current_stock ?? 1,
+        code: defaultCode,
+        current_stock: preset?.current_stock ?? 0,
         unit_price: preset?.unit_price ?? 0,
         color,
         is_regenerated: regen,
@@ -170,10 +175,12 @@ export default function ConsumableForm({
         /^토너 [KCMY]( 재생)?$/.test(merged.model_name.trim()) ||
         /^드럼 [KCMY]( 재생)?$/.test(merged.model_name.trim()))
     ) {
-      merged.model_name = standardConsumableName(
-        merged.category as '토너' | '드럼',
-        merged.color as TonerDrumColor,
-        merged.is_regenerated
+      merged.model_name = toConsumableModelName(
+        standardConsumableName(
+          merged.category as '토너' | '드럼',
+          merged.color as TonerDrumColor,
+          merged.is_regenerated
+        )
       )
     }
     setFormData(merged)
@@ -183,7 +190,9 @@ export default function ConsumableForm({
     e.preventDefault()
     if (!formData.model_name.trim()) return alert('모델명(품명)을 입력해주세요.')
     if (compatibleModels.length === 0) {
-      return alert('호환 기기를 1개 이상 추가해주세요.\n(여러 모델이 같은 소모품을 쓰면 모두 추가)')
+      if (!formData.id) {
+        return alert('호환 기기를 1개 이상 추가해주세요.\n(여러 모델이 같은 소모품을 쓰면 모두 추가)')
+      }
     }
     if (showColorFields && !formData.color) {
       return alert('토너/드럼은 색상(K/C/M/Y)을 선택해주세요.')
@@ -219,6 +228,12 @@ export default function ConsumableForm({
     <div className={styles.overlay} style={{ zIndex: 1200 }}>
       <div className={styles.modal} style={{ width: '480px', maxWidth: '96vw' }}>
         <h2 className={styles.title}>{editData ? '자재 수정' : '자재 등록'}</h2>
+        {preset && !editData ? (
+          <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#6b7280', lineHeight: 1.45 }}>
+            서비스 일지에서 연 등록입니다. 품명·관리코드·호환기기가 미리 채워져 있습니다.
+            재고를 0으로 두면 사용분은 <strong>미입고</strong>로 남고, 자산관리에서 입고·확정할 수 있습니다.
+          </p>
+        ) : null}
         <form onSubmit={handleSubmit}>
           <InputField
             label="소모품 종류 *"
@@ -271,8 +286,10 @@ export default function ConsumableForm({
             required
             value={formData.model_name}
             suggestions={nameSuggestions}
+            transform={toConsumableModelName}
             onChange={(v) => setFormData({ ...formData, model_name: v })}
             placeholder="예: TN-221K / 토너 K"
+            style={{ textTransform: 'uppercase' }}
           />
 
           <div className={styles.grid2}>
@@ -280,8 +297,10 @@ export default function ConsumableForm({
               label="관리 코드"
               value={formData.code || ''}
               suggestions={codeSuggestions}
+              transform={toManagementCode}
               onChange={(v) => setFormData({ ...formData, code: v })}
-              placeholder="선택사항"
+              placeholder="영문 대문자·숫자"
+              style={{ textTransform: 'uppercase' }}
             />
             <InputField
               label="현재 재고 *"
@@ -317,6 +336,7 @@ export default function ConsumableForm({
                   transform={toMachineModelName}
                   onChange={setMachineDraft}
                   placeholder="예: HL-L64100DW"
+                  style={{ textTransform: 'uppercase' }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()

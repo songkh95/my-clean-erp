@@ -3,10 +3,12 @@
 import { useMemo, useState } from 'react'
 import ConsumableForm, { type ConsumableFormPreset } from '@/components/inventory/ConsumableForm'
 import { linkConsumableCompatibleModelAction } from '@/app/actions/consumable'
+import { ensureTonerDrumConsumableAction } from '@/app/actions/service'
 import {
   findTonerDrumAny,
   findTonerDrumConsumable,
   partsConsumables,
+  standardConsumableName,
   type TonerDrumColor,
   type TonerDrumKind,
 } from '@/utils/consumableMatch'
@@ -140,7 +142,7 @@ export default function PartsUsagePicker({
         `기존 「${anySame.model_name}」(재고 ${anySame.current_stock ?? 0})에\n` +
           `기기 ${selectedMachine} 호환을 추가할까요?\n\n` +
           `「확인」= 기존 품목에 호환 연결\n` +
-          `「취소」= 품명이 다른 새 소모품으로 등록`
+          `「취소」= 자동 등록(재고 0 · 미입고 가능) 또는 상세 등록`
       )
       if (linkExisting) {
         const link = await linkConsumableCompatibleModelAction(anySame.id, selectedMachine)
@@ -159,17 +161,48 @@ export default function PartsUsagePicker({
         upsertQty(updated, 1)
         return
       }
-      // 취소 → 아래 새 등록 팝업
     }
 
-    // 새 소모품 등록 팝업 (품명이 다르면 색상이 같아도 별도 등록)
+    const stdName = standardConsumableName(kind, color, regenerated)
+    const autoCode = `${kind}-${color}${regenerated ? '-R' : ''}`
+    const autoOk = confirm(
+      `「${stdName}」이(가) 등록되어 있지 않습니다.\n\n` +
+        `확인 = 재고 0·관리코드 ${autoCode} 로 자동 등록 후 사용\n` +
+        `(완료 시 재고가 없으면 미입고로 남고, 자산관리에서 입고·확정)\n\n` +
+        `취소 = 관리코드·단가 등을 직접 입력하는 상세 등록`
+    )
+
+    if (autoOk) {
+      const res = await ensureTonerDrumConsumableAction({
+        category: kind,
+        color,
+        is_regenerated: regenerated,
+        machine_model: selectedMachine,
+      })
+      if (!res.success || !res.data) {
+        alert(res.message || '자동 등록 실패')
+        return
+      }
+      const row = res.data as ConsumableRow
+      onConsumablesChange?.([...consumables.filter((c) => c.id !== row.id), row])
+      if (res.created) onSessionCreated?.(row.id)
+      if (res.linked && selectedMachine) {
+        onSessionLinked?.({ consumable_id: row.id, machine_model: selectedMachine })
+      }
+      upsertQty(row, 1)
+      return
+    }
+
     openRegister(
       {
         category: kind,
         color,
         is_regenerated: regenerated,
         compatible_models: [selectedMachine],
-        current_stock: 1,
+        model_name: stdName,
+        code: autoCode,
+        current_stock: 0,
+        unit_price: 0,
       },
       { kind, color, regenerated }
     )
@@ -295,7 +328,7 @@ export default function PartsUsagePicker({
                   >
                     <span className={styles.colorLabel}>{color}</span>
                     <span className={styles.stockLabel}>
-                      {item ? `재고 ${stock}` : selectedMachine ? '등록/연결' : '기기선택'}
+                      {item ? `재고 ${stock}` : selectedMachine ? '등록·미입고' : '기기선택'}
                     </span>
                   </button>
                   <label className={styles.regen}>

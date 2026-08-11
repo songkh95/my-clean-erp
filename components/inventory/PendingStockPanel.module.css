@@ -91,6 +91,60 @@
   cursor: not-allowed;
 }
 
+.groupActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+}
+
+.linkBtn {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #fbbf24;
+  border-radius: 6px;
+  background: #fff;
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stockRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.stockLabel {
+  font-size: 0.72rem;
+  color: #78350f;
+  font-weight: 600;
+}
+
+.stockInput {
+  width: 88px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.stockBtn {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d97706;
+  border-radius: 6px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .list {
   list-style: none;
   margin: 8px 0 0;

@@ -79,3 +79,21 @@ export function toMachineModelName(input: string): string {
     .replace(/[^A-Z0-9\s\-_./]/g, '')
     .replace(/\s+/g, ' ')
 }
+
+/** 자재 관리코드: 영어 대문자·숫자·기호만 */
+export function toManagementCode(input: string): string {
+  return (input || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9\-_./]/g, '')
+}
+
+/**
+ * 자재 품명 입력: 영문은 대문자로, 한글(재생 등)은 유지
+ * 영문·숫자·한글·공백·일부 기호만 허용
+ */
+export function toConsumableModelName(input: string): string {
+  return (input || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9가-힣\s\-_./]/g, '')
+    .replace(/\s+/g, ' ')
+}

@@ -1,4 +1,4 @@
-/** 홈 대시보드 할 일 (브라우저 localStorage) */
+/** 홈 대시보드 할 일 */
 
 export type DashboardTodo = {
   id: string
@@ -9,7 +9,9 @@ export type DashboardTodo = {
   createdAt: string
 }
 
+/** @deprecated DB 이전용. 신규 저장은 서버(DB) 사용 */
 export const DASHBOARD_TODOS_KEY = 'my-clean-erp-dashboard-todos-v1'
+export const DASHBOARD_TODOS_MIGRATED_KEY = 'my-clean-erp-dashboard-todos-migrated-v1'
 
 export function todayYmd(d = new Date()): string {
   const y = d.getFullYear()
@@ -24,7 +26,8 @@ function normalizeDate(v: unknown): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null
 }
 
-export function loadDashboardTodos(): DashboardTodo[] {
+/** localStorage에서 읽기 (DB 이전용) */
+export function loadLocalDashboardTodos(): DashboardTodo[] {
   if (typeof window === 'undefined') return []
   try {
     const raw = localStorage.getItem(DASHBOARD_TODOS_KEY)
@@ -48,14 +51,13 @@ export function loadDashboardTodos(): DashboardTodo[] {
   }
 }
 
-export function saveDashboardTodos(todos: DashboardTodo[]): void {
+export function clearLocalDashboardTodos(): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(DASHBOARD_TODOS_KEY, JSON.stringify(todos))
+  localStorage.removeItem(DASHBOARD_TODOS_KEY)
+  localStorage.setItem(DASHBOARD_TODOS_MIGRATED_KEY, '1')
 }
 
-export function createTodoId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `todo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+export function isLocalDashboardTodosMigrated(): boolean {
+  if (typeof window === 'undefined') return true
+  return localStorage.getItem(DASHBOARD_TODOS_MIGRATED_KEY) === '1'
 }

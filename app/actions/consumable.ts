@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { toMachineModelName } from '@/utils/suggestMatch'
+import { toMachineModelName, toManagementCode, toConsumableModelName } from '@/utils/suggestMatch'
 import { detectColor, isRegeneratedName } from '@/utils/consumableMatch'
 
 function normalizeCompatibleModels(raw: unknown): string[] {
@@ -257,56 +257,69 @@ export async function upsertConsumableAction(formData: any) {
   const isNew = !payload.id
   const editingId = payload.id ? String(payload.id) : null
 
-  // 관리코드 중복 처리 (활성만 막고, 숨긴 품목 코드는 비워서 재사용 허용)
-  const code = payload.code != null ? String(payload.code).trim() : ''
+  // 관리코드 중복 처리
+  // - 같은 코드라도 정품/재생(is_regenerated)이 다르면 별도 품목 허용
+  // - 숨긴 품목 코드는 비워서 재사용 허용
+  const code = payload.code != null ? toManagementCode(String(payload.code)) : ''
   if (code) {
+    payload.code = code
     let activeQ = supabase
       .from('consumables')
-      .select('id, model_name, is_active')
+      .select('id, model_name, is_regenerated, is_active')
       .eq('organization_id', orgId)
       .eq('code', code)
       .or('is_active.is.null,is_active.eq.true')
-      .limit(1)
     if (editingId) activeQ = activeQ.neq('id', editingId)
-    const { data: codeHit } = await activeQ.maybeSingle()
-    if (codeHit) {
+    const { data: codeHits } = await activeQ
+    const conflict = (codeHits || []).find(
+      (h) => Boolean(h.is_regenerated) === isRegen
+    )
+    if (conflict) {
+      const regenLabel = isRegen ? '재생' : '정품'
       return {
         success: false,
         message:
-          `관리코드 "${code}" 가 이미 사용 중입니다.\n` +
-          `기존 품목: ${codeHit.model_name}\n\n` +
-          `다른 코드를 쓰거나, 기존 품목을 수정하세요.\n` +
-          `(목록에 안 보이면 「숨긴 항목 포함」을 켜 보세요.)`,
+          `관리코드 "${code}" (${regenLabel}) 가 이미 사용 중입니다.\n` +
+          `기존 품목: ${conflict.model_name}\n\n` +
+          `같은 코드로 정품·재생을 각각 등록할 수는 있습니다.\n` +
+          `재생 여부가 같은 품목이 이미 있으면 다른 코드를 쓰거나 기존 품목을 수정하세요.`,
       }
     }
 
-    // 숨긴 품목에 같은 코드가 있으면 비워서 신규 등록 가능하게
+    // 숨긴 품목에 같은 코드+재생여부가 있으면 비워서 신규 등록 가능하게
     let hiddenQ = supabase
       .from('consumables')
-      .select('id')
+      .select('id, is_regenerated')
       .eq('organization_id', orgId)
       .eq('code', code)
       .eq('is_active', false)
     if (editingId) hiddenQ = hiddenQ.neq('id', editingId)
     const { data: hiddenHits } = await hiddenQ
-    if (hiddenHits && hiddenHits.length > 0) {
+    const hiddenSameRegen = (hiddenHits || []).filter(
+      (h) => Boolean(h.is_regenerated) === isRegen
+    )
+    if (hiddenSameRegen.length > 0) {
       await supabase
         .from('consumables')
         .update({ code: null } as any)
-        .in('id', hiddenHits.map((h) => h.id))
+        .in(
+          'id',
+          hiddenSameRegen.map((h) => h.id)
+        )
     }
   } else {
     payload.code = null
   }
 
-  // 신규 등록 시: 품명(또는 코드)이 같은 기존 품목만 합침 — 색상만 같다고 합치지 않음
+  // 신규 등록 시: 품명이 같은 기존 품목만 합침 — 관리코드만 같다고 합치지 않음
+  // (검정 토너 / 검정 재생토너는 품명·가격이 다르므로 별도 등록)
   if (
     isNew &&
     !forceNew &&
     (category === '토너' || category === '드럼') &&
     modelName.trim()
   ) {
-    let existingQ = supabase
+    const { data: existing } = await supabase
       .from('consumables')
       .select('*')
       .eq('organization_id', orgId)
@@ -314,22 +327,7 @@ export async function upsertConsumableAction(formData: any) {
       .ilike('model_name', modelName.trim())
       .or('is_active.is.null,is_active.eq.true')
       .limit(1)
-
-    const { data: byName } = await existingQ.maybeSingle()
-
-    // 코드가 같고 품명이 비어 있는 경우만 코드로도 매칭 (위에서 이미 코드 중복은 막음)
-    let existing = byName
-    if (!existing && code) {
-      const { data: byCode } = await supabase
-        .from('consumables')
-        .select('*')
-        .eq('organization_id', orgId)
-        .eq('code', code)
-        .or('is_active.is.null,is_active.eq.true')
-        .limit(1)
-        .maybeSingle()
-      existing = byCode
-    }
+      .maybeSingle()
 
     if (existing) {
       const { data: prevLinks } = await supabase
@@ -382,6 +380,9 @@ export async function upsertConsumableAction(formData: any) {
   if (!payload.id) delete payload.id
   if (color) payload.color = color
   payload.is_regenerated = isRegen
+  if (payload.model_name != null) {
+    payload.model_name = toConsumableModelName(String(payload.model_name)).trim()
+  }
 
   const { data: saved, error } = await supabase
     .from('consumables')
@@ -390,10 +391,12 @@ export async function upsertConsumableAction(formData: any) {
     .single()
 
   if (error || !saved) {
-    if (/consumables_org_code_uidx|duplicate key/i.test(error?.message || '')) {
+    if (/consumables_org_code_uidx|consumables_org_code_regen_uidx|duplicate key/i.test(error?.message || '')) {
       return {
         success: false,
-        message: '동일한 관리코드가 이미 있습니다. 다른 코드를 사용하거나 기존 품목을 수정하세요.',
+        message:
+          '동일한 관리코드·재생여부의 품목이 이미 있습니다.\n' +
+          '정품/재생이 다르면 같은 코드를 쓸 수 있습니다. DB 제약이 예전 버전이면 sql/fix_code_unique_with_regen.sql 을 실행하세요.',
       }
     }
     if (/consumables_org_toner_color_uidx/i.test(error?.message || '')) {
@@ -578,7 +581,7 @@ export async function restoreConsumableAction(id: string) {
     if (/unique|org_code/i.test(error.message)) {
       return {
         success: false,
-        message: '같은 관리코드의 활성 품목이 이미 있어 복구할 수 없습니다.',
+        message: '같은 관리코드·재생여부의 활성 품목이 이미 있어 복구할 수 없습니다.',
       }
     }
     return { success: false, message: error.message }
@@ -601,4 +604,53 @@ export async function getIncompleteConsumablesAction() {
     return noCompat || noColor
   })
   return { success: true as const, data: incomplete }
+}
+
+/** 미입고 대기 품목에 재고 입고(수량 가산) */
+export async function addConsumableStockAction(id: string, addQty: number) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false as const, message: '로그인 필요' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single()
+  if (!profile?.organization_id) return { success: false as const, message: '조직 정보 없음' }
+
+  const qty = Math.floor(Number(addQty))
+  if (!id || !Number.isFinite(qty) || qty <= 0) {
+    return { success: false as const, message: '입고 수량을 확인해 주세요.' }
+  }
+
+  const { data: row, error: fetchErr } = await supabase
+    .from('consumables')
+    .select('id, model_name, current_stock')
+    .eq('id', id)
+    .eq('organization_id', profile.organization_id)
+    .single()
+
+  if (fetchErr || !row) {
+    return { success: false as const, message: fetchErr?.message || '소모품을 찾을 수 없습니다.' }
+  }
+
+  const next = (Number(row.current_stock) || 0) + qty
+  const { error } = await supabase
+    .from('consumables')
+    .update({ current_stock: next } as any)
+    .eq('id', id)
+    .eq('organization_id', profile.organization_id)
+
+  if (error) return { success: false as const, message: error.message }
+
+  revalidatePath('/inventory')
+  revalidatePath('/service')
+  return {
+    success: true as const,
+    message: `「${row.model_name}」 재고 +${qty} (현재 ${next})`,
+    current_stock: next,
+  }
 }

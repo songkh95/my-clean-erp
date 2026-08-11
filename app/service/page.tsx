@@ -133,7 +133,9 @@ export default function ServicePage() {
   const [saving, setSaving] = useState(false)
   const [selectedLog, setSelectedLog] = useState<ServiceLog | null>(null)
   const [employees, setEmployees] = useState<{ id: string; name: string | null }[]>([])
-  const [machineOptions, setMachineOptions] = useState<Record<string, { value: string; label: string }[]>>({})
+  const [machineOptions, setMachineOptions] = useState<
+    Record<string, { value: string; label: string; department?: string | null }[]>
+  >({})
   const [query, setQuery] = useState('')
   const [locked, setLocked] = useState(false)
   const [clientSort, setClientSort] = useState<'asc' | 'desc'>('asc')
@@ -152,7 +154,9 @@ export default function ServicePage() {
   const [schemaWarning, setSchemaWarning] = useState<string | null>(null)
   const [excelOpen, setExcelOpen] = useState(false)
   const widthsReady = useRef(false)
-  const machineCache = React.useRef<Record<string, { value: string; label: string }[]>>({})
+  const machineCache = React.useRef<
+    Record<string, { value: string; label: string; department?: string | null }[]>
+  >({})
 
   const typeOptions = useMemo(
     () => (settings.service.serviceTypes.length > 0
@@ -185,13 +189,16 @@ export default function ServicePage() {
     setLoading(true)
     const result = await getServiceLogsAction()
     if (result.success) {
-      setLogs(result.data as unknown as ServiceLog[])
+      const data = result.data as unknown as ServiceLog[]
+      setLogs(data)
       if (opts?.clearPending !== false) {
         setPending({})
       }
+      setLoading(false)
+      return { success: true as const, data }
     }
     setLoading(false)
-    return result.success
+    return { success: false as const, data: [] as ServiceLog[] }
   }, [])
 
   useEffect(() => {
@@ -218,9 +225,10 @@ export default function ServicePage() {
     const machines = await getClientMachinesAction(clientId)
     const opts = [
       { value: '', label: '(기기 없음)' },
-      ...machines.map((m: { id: string; model_name: string; serial_number: string }) => ({
+      ...machines.map((m: { id: string; model_name: string; serial_number: string; department?: string | null }) => ({
         value: m.id,
         label: `${m.model_name} (${m.serial_number})`,
+        department: m.department || null,
       })),
     ]
     machineCache.current[clientId] = opts
@@ -245,8 +253,16 @@ export default function ServicePage() {
         } else if (opt) {
           const match = opt.label.match(/^(.*) \((.*)\)$/)
           next.inventory = match
-            ? { model_name: match[1], serial_number: match[2] }
-            : { model_name: opt.label, serial_number: '' }
+            ? {
+                model_name: match[1],
+                serial_number: match[2],
+                department: opt.department ?? null,
+              }
+            : {
+                model_name: opt.label,
+                serial_number: '',
+                department: opt.department ?? null,
+              }
         }
       }
       return next
@@ -280,6 +296,7 @@ export default function ServicePage() {
         log.client?.name,
         log.inventory?.model_name,
         log.inventory?.serial_number,
+        log.inventory?.department,
         log.symptom,
         log.action_detail,
         log.memo,
@@ -554,13 +571,108 @@ export default function ServicePage() {
     setSelectedLog(null)
   }
 
-  const openPartsEdit = (log: ServiceLog) => {
+  /** 표에서 입력 중인 한 행을 DB에 반영 (교체/배송 팝업 전에 연결) */
+  const persistSingleRow = async (
+    base: ServiceLog,
+    fields: PendingFields
+  ): Promise<{ success: boolean; message: string; id?: string }> => {
+    if (isDummyId(base.id)) {
+      const merged = { ...base, ...fields } as ServiceLog
+      if (!merged.client_id) {
+        return { success: false, message: `${merged.client?.name || '거래처'}: 거래처 정보가 없습니다.` }
+      }
+      let managerId = merged.manager_id || myUserId || employees[0]?.id || null
+      if (!managerId) {
+        return { success: false, message: `${merged.client?.name || '거래처'}: 담당자를 선택해 주세요.` }
+      }
+      const status = merged.status === '미방문' ? '접수' : merged.status || '접수'
+      const result = await createServiceLogAction(
+        {
+          client_id: merged.client_id,
+          inventory_id: merged.inventory_id || null,
+          status,
+          service_type: merged.service_type || 'A/S',
+          visit_date: merged.visit_date || todayStr(),
+          symptom: merged.symptom || '',
+          action_detail: merged.action_detail || '',
+          memo: merged.memo || '',
+          spare_stock: merged.spare_stock || '',
+          spare_stock_at: merged.spare_stock_at || (merged.spare_stock ? todayStr() : null),
+          meter_bw: merged.meter_bw || 0,
+          meter_col: merged.meter_col || 0,
+          manager_id: managerId,
+        },
+        []
+      )
+      if (!result.success) {
+        return { success: false, message: `일지 등록 실패: ${result.message}` }
+      }
+      return { success: true, message: result.message, id: result.id }
+    }
+
+    if (Object.keys(fields).length === 0) {
+      return { success: true, message: 'ok', id: base.id }
+    }
+
+    const result = await patchServiceLogAction(base.id, fields)
+    if (!result.success) {
+      return { success: false, message: result.message }
+    }
+    return { success: true, message: result.message, id: base.id }
+  }
+
+  const openPartsEdit = async (log: ServiceLog) => {
     if (locked) return
-    if (isDummyId(log.id)) {
-      alert('미방문 행은 먼저 표에서 내용을 입력·저장해 일지를 등록한 뒤, 교체/배송을 추가할 수 있습니다.')
+
+    const dirty = pending[log.id]
+    const needsPersist = isDummyId(log.id) || Boolean(dirty)
+
+    if (!needsPersist) {
+      setPartsModalLog(log)
       return
     }
-    setPartsModalLog(log)
+
+    setSaving(true)
+    try {
+      // 표에 입력한 증상·조치 등을 같은 일지에 먼저 붙인 뒤 교체/배송 팝업 오픈
+      const fields: PendingFields = { ...(dirty || {}) }
+      if (isDummyId(log.id)) {
+        if (!fields.status && log.status === '미방문') fields.status = '접수'
+        if (!fields.visit_date && !log.visit_date) fields.visit_date = todayStr()
+        if (!fields.service_type && !log.service_type) fields.service_type = 'A/S'
+      }
+
+      const saved = await persistSingleRow(log, fields)
+      if (!saved.success || !saved.id) {
+        alert(saved.message || '일지 저장에 실패했습니다. 표 내용을 확인한 뒤 다시 시도하세요.')
+        return
+      }
+
+      setPending((prev) => {
+        const next = { ...prev }
+        delete next[log.id]
+        return next
+      })
+
+      const refreshed = await fetchLogs({ clearPending: false })
+      const target =
+        refreshed.data.find((l) => l.id === saved.id) ||
+        refreshed.data.find(
+          (l) =>
+            l.client_id === log.client_id &&
+            (l.inventory_id || null) === (log.inventory_id || null) &&
+            !isDummyId(l.id)
+        )
+
+      if (!target) {
+        alert('표 내용은 저장되었습니다. 목록을 새로고친 뒤 교체/배송을 다시 열어 주세요.')
+        return
+      }
+
+      setPartsModalLog(target)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const toggleLock = () => {
@@ -710,7 +822,12 @@ export default function ServicePage() {
                   {opts.expanded ? '▾' : '▸'}
                 </span>
               ) : null}
-              <span>{log.client?.name || '(거래처 없음)'}</span>
+              <span>
+                {log.client?.name || '(거래처 없음)'}
+                {log.inventory?.department
+                  ? `(${log.inventory.department})`
+                  : ''}
+              </span>
               {canExpand ? (
                 <span className={styles.historyCountBadge}>{opts.historyCount}</span>
               ) : null}
@@ -751,12 +868,17 @@ export default function ServicePage() {
         />
 
         <td
-          className={`${styles.td} ${styles.tdClamp} ${!locked && !dummy ? styles.tdEditable : styles.tdReadonly} ${styles.tdWrap}`}
-          onClick={() => openPartsEdit(log)}
+          className={`${styles.td} ${styles.tdClamp} ${!locked ? styles.tdEditable : styles.tdReadonly} ${styles.tdWrap}`}
+          onClick={() => {
+            if (locked || saving) return
+            void openPartsEdit(log)
+          }}
           title={
-            dummy
-              ? '일지 등록 후 교체/배송을 추가할 수 있습니다'
-              : '클릭하여 토너·드럼·부품 선택'
+            locked
+              ? undefined
+              : dirty || dummy
+                ? '표에 입력한 내용을 이 일지에 저장한 뒤 교체/배송을 엽니다'
+                : '클릭하여 토너·드럼·부품 선택'
           }
         >
           <div className={styles.clampInner}>
@@ -1186,7 +1308,10 @@ export default function ServicePage() {
         log={partsModalLog}
         locked={locked}
         onClose={() => setPartsModalLog(null)}
-        onSuccess={fetchLogs}
+        onSuccess={() => {
+          // 다른 행의 표 입력(pending)은 유지
+          void fetchLogs({ clearPending: false })
+        }}
       />
 
       {galleryLog && (

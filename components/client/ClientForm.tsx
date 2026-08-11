@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type KeyboardEvent, type FormEvent } from 'react'
 import { createClient } from '@/utils/supabase'
 import Button from './../ui/Button'
 import InputField from './../ui/Input'
@@ -95,6 +95,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
   const [newMachines, setNewMachines] = useState<NewMachineDraft[]>([])
   const [showNewMachineForm, setShowNewMachineForm] = useState(false)
   const [draftMachine, setDraftMachine] = useState<NewMachineDraft>(emptyNewMachine)
+  const [editingMachineIndex, setEditingMachineIndex] = useState<number | null>(null)
   const [clientNameSuggestions, setClientNameSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
   const [machineModelSuggestions, setMachineModelSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
   const [machineSnSuggestions, setMachineSnSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
@@ -173,6 +174,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
     setMachineSearch('')
     setShowNewMachineForm(false)
     setDraftMachine(emptyNewMachine())
+    setEditingMachineIndex(null)
     setConfirmSaveOpen(false)
 
     if (editData) {
@@ -221,25 +223,90 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
     if (!draftMachine.type || !draftMachine.category) {
       return alert('종류와 구분을 선택해주세요.')
     }
+    const snKey = draftMachine.serial_number.trim().toLowerCase()
     const dupInList = newMachines.some(
-      (m) => m.serial_number.trim().toLowerCase() === draftMachine.serial_number.trim().toLowerCase()
+      (m, i) =>
+        i !== editingMachineIndex &&
+        m.serial_number.trim().toLowerCase() === snKey
     )
     const dupInWarehouse = warehouseAll.some(
-      (m) => m.serial_number.toLowerCase() === draftMachine.serial_number.trim().toLowerCase()
+      (m) => m.serial_number.toLowerCase() === snKey
     )
     if (dupInList || dupInWarehouse) {
       return alert('같은 S/N이 이미 목록 또는 창고에 있습니다.')
     }
-    setNewMachines((prev) => [...prev, { ...draftMachine, model_name: modelName }])
+
+    const nextMachine = { ...draftMachine, model_name: modelName }
+    if (editingMachineIndex !== null) {
+      setNewMachines((prev) =>
+        prev.map((m, i) => (i === editingMachineIndex ? nextMachine : m))
+      )
+    } else {
+      setNewMachines((prev) => [...prev, nextMachine])
+    }
     setDraftMachine(emptyNewMachine())
+    setEditingMachineIndex(null)
     setShowNewMachineForm(false)
+  }
+
+  const startEditNewMachine = (index: number) => {
+    const m = newMachines[index]
+    if (!m) return
+    setDraftMachine({ ...m })
+    setEditingMachineIndex(index)
+    setShowNewMachineForm(true)
+  }
+
+  const cancelMachineDraft = () => {
+    setShowNewMachineForm(false)
+    setDraftMachine(emptyNewMachine())
+    setEditingMachineIndex(null)
   }
 
   const removeNewMachine = (index: number) => {
     setNewMachines((prev) => prev.filter((_, i) => i !== index))
+    if (editingMachineIndex === index) {
+      cancelMachineDraft()
+    } else if (editingMachineIndex !== null && editingMachineIndex > index) {
+      setEditingMachineIndex(editingMachineIndex - 1)
+    }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  /** Enter = Tab처럼 다음 입력으로 이동 (저장 제출 방지) */
+  const handleFormKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
+    if (e.key !== 'Enter') return
+    const target = e.target as HTMLElement
+    const tag = target.tagName
+    if (tag === 'TEXTAREA') return
+    if (tag === 'BUTTON') return
+    if ((target as HTMLInputElement).type === 'submit') return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const form = e.currentTarget
+    const nodes = Array.from(
+      form.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+      )
+    ).filter((el) => {
+      if ((el as HTMLInputElement).type === 'checkbox') return false
+      const rect = el.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    })
+
+    const idx = nodes.indexOf(target)
+    if (idx === -1) return
+    const next = nodes[idx + 1]
+    if (next) {
+      next.focus()
+      if (next instanceof HTMLInputElement || next instanceof HTMLTextAreaElement) {
+        next.select?.()
+      }
+    }
+  }
+
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (loading) return
     setConfirmSaveOpen(true)
@@ -308,7 +375,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
           {editData ? '거래처 수정' : '거래처 등록'}
         </h2>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown}>
           <div style={{
             padding: '16px', backgroundColor: 'var(--notion-soft-bg)', borderRadius: '8px',
             marginBottom: '16px', border: '1px solid var(--notion-border)',
@@ -377,9 +444,17 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => { setShowNewMachineForm((v) => !v); setDraftMachine(emptyNewMachine()) }}
+                onClick={() => {
+                  if (showNewMachineForm) {
+                    cancelMachineDraft()
+                  } else {
+                    setEditingMachineIndex(null)
+                    setDraftMachine(emptyNewMachine())
+                    setShowNewMachineForm(true)
+                  }
+                }}
               >
-                {showNewMachineForm ? '신규 입력 닫기' : '+ 신규 기기'}
+                {showNewMachineForm ? '입력 닫기' : '+ 신규 기기'}
               </Button>
             </div>
 
@@ -464,7 +539,8 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                     key={`${m.serial_number}-${idx}`}
                     style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '8px 10px', background: '#fff', border: '1px dashed #0070f3',
+                      padding: '8px 10px', background: editingMachineIndex === idx ? '#eff6ff' : '#fff',
+                      border: editingMachineIndex === idx ? '1px solid #0070f3' : '1px dashed #0070f3',
                       borderRadius: 6, marginBottom: 4, fontSize: '0.85rem',
                     }}
                   >
@@ -476,13 +552,22 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                       ) : null}
                       <span style={{ color: '#666', fontSize: '0.75rem', marginLeft: 8 }}>{m.type}</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => removeNewMachine(idx)}
-                      style={{ border: 'none', background: 'none', color: '#d93025', cursor: 'pointer', fontSize: '0.8rem' }}
-                    >
-                      제거
-                    </button>
+                    <span style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => startEditNewMachine(idx)}
+                        style={{ border: 'none', background: 'none', color: '#0070f3', cursor: 'pointer', fontSize: '0.8rem' }}
+                      >
+                        수정
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeNewMachine(idx)}
+                        style={{ border: 'none', background: 'none', color: '#d93025', cursor: 'pointer', fontSize: '0.8rem' }}
+                      >
+                        제거
+                      </button>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -493,7 +578,9 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                 padding: 12, background: '#fff', borderRadius: 8,
                 border: '1px solid #0070f3', marginTop: 4,
               }}>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 10 }}>신규 기기 입력</div>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 10 }}>
+                  {editingMachineIndex !== null ? `신규 기기 수정 (#${editingMachineIndex + 1})` : '신규 기기 입력'}
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <InputField
                     label="종류 *"
@@ -567,8 +654,10 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                   />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowNewMachineForm(false)}>취소</Button>
-                  <Button type="button" variant="primary" size="sm" onClick={addDraftMachine}>목록에 추가</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={cancelMachineDraft}>취소</Button>
+                  <Button type="button" variant="primary" size="sm" onClick={addDraftMachine}>
+                    {editingMachineIndex !== null ? '수정 반영' : '목록에 추가'}
+                  </Button>
                 </div>
               </div>
             )}

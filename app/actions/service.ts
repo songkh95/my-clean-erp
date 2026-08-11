@@ -479,7 +479,7 @@ export async function getServiceLogsAction() {
   const selectWithStatus = `
       *,
       client:clients(name, is_deleted),
-      inventory:inventory(id, model_name, serial_number),
+      inventory:inventory(id, model_name, serial_number, department),
       manager:profiles(name),
       parts_usage:service_parts_usage(
         id,
@@ -492,7 +492,7 @@ export async function getServiceLogsAction() {
   const selectLegacy = `
       *,
       client:clients(name, is_deleted),
-      inventory:inventory(id, model_name, serial_number),
+      inventory:inventory(id, model_name, serial_number, department),
       manager:profiles(name),
       parts_usage:service_parts_usage(
         id,
@@ -581,7 +581,8 @@ export async function getServiceLogsAction() {
     .select(`
       id, 
       model_name, 
-      serial_number, 
+      serial_number,
+      department,
       status, 
       client_id, 
       client:clients(id, name)
@@ -613,7 +614,8 @@ export async function getServiceLogsAction() {
       inventory: { 
         id: m.id,
         model_name: m.model_name, 
-        serial_number: m.serial_number 
+        serial_number: m.serial_number,
+        department: m.department || null,
       },
       status: '미방문',
       service_type: '',
@@ -984,7 +986,7 @@ export async function getConsumablesAction() {
 export async function getClientMachinesAction(clientId: string) {
   const supabase = await createClient()
   if (!clientId) return []
-  const { data } = await supabase.from('inventory').select('id, model_name, serial_number').eq('client_id', clientId).eq('status', '설치')
+  const { data } = await supabase.from('inventory').select('id, model_name, serial_number, department').eq('client_id', clientId).eq('status', '설치')
   return data || []
 }
 
@@ -1295,9 +1297,9 @@ export async function getPendingPartsAction() {
       quantity,
       stock_status,
       consumable_id,
-      consumable:consumables(id, model_name, category, current_stock, code, product_group),
-      service_log:service_logs(id, visit_date, status, client:clients(name))
-    `)
+      consumable:consumables(id, model_name, category, current_stock, code, product_group, color, is_regenerated),
+      service_log:service_logs(id, visit_date, status, client:clients(name), inventory:inventory(model_name, serial_number, department))
+    `))
     .eq('stock_status', 'pending')
     .order('created_at', { ascending: true })
 

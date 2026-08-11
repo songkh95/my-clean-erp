@@ -248,7 +248,7 @@ export interface ServiceLog {
   prev_visit_date?: string | null;
   
   client?: { name: string; is_deleted?: boolean | null };
-  inventory?: { model_name: string; serial_number: string };
+  inventory?: { model_name: string; serial_number: string; department?: string | null };
   manager?: { name: string };
   parts_usage?: ServicePartUsage[];
   images?: ServiceLogImage[];

@@ -2,12 +2,19 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  createTodoId,
-  loadDashboardTodos,
-  saveDashboardTodos,
+  clearLocalDashboardTodos,
+  isLocalDashboardTodosMigrated,
+  loadLocalDashboardTodos,
   todayYmd,
   type DashboardTodo,
 } from '@/utils/dashboardTodos'
+import {
+  createDashboardTodoAction,
+  deleteDashboardTodoAction,
+  listDashboardTodosAction,
+  migrateDashboardTodosAction,
+  updateDashboardTodoAction,
+} from '@/app/actions/dashboardTodos'
 import { getKoreanHolidays } from '@/utils/koreanHolidays'
 import styles from '@/app/home.module.css'
 
@@ -22,6 +29,9 @@ function truncate(text: string, max = 6): string {
 
 export default function DashboardPlanner() {
   const [todos, setTodos] = useState<DashboardTodo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [busy, setBusy] = useState(false)
   const [text, setText] = useState('')
   /** 등록용 날짜 */
   const [entryDate, setEntryDate] = useState(todayYmd())
@@ -34,16 +44,61 @@ export default function DashboardPlanner() {
   const [assigningId, setAssigningId] = useState<string | null>(null)
 
   useEffect(() => {
-    setTodos(loadDashboardTodos())
-  }, [])
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      try {
+        const result = await listDashboardTodosAction()
+        if (cancelled) return
 
-  const updateTodos = (updater: (prev: DashboardTodo[]) => DashboardTodo[]) => {
-    setTodos((prev) => {
-      const next = updater(prev)
-      saveDashboardTodos(next)
-      return next
-    })
-  }
+        if (!result.success) {
+          setLoadError(result.message)
+          setTodos([])
+          return
+        }
+
+        let data = result.data
+
+        // DB가 비어 있고 이 브라우저에만 있던 할 일이 있으면 계정으로 이전
+        if (data.length === 0 && !isLocalDashboardTodosMigrated()) {
+          const local = loadLocalDashboardTodos()
+          if (local.length > 0) {
+            const migrated = await migrateDashboardTodosAction(
+              local.map((t) => ({
+                text: t.text,
+                date: t.date,
+                done: t.done,
+                createdAt: t.createdAt,
+              }))
+            )
+            if (cancelled) return
+            if (migrated.success && migrated.imported > 0) {
+              clearLocalDashboardTodos()
+              const again = await listDashboardTodosAction()
+              if (cancelled) return
+              if (again.success) data = again.data
+            } else if (migrated.success) {
+              clearLocalDashboardTodos()
+            }
+          } else {
+            clearLocalDashboardTodos()
+          }
+        }
+
+        setLoadError('')
+        setTodos(data)
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(e instanceof Error ? e.message : '할 일을 불러오지 못했습니다.')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   /** 날짜 있는 일정만 달력에 표시 */
   const todosByDate = useMemo(() => {
@@ -110,40 +165,63 @@ export default function DashboardPlanner() {
     setEntryDate(ymd)
   }
 
-  const addTodo = (date: string | null) => {
+  const addTodo = async (date: string | null) => {
     const trimmed = text.trim()
-    if (!trimmed) return
-    updateTodos((prev) => [
-      ...prev,
-      {
-        id: createTodoId(),
-        text: trimmed,
-        date,
-        done: false,
-        createdAt: new Date().toISOString(),
-      },
-    ])
-    setText('')
-    setPage(Math.max(1, Math.ceil((allTodosSorted.length + 1) / PAGE_SIZE)))
+    if (!trimmed || busy) return
+    setBusy(true)
+    try {
+      const result = await createDashboardTodoAction({ text: trimmed, date })
+      if (!result.success || !result.data) {
+        alert(result.message)
+        return
+      }
+      setTodos((prev) => [...prev, result.data!])
+      setText('')
+      setPage(Math.max(1, Math.ceil((allTodosSorted.length + 1) / PAGE_SIZE)))
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const toggleDone = (id: string) => {
-    updateTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)))
+  const toggleDone = async (id: string) => {
+    const target = todos.find((t) => t.id === id)
+    if (!target || busy) return
+    const nextDone = !target.done
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: nextDone } : t)))
+    const result = await updateDashboardTodoAction(id, { done: nextDone })
+    if (!result.success) {
+      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: target.done } : t)))
+      alert(result.message)
+    }
   }
 
-  const removeTodo = (id: string) => {
-    updateTodos((prev) => prev.filter((t) => t.id !== id))
+  const removeTodo = async (id: string) => {
+    if (busy) return
+    const prev = todos
+    setTodos((list) => list.filter((t) => t.id !== id))
     if (assigningId === id) setAssigningId(null)
+    const result = await deleteDashboardTodoAction(id)
+    if (!result.success) {
+      setTodos(prev)
+      alert(result.message)
+    }
   }
 
-  const assignDate = (id: string, date: string) => {
-    updateTodos((prev) => prev.map((t) => (t.id === id ? { ...t, date } : t)))
+  const assignDate = async (id: string, date: string) => {
+    const target = todos.find((t) => t.id === id)
+    if (!target) return
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, date } : t)))
     setAssigningId(null)
     const [y, m] = date.split('-').map(Number)
     if (y && m) {
       setViewYear(y)
       setViewMonth(m - 1)
       setSelectedDate(date)
+    }
+    const result = await updateDashboardTodoAction(id, { date })
+    if (!result.success) {
+      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, date: target.date } : t)))
+      alert(result.message)
     }
   }
 
@@ -154,27 +232,36 @@ export default function DashboardPlanner() {
       <div className={styles.section} style={{ marginBottom: 0 }}>
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>오늘 할 일</h2>
-          <span className={styles.plannerDateLabel}>전체 {allTodosSorted.length}건</span>
+          <span className={styles.plannerDateLabel}>
+            {loading ? '불러오는 중…' : `전체 ${allTodosSorted.length}건`}
+          </span>
         </div>
         <div className={styles.panel}>
+          {loadError ? (
+            <div className={styles.empty} style={{ color: '#b91c1c', whiteSpace: 'pre-wrap' }}>
+              {loadError}
+            </div>
+          ) : null}
           <div className={styles.todoForm}>
             <input
               className={styles.todoInput}
               type="text"
               value={text}
               placeholder="할 일을 입력하세요"
+              disabled={loading || busy || Boolean(loadError)}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault()
-                  addTodo(entryDate || todayYmd())
+                  void addTodo(entryDate || todayYmd())
                 }
               }}
             />
             <button
               type="button"
               className={styles.todoUndatedBtn}
-              onClick={() => addTodo(null)}
+              onClick={() => void addTodo(null)}
+              disabled={loading || busy || Boolean(loadError)}
               title="날짜 미정으로 등록"
             >
               미정
@@ -183,6 +270,7 @@ export default function DashboardPlanner() {
               className={styles.todoDate}
               type="date"
               value={entryDate}
+              disabled={loading || busy || Boolean(loadError)}
               onChange={(e) => {
                 const v = e.target.value || todayYmd()
                 setEntryDate(v)
@@ -193,12 +281,19 @@ export default function DashboardPlanner() {
                 }
               }}
             />
-            <button type="button" className={styles.todoAddBtn} onClick={() => addTodo(entryDate || todayYmd())}>
+            <button
+              type="button"
+              className={styles.todoAddBtn}
+              onClick={() => void addTodo(entryDate || todayYmd())}
+              disabled={loading || busy || Boolean(loadError)}
+            >
               등록
             </button>
           </div>
 
-          {allTodosSorted.length === 0 ? (
+          {loading ? (
+            <div className={styles.empty}>할 일을 불러오는 중…</div>
+          ) : allTodosSorted.length === 0 && !loadError ? (
             <div className={styles.empty}>등록된 할 일이 없습니다.</div>
           ) : (
             <>
@@ -213,10 +308,9 @@ export default function DashboardPlanner() {
                         defaultValue={todayYmd()}
                         onChange={(e) => {
                           const v = e.target.value
-                          if (v) assignDate(t.id, v)
+                          if (v) void assignDate(t.id, v)
                         }}
                         onBlur={() => {
-                          // 날짜 선택 UI가 열린 동안 blur가 먼저 올 수 있어 약간 지연
                           window.setTimeout(() => setAssigningId((cur) => (cur === t.id ? null : cur)), 200)
                         }}
                       />
@@ -242,14 +336,14 @@ export default function DashboardPlanner() {
                   <button
                     type="button"
                     className={`${styles.todoDoneBtn} ${t.done ? styles.todoDoneBtnActive : ''}`}
-                    onClick={() => toggleDone(t.id)}
+                    onClick={() => void toggleDone(t.id)}
                   >
                     {t.done ? '취소' : '완료'}
                   </button>
                   <button
                     type="button"
                     className={styles.todoDelete}
-                    onClick={() => removeTodo(t.id)}
+                    onClick={() => void removeTodo(t.id)}
                     aria-label="삭제"
                   >
                     ×
