@@ -1299,7 +1299,7 @@ export async function getPendingPartsAction() {
       consumable_id,
       consumable:consumables(id, model_name, category, current_stock, code, product_group, color, is_regenerated),
       service_log:service_logs(id, visit_date, status, client:clients(name), inventory:inventory(model_name, serial_number, department))
-    `))
+    `)
     .eq('stock_status', 'pending')
     .order('created_at', { ascending: true })
 
