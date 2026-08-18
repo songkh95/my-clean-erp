@@ -1,3 +1,13 @@
+import {
+  DEFAULT_FOOTER_NOTICE,
+  DEFAULT_ISSUER,
+  DEFAULT_MFP_AMOUNT_TEMPLATE,
+  DEFAULT_NOTE_PRESETS,
+  formatLeaseInfo,
+  parseLeaseInfo,
+  type QuoteNotePreset,
+} from '@/utils/quoteDefaults'
+
 /** 앱 전역 설정 (로컬 저장, 조직/브라우저 단위) */
 
 export type AppSettings = {
@@ -36,6 +46,23 @@ export type AppSettings = {
     /** 미정산만 보기 기본값 */
     defaultShowUnregistered: boolean
   }
+  quotes: {
+    defaultIntro: string
+    defaultFooterNotice: string
+    /** 임대 정보 표 기본값 */
+    mfpAmountTemplate: string
+    notePresets: QuoteNotePreset[]
+    issuer_company: string
+    issuer_partner: string
+    issuer_ceo: string
+    issuer_biz_no: string
+    issuer_address: string
+    issuer_manager: string
+    issuer_tel: string
+    issuer_hp: string
+    issuer_homepage: string
+    issuer_blog: string
+  }
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -68,6 +95,13 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     confirmWhenUsingInitialCounter: true,
     defaultShowUnregistered: false,
   },
+  quotes: {
+    defaultIntro: '아래와 같이 見積합니다.',
+    defaultFooterNotice: DEFAULT_FOOTER_NOTICE,
+    mfpAmountTemplate: DEFAULT_MFP_AMOUNT_TEMPLATE,
+    notePresets: structuredClone(DEFAULT_NOTE_PRESETS),
+    ...DEFAULT_ISSUER,
+  },
 }
 
 export const APP_SETTINGS_STORAGE_KEY = 'my-clean-erp-settings-v1'
@@ -96,6 +130,29 @@ function mergeSettings(base: AppSettings, patch: unknown): AppSettings {
   }
   if (isPlainObject(patch.service) && Array.isArray(patch.service.serviceTypes)) {
     out.service.serviceTypes = patch.service.serviceTypes.map(String).filter(Boolean)
+  }
+  if (isPlainObject(patch.quotes)) {
+    const q = patch.quotes
+    if (Array.isArray(q.notePresets)) {
+      out.quotes.notePresets = q.notePresets
+        .filter((p): p is Record<string, unknown> => isPlainObject(p))
+        .map((p, i) => ({
+          id: String(p.id || `preset-${i + 1}`),
+          name: String(p.name || `비고 ${i + 1}`),
+          content: String(p.content || ''),
+        }))
+        .filter((p) => p.name.trim())
+    }
+    if (typeof q.defaultIntro === 'string') out.quotes.defaultIntro = q.defaultIntro
+    if (typeof q.defaultFooterNotice === 'string') out.quotes.defaultFooterNotice = q.defaultFooterNotice
+    if (typeof q.mfpAmountTemplate === 'string') {
+      // 구형 양식(보증금: 없는 텍스트)이면 새 임대정보 기본값으로 교체
+      if (!/^\s*보증금\s*[:：]/m.test(q.mfpAmountTemplate)) {
+        out.quotes.mfpAmountTemplate = DEFAULT_MFP_AMOUNT_TEMPLATE
+      } else {
+        out.quotes.mfpAmountTemplate = formatLeaseInfo(parseLeaseInfo(q.mfpAmountTemplate))
+      }
+    }
   }
   return out
 }

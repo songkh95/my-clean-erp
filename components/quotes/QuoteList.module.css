@@ -1,0 +1,381 @@
+.wrap {
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--notion-main-text);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.panel {
+  background: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--notion-border);
+  flex-wrap: wrap;
+}
+
+.search {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  background: var(--notion-soft-bg);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--notion-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th {
+  background: var(--notion-soft-bg);
+  color: var(--notion-sub-text);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.rowClick {
+  cursor: pointer;
+}
+
+.rowClick:hover {
+  background: var(--notion-soft-bg);
+}
+
+.right {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--notion-sub-text);
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  border: 1px solid var(--notion-border);
+  color: var(--notion-sub-text);
+}
+
+.editorLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.formCard,
+.previewCard {
+  background: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.previewCard {
+  position: static;
+  max-height: none;
+  overflow: visible;
+}
+
+.previewTitle {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px 12px;
+}
+
+@media (max-width: 700px) {
+  .grid2,
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--notion-sub-text);
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  background: var(--notion-bg);
+  color: var(--notion-main-text);
+  box-sizing: border-box;
+}
+
+.field textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.itemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.itemsTable th,
+.itemsTable td {
+  border: 1px solid var(--notion-border);
+  padding: 6px;
+  vertical-align: middle;
+}
+
+.itemsTable th {
+  background: var(--notion-soft-bg);
+  font-size: 0.75rem;
+  color: var(--notion-sub-text);
+}
+
+.itemsTable input[type='text'],
+.itemsTable input[type='number'] {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 4px 6px;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+
+.itemsTable input:focus {
+  outline: none;
+  border-color: var(--notion-blue);
+  background: #fff;
+}
+
+.itemBlock {
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--notion-soft-bg);
+}
+
+.itemRow {
+  display: grid;
+  grid-template-columns: 2fr 0.6fr 0.7fr 1fr auto auto;
+  gap: 8px;
+  align-items: end;
+}
+
+@media (max-width: 800px) {
+  .itemRow {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.leaseTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  background: #fff;
+}
+
+.leaseTable th,
+.leaseTable td {
+  border: 1px solid var(--notion-border);
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+
+.leaseTable thead th {
+  background: var(--notion-soft-bg);
+  text-align: center;
+  font-weight: 700;
+}
+
+.leaseTable tbody th {
+  width: 88px;
+  background: var(--notion-soft-bg);
+  font-weight: 600;
+  text-align: center;
+  color: var(--notion-sub-text);
+  white-space: nowrap;
+}
+
+.leaseTable tbody td input,
+.leaseTable tbody td textarea {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 4px 6px;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.leaseTable tbody td textarea {
+  min-height: 64px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.leaseTable tbody td input:focus,
+.leaseTable tbody td textarea:focus {
+  outline: none;
+  border-color: var(--notion-blue);
+  background: #fff;
+}
+
+.presetRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.presetRow select {
+  min-width: 160px;
+  padding: 6px 10px;
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.itemActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.totalsBar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.previewActions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.printOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+  overflow: auto;
+}
+
+.printActions {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  display: flex;
+  gap: 8px;
+  z-index: 3100;
+  background: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .printRoot,
+  .printRoot * {
+    visibility: visible !important;
+  }
+  .printOverlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .printActions {
+    display: none !important;
+  }
+  .printRoot {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

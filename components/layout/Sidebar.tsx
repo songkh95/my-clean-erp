@@ -37,6 +37,7 @@ export default function Sidebar({
     { name: '거래처 관리', path: '/clients', icon: '👥' },
     { name: '자산 및 재고', path: '/inventory', icon: '📦' },
     { name: '서비스 일지', path: '/service', icon: '🛠️' },
+    { name: '견적서', path: '/quotes', icon: '📄' },
     { name: '월 정산 등록', path: '/accounting/registration', icon: '📝' },
     { name: '청구 이력/수정', path: '/accounting/history', icon: '🕒' },
     { name: '설정', path: '/settings', icon: '⚙️' },

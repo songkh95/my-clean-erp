@@ -1,7 +1,7 @@
 // components/client/ClientList.tsx
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase'
 import ClientForm from './ClientForm'
 import PlanSettingModal from './PlanSettingModal'
@@ -14,6 +14,11 @@ import { Client, Inventory } from '@/app/types'
 // ✅ [추가] 서버 액션 임포트
 import { deleteClientAction } from '@/app/actions/client'
 import ClientExcelModal from './ClientExcelModal'
+import {
+  detectClientIssues,
+  groupClientIssues,
+  clientIssueKindTitle,
+} from '@/utils/clientIssues'
 
 export default function ClientList() {
   const supabase = createClient()
@@ -75,6 +80,9 @@ export default function ClientList() {
       }
     }
     setLoading(false)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('ops-issues-refresh'))
+    }
   }
 
   // ✅ [수정] 삭제 로직을 Server Action 호출로 변경
@@ -180,6 +188,9 @@ export default function ClientList() {
     return sortClientsByHierarchy(clients.filter((c) => matched.has(c.id)))
   })()
 
+  const clientIssues = useMemo(() => detectClientIssues(clients), [clients])
+  const clientIssueGroups = useMemo(() => groupClientIssues(clientIssues), [clientIssues])
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -193,6 +204,44 @@ export default function ClientList() {
           </Button>
         </div>
       </div>
+
+      {clientIssueGroups.length > 0 && (
+        <div className={styles.issueBanner}>
+          <div className={styles.issueTitle}>
+            문제 해결이 필요한 내용 {clientIssues.length}건
+          </div>
+          <p className={styles.issueDesc}>
+            중복·오류·부족한 정보가 있습니다. 항목을 누르면 수정 화면이 열립니다.
+          </p>
+          {clientIssueGroups.map((group) => (
+            <div key={group.kind} className={styles.issueGroup}>
+              <div className={styles.issueGroupTitle}>
+                {clientIssueKindTitle(group.kind)} {group.items.length}건
+              </div>
+              <div className={styles.issueChips}>
+                {group.items.slice(0, 8).map((issue) => (
+                  <button
+                    key={`${issue.kind}-${issue.clientId}`}
+                    type="button"
+                    className={styles.issueChip}
+                    title={issue.detail}
+                    onClick={() => {
+                      const client = clients.find((c) => c.id === issue.clientId)
+                      if (!client) return
+                      setSelectedClient(client)
+                      setIsRegModalOpen(true)
+                    }}
+                  >
+                    {issue.label}
+                    <span className={styles.issueChipDetail}> ·{issue.detail}</span>
+                  </button>
+                ))}
+                {group.items.length > 8 ? <span className={styles.issueMore}>…</span> : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className={styles.searchContainer}>
         <input 

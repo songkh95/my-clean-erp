@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Button from '@/components/ui/Button'
 import AccountSettings from '@/components/settings/AccountSettings'
+import QuoteBrandingSettings from '@/components/settings/QuoteBrandingSettings'
 import styles from './settings.module.css'
 import {
   AppSettings,
@@ -13,8 +14,13 @@ import {
   resetAppSettings,
   saveAppSettings,
 } from '@/utils/appSettings'
+import {
+  DEFAULT_MFP_AMOUNT_TEMPLATE,
+  formatLeaseInfo,
+  parseLeaseInfo,
+} from '@/utils/quoteDefaults'
 
-type TabId = 'account' | 'general' | 'clients' | 'inventory' | 'stock' | 'service' | 'accounting'
+type TabId = 'account' | 'general' | 'clients' | 'inventory' | 'stock' | 'service' | 'accounting' | 'quotes'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'account', label: '계정' },
@@ -24,6 +30,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'stock', label: '재고/소모품' },
   { id: 'service', label: '서비스 일지' },
   { id: 'accounting', label: '정산' },
+  { id: 'quotes', label: '견적서' },
 ]
 
 const MACHINE_TYPES = [
@@ -64,6 +71,17 @@ export default function SettingsPage() {
       service: {
         ...draft.service,
         serviceTypes: draft.service.serviceTypes.map((s) => s.trim()).filter(Boolean),
+      },
+      quotes: {
+        ...draft.quotes,
+        mfpAmountTemplate: formatLeaseInfo(parseLeaseInfo(draft.quotes.mfpAmountTemplate)),
+        notePresets: draft.quotes.notePresets
+          .map((p, i) => ({
+            id: (p.id || `preset-${i + 1}`).trim() || `preset-${i + 1}`,
+            name: (p.name || '').trim(),
+            content: p.content || '',
+          }))
+          .filter((p) => p.name),
       },
     }
     if (next.service.serviceTypes.length === 0) {
@@ -349,6 +367,277 @@ export default function SettingsPage() {
               청구 합계 규칙: 공급가 + VAT(10% 내림) 후 10원 단위 절사 — 코드에 고정되어 있습니다.
             </p>
           </div>
+        )}
+
+        {tab === 'quotes' && (
+          <>
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>견적서 기본값</h2>
+              <p className={styles.cardDesc}>새 견적서 작성 시 자동으로 채워지는 값입니다.</p>
+              <div className={styles.field}>
+                <label className={styles.label}>안내 문구</label>
+                <input
+                  className={styles.input}
+                  value={draft.quotes.defaultIntro}
+                  onChange={(e) => patch('quotes', { defaultIntro: e.target.value })}
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label}>비고 아래 안내 문구</label>
+                <textarea
+                  className={styles.textarea}
+                  value={draft.quotes.defaultFooterNotice}
+                  onChange={(e) => patch('quotes', { defaultFooterNotice: e.target.value })}
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label}>임대 정보 기본값</label>
+                <span className={styles.hint} style={{ marginBottom: 8 }}>
+                  견적서 품목에서 「임대 정보」를 누르면 아래 값이 기본으로 들어갑니다. 오른쪽 열(임대정보)에 표시됩니다.
+                </span>
+                {(() => {
+                  const lease = parseLeaseInfo(draft.quotes.mfpAmountTemplate)
+                  const patchLease = (next: typeof lease) =>
+                    patch('quotes', { mfpAmountTemplate: formatLeaseInfo(next) })
+                  return (
+                    <table className={styles.leaseTable}>
+                      <thead>
+                        <tr>
+                          <th colSpan={2}>임대 정보</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <th>보증금</th>
+                          <td>
+                            <input
+                              className={styles.input}
+                              value={lease.deposit}
+                              onChange={(e) => patchLease({ ...lease, deposit: e.target.value })}
+                              placeholder="면제"
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <th>기본요금</th>
+                          <td>
+                            <input
+                              className={styles.input}
+                              value={lease.baseFee}
+                              onChange={(e) => patchLease({ ...lease, baseFee: e.target.value })}
+                              placeholder="흑: 1000매 / 칼: 100매"
+                            />
+                          </td>
+                        </tr>
+                        <tr>
+                          <th>추가요금</th>
+                          <td>
+                            <textarea
+                              className={styles.textarea}
+                              value={lease.extraFee}
+                              onChange={(e) => patchLease({ ...lease, extraFee: e.target.value })}
+                              placeholder="흑: 10원 / 칼라: A4 100원, A3 200원/장당"
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  )
+                })()}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  style={{ marginTop: 8 }}
+                  onClick={() =>
+                    patch('quotes', { mfpAmountTemplate: DEFAULT_MFP_AMOUNT_TEMPLATE })
+                  }
+                >
+                  기본값으로 채우기
+                </Button>
+              </div>
+            </div>
+
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>도장 · 본사 로고</h2>
+              <p className={styles.cardDesc}>
+                Supabase에 저장되어 어디서나 동일하게 표시됩니다. 도장은 상단 우측, 본사 로고는 하단 우측입니다.
+              </p>
+              <QuoteBrandingSettings />
+            </div>
+
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>비고 기본값 (선택 목록)</h2>
+              <p className={styles.cardDesc}>
+                견적서 작성 시 드롭다운에서 골라 넣을 수 있습니다. 이름만 있으면 목록에 표시됩니다.
+              </p>
+              {draft.quotes.notePresets.map((preset, idx) => (
+                <div
+                  key={preset.id || idx}
+                  style={{
+                    border: '1px solid var(--notion-border)',
+                    borderRadius: 8,
+                    padding: 12,
+                    marginBottom: 10,
+                  }}
+                >
+                  <div className={styles.row}>
+                    <div className={styles.field} style={{ flex: 1, marginBottom: 8 }}>
+                      <label className={styles.label}>이름</label>
+                      <input
+                        className={styles.input}
+                        value={preset.name}
+                        onChange={(e) => {
+                          const notePresets = [...draft.quotes.notePresets]
+                          notePresets[idx] = { ...preset, name: e.target.value }
+                          patch('quotes', { notePresets })
+                        }}
+                        placeholder="예: 복합기 임대"
+                      />
+                    </div>
+                    <div style={{ paddingTop: 22 }}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="danger"
+                        onClick={() =>
+                          patch('quotes', {
+                            notePresets: draft.quotes.notePresets.filter((_, i) => i !== idx),
+                          })
+                        }
+                      >
+                        삭제
+                      </Button>
+                    </div>
+                  </div>
+                  <div className={styles.field} style={{ marginBottom: 0 }}>
+                    <label className={styles.label}>내용</label>
+                    <textarea
+                      className={styles.textarea}
+                      value={preset.content}
+                      onChange={(e) => {
+                        const notePresets = [...draft.quotes.notePresets]
+                        notePresets[idx] = { ...preset, content: e.target.value }
+                        patch('quotes', { notePresets })
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  patch('quotes', {
+                    notePresets: [
+                      ...draft.quotes.notePresets,
+                      {
+                        id: `preset-${Date.now()}`,
+                        name: `비고 ${draft.quotes.notePresets.length + 1}`,
+                        content: '',
+                      },
+                    ],
+                  })
+                }
+              >
+                + 비고 기본값 추가
+              </Button>
+            </div>
+
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>발행자 기본 정보</h2>
+              <p className={styles.cardDesc}>
+                상단 우측(사업자·주소·상호)과 하단 좌측(상호·담당자·연락처)에 사용됩니다.
+              </p>
+              <div className={styles.row}>
+                <div className={styles.field}>
+                  <label className={styles.label}>상호</label>
+                  <input
+                    className={styles.input}
+                    value={draft.quotes.issuer_company}
+                    onChange={(e) => patch('quotes', { issuer_company: e.target.value })}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>파트너/브랜드</label>
+                  <input
+                    className={styles.input}
+                    value={draft.quotes.issuer_partner}
+                    onChange={(e) => patch('quotes', { issuer_partner: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className={styles.row}>
+                <div className={styles.field}>
+                  <label className={styles.label}>대표자</label>
+                  <input
+                    className={styles.input}
+                    value={draft.quotes.issuer_ceo}
+                    onChange={(e) => patch('quotes', { issuer_ceo: e.target.value })}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>사업자번호</label>
+                  <input
+                    className={styles.input}
+                    value={draft.quotes.issuer_biz_no}
+                    onChange={(e) => patch('quotes', { issuer_biz_no: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label}>주소</label>
+                <input
+                  className={styles.input}
+                  value={draft.quotes.issuer_address}
+                  onChange={(e) => patch('quotes', { issuer_address: e.target.value })}
+                />
+              </div>
+              <div className={styles.row}>
+                <div className={styles.field}>
+                  <label className={styles.label}>담당자</label>
+                  <input
+                    className={styles.input}
+                    value={draft.quotes.issuer_manager}
+                    onChange={(e) => patch('quotes', { issuer_manager: e.target.value })}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>TEL</label>
+                  <input
+                    className={styles.input}
+                    value={draft.quotes.issuer_tel}
+                    onChange={(e) => patch('quotes', { issuer_tel: e.target.value })}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>HP</label>
+                  <input
+                    className={styles.input}
+                    value={draft.quotes.issuer_hp}
+                    onChange={(e) => patch('quotes', { issuer_hp: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label}>홈페이지</label>
+                <input
+                  className={styles.input}
+                  value={draft.quotes.issuer_homepage}
+                  onChange={(e) => patch('quotes', { issuer_homepage: e.target.value })}
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label}>블로그</label>
+                <input
+                  className={styles.input}
+                  value={draft.quotes.issuer_blog}
+                  onChange={(e) => patch('quotes', { issuer_blog: e.target.value })}
+                />
+              </div>
+            </div>
+          </>
         )}
       </div>
 

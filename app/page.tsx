@@ -8,6 +8,7 @@ import { loadAppSettings } from '@/utils/appSettings'
 import { getPendingPartsAction } from '@/app/actions/service'
 import DashboardPlanner from '@/components/home/DashboardPlanner'
 import ClientsMap from '@/components/home/ClientsMap'
+import OpsIssuesBanner from '@/components/layout/OpsIssuesBanner'
 import styles from './home.module.css'
 
 type RecentLog = {
@@ -261,43 +262,6 @@ export default function HomePage() {
     return <div className="pageShell" style={{ color: '#666' }}>데이터를 불러오는 중...</div>
   }
 
-  const alerts: { href: string; text: string; kind: 'warn' | 'danger' | 'info' }[] = []
-  if (data.pendingStockCount > 0) {
-    alerts.push({
-      href: '/inventory',
-      kind: 'warn',
-      text: `미입고(가출고) ${data.pendingStockCount}건 · ${data.pendingStockQty}개 대기`,
-    })
-  }
-  if (data.lowStock.length > 0) {
-    alerts.push({
-      href: '/inventory',
-      kind: 'danger',
-      text: `재고 부족 ${data.lowStock.length}품목 이상`,
-    })
-  }
-  if (data.unpaidCount > 0) {
-    alerts.push({
-      href: '/accounting',
-      kind: 'danger',
-      text: `미수금 ${data.unpaidCount}건 · ${data.unpaidAmount.toLocaleString()}원`,
-    })
-  }
-  if (data.incompleteConsumables > 0) {
-    alerts.push({
-      href: '/inventory',
-      kind: 'info',
-      text: `소모품 정리 필요 ${data.incompleteConsumables}건 (색상/호환)`,
-    })
-  }
-  if (data.serviceMonthOpen > 0) {
-    alerts.push({
-      href: '/service',
-      kind: 'info',
-      text: `이번 달 미완료 일지 ${data.serviceMonthOpen}건`,
-    })
-  }
-
   return (
     <div className={`pageShell ${styles.wrap}`}>
       <section className={styles.header}>
@@ -310,25 +274,7 @@ export default function HomePage() {
         {dashboardNote ? <p className={styles.note}>{dashboardNote}</p> : null}
       </section>
 
-      {alerts.length > 0 && (
-        <section className={styles.alerts}>
-          {alerts.map((a) => (
-            <Link
-              key={a.text}
-              href={a.href}
-              className={`${styles.alert} ${
-                a.kind === 'danger'
-                  ? styles.alertDanger
-                  : a.kind === 'warn'
-                    ? styles.alertWarn
-                    : styles.alertInfo
-              }`}
-            >
-              {a.text}
-            </Link>
-          ))}
-        </section>
-      )}
+      <OpsIssuesBanner />
 
       <section className={styles.grid}>
         <Link href="/clients" className={`${styles.card} ${styles.cardLink}`}>

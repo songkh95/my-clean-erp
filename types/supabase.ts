@@ -232,6 +232,194 @@ export type Database = {
           },
         ]
       }
+      quotes: {
+        Row: {
+          id: string
+          organization_id: string
+          created_by: string | null
+          quote_no: string | null
+          quote_date: string
+          client_id: string | null
+          client_name: string
+          title: string
+          intro: string
+          notes: string | null
+          footer_notice: string | null
+          issuer_company: string | null
+          issuer_partner: string | null
+          issuer_ceo: string | null
+          issuer_biz_no: string | null
+          issuer_address: string | null
+          issuer_manager: string | null
+          issuer_tel: string | null
+          issuer_hp: string | null
+          issuer_homepage: string | null
+          issuer_blog: string | null
+          vat_rate: number
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          created_by?: string | null
+          quote_no?: string | null
+          quote_date?: string
+          client_id?: string | null
+          client_name?: string
+          title?: string
+          intro?: string
+          notes?: string | null
+          footer_notice?: string | null
+          issuer_company?: string | null
+          issuer_partner?: string | null
+          issuer_ceo?: string | null
+          issuer_biz_no?: string | null
+          issuer_address?: string | null
+          issuer_manager?: string | null
+          issuer_tel?: string | null
+          issuer_hp?: string | null
+          issuer_homepage?: string | null
+          issuer_blog?: string | null
+          vat_rate?: number
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          created_by?: string | null
+          quote_no?: string | null
+          quote_date?: string
+          client_id?: string | null
+          client_name?: string
+          title?: string
+          intro?: string
+          notes?: string | null
+          footer_notice?: string | null
+          issuer_company?: string | null
+          issuer_partner?: string | null
+          issuer_ceo?: string | null
+          issuer_biz_no?: string | null
+          issuer_address?: string | null
+          issuer_manager?: string | null
+          issuer_tel?: string | null
+          issuer_hp?: string | null
+          issuer_homepage?: string | null
+          issuer_blog?: string | null
+          vat_rate?: number
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_items: {
+        Row: {
+          id: string
+          quote_id: string
+          organization_id: string
+          sort_order: number
+          description: string
+          unit: string
+          quantity: number
+          unit_price: number
+          unit_price_text: string | null
+          amount_text: string | null
+          exclude_from_total: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          organization_id: string
+          sort_order?: number
+          description?: string
+          unit?: string
+          quantity?: number
+          unit_price?: number
+          unit_price_text?: string | null
+          amount_text?: string | null
+          exclude_from_total?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          organization_id?: string
+          sort_order?: number
+          description?: string
+          unit?: string
+          quantity?: number
+          unit_price?: number
+          unit_price_text?: string | null
+          amount_text?: string | null
+          exclude_from_total?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_branding: {
+        Row: {
+          organization_id: string
+          stamp_path: string | null
+          hq_logo_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          organization_id: string
+          stamp_path?: string | null
+          hq_logo_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          organization_id?: string
+          stamp_path?: string | null
+          hq_logo_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_branding_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           billing_date: string | null

@@ -55,6 +55,7 @@ export async function proxy(request: NextRequest) {
     '/inventory',
     '/accounting',
     '/service',
+    '/quotes',
     '/settings',
   ]
 

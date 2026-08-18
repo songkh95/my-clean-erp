@@ -1,0 +1,357 @@
+.sheet {
+  background: #fff;
+  color: #111;
+  width: 210mm;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 14mm 14mm 12mm;
+  box-sizing: border-box;
+  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  border: 1px solid #ddd;
+}
+
+.title {
+  text-align: center;
+  font-size: 26pt;
+  font-weight: 700;
+  letter-spacing: 0.45em;
+  margin: 0 0 36px;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.topGrid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+  align-items: start;
+}
+
+.topLeft {
+  min-width: 0;
+}
+
+.quoteNo {
+  font-size: 10pt;
+  margin-bottom: 6px;
+}
+
+.date {
+  font-size: 11pt;
+  margin-bottom: 12px;
+}
+
+.clientLine {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 8px 0 12px;
+  font-size: 13pt;
+  font-weight: 700;
+}
+
+.clientName {
+  flex: 1;
+  border-bottom: 1px solid #333;
+  padding-bottom: 2px;
+  min-width: 0;
+}
+
+.gujung {
+  white-space: nowrap;
+  letter-spacing: 0.25em;
+  font-weight: 700;
+}
+
+.intro {
+  margin: 0;
+  font-size: 10.5pt;
+}
+
+.issuerBox {
+  position: relative;
+  border: none;
+  padding: 4px 4px 8px;
+  font-size: 9.5pt;
+  line-height: 1.45;
+  min-height: 110px;
+}
+
+.issuerRow {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 4px 8px;
+  margin-bottom: 4px;
+}
+
+.issuerLabel {
+  color: #333;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.issuerValue {
+  word-break: break-all;
+}
+
+.issuerCompanyLine {
+  margin: 4px 0 4px;
+  font-weight: 700;
+  font-size: 9.5pt;
+  letter-spacing: 1.15em;
+  white-space: nowrap;
+  line-height: 1.45;
+}
+
+.issuerPartnerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+  line-height: 1.45;
+  position: relative;
+  min-height: 0;
+  padding-right: 56px;
+}
+
+.issuerPartnerLine {
+  font-size: 9.5pt;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  line-height: 1.45;
+}
+
+.issuerCeoLine {
+  margin: 0;
+  display: block;
+  font-size: 9.5pt;
+  letter-spacing: 0.85em;
+  white-space: nowrap;
+  line-height: 1.45;
+}
+
+.stampImg {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.totalBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid #222;
+  padding: 8px 12px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+  font-size: 11.5pt;
+}
+
+.totalLabel {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.totalGold {
+  font-weight: 700;
+}
+
+.totalKorean {
+  flex: 1;
+  font-weight: 600;
+}
+
+.totalWon {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4px;
+  font-size: 9pt;
+  table-layout: fixed;
+}
+
+.table th,
+.table td {
+  border: 1px solid #333;
+  padding: 5px 6px;
+  vertical-align: middle;
+}
+
+.table th {
+  background: #f3f3f3;
+  font-weight: 700;
+  text-align: center;
+}
+
+.colDesc {
+  width: 34%;
+  text-align: left;
+  word-break: break-word;
+}
+
+.colUnit {
+  width: 7%;
+  text-align: center;
+}
+
+.colQty {
+  width: 7%;
+  text-align: center;
+}
+
+.colPrice {
+  width: 16%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.colAmount {
+  width: 16%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tableWithLease .colDesc {
+  width: 24%;
+}
+
+.tableWithLease .colPrice,
+.tableWithLease .colAmount {
+  width: 12%;
+}
+
+.colLease {
+  width: 30%;
+  text-align: left;
+}
+
+.leaseText {
+  white-space: pre-wrap !important;
+  font-size: 8.5pt;
+  line-height: 1.45;
+  font-weight: 500;
+  text-align: left !important;
+}
+
+.priceText,
+.amountText {
+  text-align: left !important;
+  white-space: pre-wrap !important;
+  font-size: 8.5pt;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.muted {
+  color: #666;
+  font-size: 8pt;
+}
+
+.summaryWrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.summaryTable {
+  width: auto;
+  min-width: 220px;
+  border-collapse: collapse;
+}
+
+.summaryRow td {
+  border: none;
+  padding: 3px 6px;
+  font-size: 10pt;
+}
+
+.summaryLabel {
+  text-align: right;
+  font-weight: 700;
+  padding-right: 12px !important;
+}
+
+.summaryValue {
+  text-align: right;
+  font-weight: 700;
+  min-width: 100px;
+}
+
+.notes {
+  margin-top: 14px;
+  font-size: 9pt;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.notesTitle {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.footerNotice {
+  margin-top: 18px;
+  font-size: 8.5pt;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.footerBrand {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid #ccc;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.footerLeft {
+  font-size: 9.5pt;
+  line-height: 1.55;
+  min-width: 0;
+}
+
+.footerCompany {
+  font-size: 16pt;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+
+.footerPartner {
+  font-size: 9pt;
+  margin-bottom: 4px;
+}
+
+.footerContact {
+  font-size: 9pt;
+}
+
+.hqLogo {
+  max-width: 200px;
+  max-height: 78px;
+  object-fit: contain;
+  display: block;
+}
+
+@media print {
+  .sheet {
+    border: none;
+    width: auto;
+    max-width: none;
+    padding: 8mm 12mm;
+    box-shadow: none;
+  }
+}

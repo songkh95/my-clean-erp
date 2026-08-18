@@ -59,6 +59,12 @@ const DEFAULT_COL_WIDTHS: Record<ColKey, number> = {
 }
 
 const COL_WIDTHS_KEY = 'service-log-col-widths'
+const STATUS_ORDER = ['미방문', '접수', '보류', '완료'] as const
+
+function statusRank(status: string | null | undefined) {
+  const i = STATUS_ORDER.indexOf((status || '') as (typeof STATUS_ORDER)[number])
+  return i === -1 ? STATUS_ORDER.length : i
+}
 
 function isDummyId(id: string) {
   return id.startsWith('dummy_')
@@ -138,7 +144,9 @@ export default function ServicePage() {
   >({})
   const [query, setQuery] = useState('')
   const [locked, setLocked] = useState(false)
+  const [sortBy, setSortBy] = useState<'client' | 'status'>('client')
   const [clientSort, setClientSort] = useState<'asc' | 'desc'>('asc')
+  const [statusSort, setStatusSort] = useState<'asc' | 'desc'>('asc')
   const [visitPin, setVisitPin] = useState<'none' | 'visited' | 'unvisited'>('none')
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('all')
   const [periodYear, setPeriodYear] = useState(() => new Date().getFullYear())
@@ -312,12 +320,12 @@ export default function ServicePage() {
 
   const sortedLogs = useMemo(() => {
     const list = [...filteredLogs]
-    const dir = clientSort === 'asc' ? 1 : -1
+    const clientDir = clientSort === 'asc' ? 1 : -1
     list.sort((a, b) => {
       const nameA = a.client?.name || ''
       const nameB = b.client?.name || ''
       const byName = nameA.localeCompare(nameB, 'ko')
-      if (byName !== 0) return byName * dir
+      if (byName !== 0) return byName * clientDir
       const dateA = a.visit_date || ''
       const dateB = b.visit_date || ''
       if (dateA !== dateB) {
@@ -369,20 +377,37 @@ export default function ServicePage() {
   const isMonthVisitedLog = (log: ServiceLog) =>
     !isMonthUnvisitedLog(log) && String(log.visit_date || '').startsWith(currentMonthPrefix)
 
-  /** 이번 달 방문/미방문 클릭 시 해당 그룹을 위로 */
+  /** 이번 달 방문/미방문 클릭 시 해당 그룹을 위로 / 상태 정렬 시 상태끼리 묶음 */
   const displayRowGroups = useMemo(() => {
-    if (visitPin === 'none') return rowGroups
-    const scored = rowGroups.map((g, index) => {
-      const unvisited = isMonthUnvisitedLog(g.primary)
-      const visited = isMonthVisitedLog(g.primary)
-      let rank = 1
-      if (visitPin === 'visited') rank = visited ? 0 : 1
-      if (visitPin === 'unvisited') rank = unvisited ? 0 : 1
-      return { g, index, rank }
-    })
-    scored.sort((a, b) => (a.rank - b.rank) || (a.index - b.index))
-    return scored.map((s) => s.g)
-  }, [rowGroups, visitPin, currentMonthPrefix])
+    let groups = rowGroups
+
+    if (visitPin !== 'none') {
+      const scored = groups.map((g, index) => {
+        const unvisited = isMonthUnvisitedLog(g.primary)
+        const visited = isMonthVisitedLog(g.primary)
+        let rank = 1
+        if (visitPin === 'visited') rank = visited ? 0 : 1
+        if (visitPin === 'unvisited') rank = unvisited ? 0 : 1
+        return { g, index, rank }
+      })
+      scored.sort((a, b) => (a.rank - b.rank) || (a.index - b.index))
+      groups = scored.map((s) => s.g)
+    }
+
+    if (sortBy === 'status') {
+      const statusDir = statusSort === 'asc' ? 1 : -1
+      const clientDir = clientSort === 'asc' ? 1 : -1
+      groups = [...groups].sort((a, b) => {
+        const byStatus = (statusRank(a.primary.status) - statusRank(b.primary.status)) * statusDir
+        if (byStatus !== 0) return byStatus
+        const nameA = a.primary.client?.name || ''
+        const nameB = b.primary.client?.name || ''
+        return nameA.localeCompare(nameB, 'ko') * clientDir
+      })
+    }
+
+    return groups
+  }, [rowGroups, visitPin, currentMonthPrefix, sortBy, statusSort, clientSort])
 
   const summaryStats = useMemo(() => {
     const source = periodLogs
@@ -1210,17 +1235,39 @@ export default function ServicePage() {
           <thead>
             <tr>
               <ResizableTh className={styles.th} width={colWidths.no} minWidth={32} onResize={(w) => setColWidth('no', w)}>No</ResizableTh>
-              <ResizableTh className={styles.th} width={colWidths.status} minWidth={48} onResize={(w) => setColWidth('status', w)}>상태</ResizableTh>
+              <ResizableTh className={styles.th} width={colWidths.status} minWidth={48} onResize={(w) => setColWidth('status', w)}>
+                <button
+                  type="button"
+                  className={styles.sortThBtn}
+                  onClick={() => {
+                    if (sortBy === 'status') {
+                      setStatusSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                    } else {
+                      setSortBy('status')
+                      setStatusSort('asc')
+                    }
+                  }}
+                  title="상태별로 묶어서 정렬"
+                >
+                  상태{sortBy === 'status' ? (statusSort === 'asc' ? ' ↑' : ' ↓') : ''}
+                </button>
+              </ResizableTh>
               <ResizableTh className={styles.th} width={colWidths.visit} minWidth={72} onResize={(w) => setColWidth('visit', w)}>방문일자</ResizableTh>
               <ResizableTh className={styles.th} width={colWidths.type} minWidth={52} onResize={(w) => setColWidth('type', w)}>구분</ResizableTh>
               <ResizableTh className={styles.th} width={colWidths.client} minWidth={72} onResize={(w) => setColWidth('client', w)}>
                 <button
                   type="button"
                   className={styles.sortThBtn}
-                  onClick={() => setClientSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                  onClick={() => {
+                    if (sortBy === 'client') {
+                      setClientSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                    } else {
+                      setSortBy('client')
+                    }
+                  }}
                   title="거래처명으로 묶어서 정렬"
                 >
-                  거래처명 {clientSort === 'asc' ? '↑' : '↓'}
+                  거래처명{sortBy === 'client' ? (clientSort === 'asc' ? ' ↑' : ' ↓') : ''}
                 </button>
               </ResizableTh>
               <ResizableTh className={styles.th} width={colWidths.machine} minWidth={80} onResize={(w) => setColWidth('machine', w)}>기기정보</ResizableTh>
