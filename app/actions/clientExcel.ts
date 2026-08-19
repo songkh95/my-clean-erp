@@ -286,7 +286,7 @@ export async function importClientsMachinesFromExcelAction(
         created_at: new Date().toISOString(),
       }
 
-      const { error } = await supabase.from('inventory').insert(payload)
+      const { error } = await supabase.from('inventory').insert(payload as any)
       if (error) {
         const msg = error.message || '등록 실패'
         if (
