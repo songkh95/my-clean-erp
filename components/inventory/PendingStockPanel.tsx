@@ -1,19 +1,24 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   confirmPendingPartsAction,
   getPendingPartsAction,
 } from '@/app/actions/service'
 import { addConsumableStockAction, getConsumablesAction } from '@/app/actions/consumable'
-import ConsumableForm from '@/components/inventory/ConsumableForm'
+import ConsumableForm from './ConsumableForm'
 import styles from './PendingStockPanel.module.css'
 
-export default function PendingStockPanel() {
+type Props = {
+  onGoConsumables?: () => void
+}
+
+export default function PendingStockPanel({ onGoConsumables }: Props) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [busyId, setBusyId] = useState<string | null>(null)
   const [hint, setHint] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [stockDraft, setStockDraft] = useState<Record<string, string>>({})
   const [editItem, setEditItem] = useState<any | null>(null)
 
@@ -29,6 +34,17 @@ export default function PendingStockPanel() {
     load()
   }, [load])
 
+  const summary = useMemo(() => {
+    const clients = new Set<string>()
+    let qty = 0
+    for (const row of rows) {
+      const name = row.service_log?.client?.name
+      if (name) clients.add(name)
+      qty += Number(row.quantity) || 0
+    }
+    return { clients: Array.from(clients), qty }
+  }, [rows])
+
   const confirmOne = async (usageId: string) => {
     setBusyId(usageId)
     const res = await confirmPendingPartsAction({ usageIds: [usageId] })
@@ -37,12 +53,11 @@ export default function PendingStockPanel() {
       alert(res.message)
       return
     }
-    alert(res.message)
-    load()
+    await load()
   }
 
   const confirmAllForConsumable = async (consumableId: string, name: string) => {
-    if (!confirm(`${name}의 미입고 항목을 모두 확정(재고 차감)할까요?\n재고가 충분해야 합니다.`)) return
+    if (!confirm(`${name}의 미입고 항목을 모두 확정할까요?\n재고가 충분해야 합니다.`)) return
     setBusyId(consumableId)
     const res = await confirmPendingPartsAction({ consumableId })
     setBusyId(null)
@@ -51,18 +66,11 @@ export default function PendingStockPanel() {
       return
     }
     alert(res.message)
-    load()
-  }
-
-  const openEdit = async (consumableId: string, fallback: any) => {
-    const res = await getConsumablesAction()
-    const full = (res.data || []).find((c: any) => c.id === consumableId)
-    setEditItem(full || fallback)
+    await load()
   }
 
   const addStock = async (consumableId: string) => {
-    const raw = stockDraft[consumableId]
-    const qty = Math.floor(Number(raw))
+    const qty = Math.floor(Number(stockDraft[consumableId]))
     if (!Number.isFinite(qty) || qty <= 0) {
       alert('입고 수량을 입력하세요.')
       return
@@ -79,180 +87,183 @@ export default function PendingStockPanel() {
     await load()
   }
 
+  const openEdit = async (row: any) => {
+    onGoConsumables?.()
+    const id = row.consumable_id
+    const res = await getConsumablesAction()
+    const full = (res.data || []).find((c: any) => c.id === id)
+    setEditItem(
+      full || {
+        ...(row.consumable || {}),
+        id,
+        model_name: row.consumable?.model_name,
+        current_stock: row.consumable?.current_stock,
+        category: row.consumable?.category || '토너',
+        compatible_models: [],
+      }
+    )
+  }
+
   if (loading) {
     return (
       <div className={styles.wrap}>
-        <div className={styles.title}>미입고(가출고) 대기</div>
+        <div className={styles.title}>미입고(재고 없음) 알림</div>
         <p className={styles.empty}>불러오는 중…</p>
       </div>
     )
   }
 
   if (rows.length === 0) {
+    if (!hint) return null
     return (
       <div className={styles.wrap}>
-        <div className={styles.title}>미입고(가출고) 대기</div>
+        <div className={styles.title}>미입고(재고 없음) 알림</div>
         <p className={styles.empty}>
           {hint.includes('stock_status')
             ? 'SQL(service_parts_stock_status.sql) 실행 후 사용 가능합니다.'
-            : '대기 중인 미입고 사용이 없습니다.'}
+            : hint}
         </p>
       </div>
     )
   }
 
-  // 소모품별 그룹
-  const groups = new Map<
-    string,
-    {
-      name: string
-      stock: number
-      code: string
-      category: string
-      color: string
-      regenerated: boolean
-      consumable: any
-      items: any[]
-    }
-  >()
-  for (const row of rows) {
-    const id = row.consumable_id
-    if (!groups.has(id)) {
-      const c = row.consumable || {}
-      groups.set(id, {
-        name: c.model_name || id,
-        stock: Number(c.current_stock) || 0,
-        code: c.code || '',
-        category: c.category || '',
-        color: c.color || '',
-        regenerated: Boolean(c.is_regenerated),
-        consumable: c,
-        items: [],
-      })
-    }
-    groups.get(id)!.items.push(row)
-  }
-
   return (
-    <div className={styles.wrap}>
-      <div className={styles.head}>
-        <div className={styles.title}>미입고(가출고) 대기 · {rows.length}건</div>
-        <button type="button" className={styles.refresh} onClick={load}>새로고침</button>
+    <>
+      <div className={styles.wrap}>
+        <div className={styles.head}>
+          <div>
+            <div className={styles.title}>미입고(재고 없음) · {rows.length}건 / {summary.qty}개</div>
+            <p className={styles.desc} style={{ marginBottom: 0 }}>
+              거래처 {summary.clients.slice(0, 4).join(', ') || '미확인'}
+              {summary.clients.length > 4 ? ` 외 ${summary.clients.length - 4}곳` : ''}
+              에서 재고 없이 소모품을 등록했습니다. 표로 확인하고 입고·확정하세요.
+            </p>
+          </div>
+          <div className={styles.groupActions}>
+            <button type="button" className={styles.refresh} onClick={() => void load()}>
+              새로고침
+            </button>
+            <button type="button" className={styles.goBtn} style={{ marginBottom: 0 }} onClick={() => setModalOpen(true)}>
+              표로 전체 보기
+            </button>
+          </div>
+        </div>
       </div>
-      <p className={styles.desc}>
-        서비스 일지에서 재고 없이 사용한 항목입니다.
-        아래에서 <strong>어떤 소모품인지 확인</strong>하고 재고를 입고한 뒤 <strong>입고 확정</strong>하면 차감·연결됩니다.
-      </p>
 
-      {Array.from(groups.entries()).map(([consumableId, group]) => {
-        const need = group.items.reduce((s, r) => s + Number(r.quantity), 0)
-        const canConfirm = group.stock >= need
-        const metaBits = [
-          group.category,
-          group.color ? `색상 ${group.color}` : '',
-          group.regenerated ? '재생' : '',
-          group.code ? `코드 ${group.code}` : '',
-        ].filter(Boolean)
-
-        return (
-          <div key={consumableId} className={styles.group}>
-            <div className={styles.groupHead}>
-              <div>
-                <div className={styles.groupName}>{group.name}</div>
-                <div className={styles.meta}>
-                  {metaBits.length > 0 ? `${metaBits.join(' · ')} · ` : ''}
-                  대기 {need} · 현재 재고 {group.stock}
-                  {!canConfirm && <span className={styles.warn}> · 재고 부족</span>}
-                </div>
-              </div>
-              <div className={styles.groupActions}>
-                <button
-                  type="button"
-                  className={styles.linkBtn}
-                  onClick={() =>
-                    void openEdit(consumableId, {
-                      ...group.consumable,
-                      id: consumableId,
-                      model_name: group.name,
-                      current_stock: group.stock,
-                      code: group.code,
-                      category: group.category || '토너',
-                      color: group.color || '',
-                      is_regenerated: group.regenerated,
-                      compatible_models: [],
-                    })
-                  }
-                >
-                  품목 수정
-                </button>
-                <button
-                  type="button"
-                  className={styles.confirmBtn}
-                  disabled={!canConfirm || busyId === consumableId}
-                  onClick={() => confirmAllForConsumable(consumableId, group.name)}
-                >
-                  {busyId === consumableId ? '처리 중…' : '일괄 확정'}
-                </button>
-              </div>
-            </div>
-
-            <div className={styles.stockRow}>
-              <label className={styles.stockLabel}>재고 입고</label>
-              <input
-                className={styles.stockInput}
-                type="number"
-                min={1}
-                placeholder="수량"
-                value={stockDraft[consumableId] ?? ''}
-                onChange={(e) =>
-                  setStockDraft((prev) => ({ ...prev, [consumableId]: e.target.value }))
-                }
-              />
-              <button
-                type="button"
-                className={styles.stockBtn}
-                disabled={busyId === `stock-${consumableId}`}
-                onClick={() => void addStock(consumableId)}
-              >
-                {busyId === `stock-${consumableId}` ? '입고 중…' : '입고 반영'}
+      {modalOpen ? (
+        <div className={styles.modalOverlay} onClick={() => setModalOpen(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHead}>
+              <h3 className={styles.modalTitle}>미입고 전체 목록</h3>
+              <button type="button" className={styles.refresh} onClick={() => setModalOpen(false)}>
+                닫기
               </button>
             </div>
+            <p className={styles.desc}>
+              서비스 일지에서 재고가 없는데 소모품을 등록한 건입니다. 거래처·소모품을 확인한 뒤 입고하고 확정하세요.
+            </p>
 
-            <ul className={styles.list}>
-              {group.items.map((row) => {
-                const inv = row.service_log?.inventory
-                const invLabel = inv
-                  ? [inv.model_name, inv.department ? `(${inv.department})` : '', inv.serial_number]
-                      .filter(Boolean)
-                      .join(' ')
-                  : ''
-                return (
-                  <li key={row.id} className={styles.item}>
-                    <span>
-                      {row.service_log?.client?.name || '거래처'}
-                      {invLabel ? ` · ${invLabel}` : ''}
-                      {row.service_log?.visit_date ? ` · ${row.service_log.visit_date}` : ''}
-                      {' · '}
-                      {row.quantity}개
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.smallBtn}
-                      disabled={
-                        busyId === row.id ||
-                        (Number(row.consumable?.current_stock) || 0) < Number(row.quantity)
-                      }
-                      onClick={() => confirmOne(row.id)}
-                    >
-                      확정
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>거래처</th>
+                    <th>소모품</th>
+                    <th>수량</th>
+                    <th>방문일</th>
+                    <th>기기</th>
+                    <th>현재고</th>
+                    <th>입고</th>
+                    <th>처리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const client = row.service_log?.client?.name || '거래처 미확인'
+                    const item = row.consumable?.model_name || '소모품'
+                    const qty = Number(row.quantity) || 0
+                    const stock = Number(row.consumable?.current_stock) || 0
+                    const inv = row.service_log?.inventory
+                    const invLabel = inv
+                      ? [inv.model_name, inv.department ? `(${inv.department})` : '', inv.serial_number]
+                          .filter(Boolean)
+                          .join(' ')
+                      : '-'
+                    const canConfirm = stock >= qty
+                    return (
+                      <tr key={row.id}>
+                        <td>
+                          <strong>{client}</strong>
+                        </td>
+                        <td>
+                          <button type="button" className={styles.linkCell} onClick={() => void openEdit(row)}>
+                            {item}
+                          </button>
+                          {row.consumable?.category ? (
+                            <div className={styles.sub}>{row.consumable.category}{row.consumable.color ? ` · ${row.consumable.color}` : ''}</div>
+                          ) : null}
+                        </td>
+                        <td className={styles.num}>{qty}</td>
+                        <td>{row.service_log?.visit_date || '-'}</td>
+                        <td>{invLabel}</td>
+                        <td className={styles.num} style={{ color: canConfirm ? '#059669' : '#dc2626' }}>
+                          {stock}
+                        </td>
+                        <td>
+                          <div className={styles.inlineStock}>
+                            <input
+                              type="number"
+                              min={1}
+                              className={styles.stockInput}
+                              placeholder="수량"
+                              value={stockDraft[row.consumable_id] ?? ''}
+                              onChange={(e) =>
+                                setStockDraft((prev) => ({
+                                  ...prev,
+                                  [row.consumable_id]: e.target.value,
+                                }))
+                              }
+                            />
+                            <button
+                              type="button"
+                              className={styles.stockBtn}
+                              disabled={busyId === `stock-${row.consumable_id}`}
+                              onClick={() => void addStock(row.consumable_id)}
+                            >
+                              입고
+                            </button>
+                          </div>
+                        </td>
+                        <td>
+                          <div className={styles.rowActions}>
+                            <button
+                              type="button"
+                              className={styles.smallBtn}
+                              disabled={!canConfirm || busyId === row.id}
+                              onClick={() => void confirmOne(row.id)}
+                            >
+                              확정
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.linkBtn}
+                              onClick={() =>
+                                void confirmAllForConsumable(row.consumable_id, item)
+                              }
+                            >
+                              일괄
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        )
-      })}
+        </div>
+      ) : null}
 
       <ConsumableForm
         isOpen={Boolean(editItem)}
@@ -264,6 +275,6 @@ export default function PendingStockPanel() {
           load()
         }}
       />
-    </div>
+    </>
   )
 }

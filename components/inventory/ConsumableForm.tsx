@@ -10,8 +10,10 @@ import {
   getConsumablesAction,
   getMachineModelOptionsAction,
 } from '@/app/actions/consumable'
+import { listProductGroupsAction, type ProductGroupRow } from '@/app/actions/productGroups'
 import { toMachineModelName, toManagementCode, toConsumableModelName } from '@/utils/suggestMatch'
 import { standardConsumableName, type TonerDrumColor } from '@/utils/consumableMatch'
+import ProductGroupManager from './ProductGroupManager'
 
 export type ConsumableFormPreset = {
   category?: string
@@ -61,12 +63,30 @@ export default function ConsumableForm({
     is_regenerated: false,
   })
   const [compatibleModels, setCompatibleModels] = useState<string[]>([])
+  const [productGroup, setProductGroup] = useState('')
+  const [productGroups, setProductGroups] = useState<ProductGroupRow[]>([])
+  const [groupManagerOpen, setGroupManagerOpen] = useState(false)
   const [machineDraft, setMachineDraft] = useState('')
   const [nameSuggestions, setNameSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
   const [codeSuggestions, setCodeSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
   const [machineSuggestions, setMachineSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
 
   const showColorFields = formData.category === '토너' || formData.category === '드럼'
+
+  const reloadProductGroups = () => {
+    listProductGroupsAction().then((res) => {
+      setProductGroups(res.data || [])
+    })
+  }
+
+  const applyProductGroup = (groupName: string) => {
+    setProductGroup(groupName)
+    if (!groupName) return
+    const found = productGroups.find((g) => g.name === groupName)
+    if (found && found.machine_models.length > 0) {
+      setCompatibleModels([...found.machine_models])
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -90,6 +110,8 @@ export default function ConsumableForm({
       setCompatibleModels(
         Array.from(new Set(models.map((m) => toMachineModelName(String(m)).trim()).filter(Boolean)))
       )
+      // product_group 컬럼이 실제 제품군 이름인 경우만 유지 (예전엔 단일 모델명이 들어갔을 수 있음)
+      setProductGroup(String(editData.product_group || '').trim())
     } else {
       const cat = preset?.category || defaultCategory || categories[0] || '토너'
       const color = (preset?.color || '') as TonerDrumColor | ''
@@ -123,8 +145,10 @@ export default function ConsumableForm({
           )
         )
       )
+      setProductGroup('')
     }
     setMachineDraft('')
+    reloadProductGroups()
 
     getConsumablesAction().then((res) => {
       if (!res.success || !res.data) return
@@ -204,6 +228,7 @@ export default function ConsumableForm({
       color: showColorFields && formData.color ? formData.color : null,
       is_regenerated: showColorFields ? formData.is_regenerated : false,
       compatible_models: compatibleModels,
+      product_group: productGroup || null,
     }
     if (!payload.id) delete payload.id
 
@@ -226,7 +251,7 @@ export default function ConsumableForm({
 
   return (
     <div className={styles.overlay} style={{ zIndex: 1200 }}>
-      <div className={styles.modal} style={{ width: '480px', maxWidth: '96vw' }}>
+      <div className={styles.modal} style={{ width: '520px', maxWidth: '96vw' }}>
         <h2 className={styles.title}>{editData ? '자재 수정' : '자재 등록'}</h2>
         {preset && !editData ? (
           <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#6b7280', lineHeight: 1.45 }}>
@@ -316,6 +341,58 @@ export default function ConsumableForm({
             value={formData.unit_price}
             onChange={(e) => setFormData({ ...formData, unit_price: Number(e.target.value) })}
           />
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <label style={{
+                display: 'block', fontSize: '0.75rem',
+                fontWeight: 500, color: 'var(--notion-sub-text)',
+              }}>
+                제품군
+              </label>
+              <button
+                type="button"
+                onClick={() => setGroupManagerOpen(true)}
+                style={{
+                  border: '1px solid #d1d5db',
+                  background: '#fff',
+                  borderRadius: 4,
+                  padding: '2px 8px',
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                  color: '#374151',
+                }}
+              >
+                제품군 정리/등록
+              </button>
+            </div>
+            <select
+              value={productGroup}
+              onChange={(e) => applyProductGroup(e.target.value)}
+              style={{
+                width: '100%',
+                height: 38,
+                border: '1px solid #e5e7eb',
+                borderRadius: 6,
+                padding: '0 10px',
+                fontSize: '0.9rem',
+                background: '#fff',
+              }}
+            >
+              <option value="">선택 안 함 (호환기기 직접 지정)</option>
+              {productGroup && !productGroups.some((g) => g.name === productGroup) ? (
+                <option value={productGroup}>{productGroup} (기존 값)</option>
+              ) : null}
+              {productGroups.map((g) => (
+                <option key={g.id} value={g.name}>
+                  {g.name} ({g.machine_models.length}대)
+                </option>
+              ))}
+            </select>
+            <p style={{ margin: '6px 0 0', fontSize: '0.72rem', color: '#6b7280' }}>
+              제품군을 선택하면 호환 기기가 자동으로 채워집니다. 필요하면 아래에서 기기를 더 추가/제거할 수 있습니다.
+            </p>
+          </div>
 
           <div style={{ marginBottom: 16 }}>
             <label style={{
@@ -413,6 +490,13 @@ export default function ConsumableForm({
           </div>
         </form>
       </div>
+      <ProductGroupManager
+        isOpen={groupManagerOpen}
+        onClose={() => setGroupManagerOpen(false)}
+        onChanged={() => {
+          reloadProductGroups()
+        }}
+      />
     </div>
   )
 }

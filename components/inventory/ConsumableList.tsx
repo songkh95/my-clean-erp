@@ -7,7 +7,7 @@ import {
   restoreConsumableAction,
 } from '@/app/actions/consumable'
 import ConsumableForm from './ConsumableForm'
-import PendingStockPanel from './PendingStockPanel'
+import ProductGroupManager from './ProductGroupManager'
 import styles from './InventoryList.module.css'
 import { useAppSettings } from '@/hooks/useAppSettings'
 
@@ -23,6 +23,7 @@ export default function ConsumableList({ tab }: Props) {
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [showInactive, setShowInactive] = useState(false)
+  const [groupManagerOpen, setGroupManagerOpen] = useState(false)
 
   const categoriesForTab = useMemo(() => {
     if (tab === 'consumables') return settings.stock.consumableCategories
@@ -102,6 +103,7 @@ export default function ConsumableList({ tab }: Props) {
       item.model_name?.toLowerCase().includes(q) ||
       (item.code && item.code.toLowerCase().includes(q)) ||
       compat.includes(q) ||
+      (item.product_group && String(item.product_group).toLowerCase().includes(q)) ||
       (item.color && String(item.color).toLowerCase().includes(q))
     )
   })
@@ -114,8 +116,6 @@ export default function ConsumableList({ tab }: Props) {
 
   return (
     <div className={styles.container}>
-      <PendingStockPanel />
-
       {incomplete.length > 0 && (
         <div style={{
           marginBottom: 12,
@@ -178,6 +178,25 @@ export default function ConsumableList({ tab }: Props) {
             숨김포함
           </label>
         </span>
+        <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <button
+          onClick={() => setGroupManagerOpen(true)}
+          style={{
+            padding: '0 10px',
+            height: 30,
+            backgroundColor: '#fff',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: '0.78rem',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          제품군 정리
+        </button>
         <button
           onClick={() => { setSelectedItem(null); setIsModalOpen(true); }}
           style={{
@@ -196,12 +215,13 @@ export default function ConsumableList({ tab }: Props) {
         >
           + 등록
         </button>
+        </span>
       </div>
 
       <div className={styles.searchContainer}>
         <input
           className={styles.searchInput}
-          placeholder="호환기기, 품명, 색상, 관리코드 검색..."
+          placeholder="제품군, 호환기기, 품명, 색상, 관리코드 검색..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -214,6 +234,7 @@ export default function ConsumableList({ tab }: Props) {
               <th className={styles.th} style={{ width: '50px', textAlign: 'center' }}>No.</th>
               <th className={styles.th} style={{ width: '80px' }}>종류</th>
               <th className={styles.th} style={{ width: '56px', textAlign: 'center' }}>색상</th>
+              <th className={styles.th} style={{ minWidth: '110px' }}>제품군</th>
               <th className={styles.th} style={{ minWidth: '140px' }}>호환 기기</th>
               <th className={styles.th}>모델명 (품명)</th>
               <th className={styles.th} style={{ width: '100px' }}>관리코드</th>
@@ -225,9 +246,9 @@ export default function ConsumableList({ tab }: Props) {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} className={styles.noDataRow}>데이터를 불러오는 중...</td></tr>
+              <tr><td colSpan={11} className={styles.noDataRow}>데이터를 불러오는 중...</td></tr>
             ) : filteredItems.length === 0 ? (
-              <tr><td colSpan={10} className={styles.noDataRow}>등록된 자재가 없습니다.</td></tr>
+              <tr><td colSpan={11} className={styles.noDataRow}>등록된 자재가 없습니다.</td></tr>
             ) : (
               filteredItems.map((item, index) => (
                 <tr
@@ -248,10 +269,13 @@ export default function ConsumableList({ tab }: Props) {
                     {item.color || '-'}
                     {item.is_regenerated ? <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280' }}>재생</span> : null}
                   </td>
+                  <td className={styles.td} style={{ fontWeight: 600, color: '#0f766e', fontSize: '0.8rem' }}>
+                    {item.product_group || '-'}
+                  </td>
                   <td className={styles.td} style={{ fontWeight: '600', color: '#1d4ed8', fontSize: '0.8rem' }}>
                     {Array.isArray(item.compatible_models) && item.compatible_models.length > 0
                       ? item.compatible_models.join(', ')
-                      : (item.product_group || '-')}
+                      : '-'}
                   </td>
                   <td className={styles.td} style={{ fontWeight: '600', color: '#333' }}>
                     {item.model_name}
@@ -331,6 +355,10 @@ export default function ConsumableList({ tab }: Props) {
           ]}
         />
       )}
+      <ProductGroupManager
+        isOpen={groupManagerOpen}
+        onClose={() => setGroupManagerOpen(false)}
+      />
     </div>
   )
 }

@@ -226,7 +226,6 @@ export async function upsertConsumableAction(formData: any) {
 
   const {
     compatible_models: _cm,
-    product_group: _pg,
     force_new: forceNew,
     ...rest
   } = formData || {}
@@ -235,11 +234,16 @@ export async function upsertConsumableAction(formData: any) {
   const modelName = String(formData.model_name || '')
   const stockIn = Number(formData.current_stock)
   const priceIn = Number(formData.unit_price)
+  const productGroupName =
+    formData.product_group != null && String(formData.product_group).trim()
+      ? String(formData.product_group).trim()
+      : null
   const payload: Record<string, unknown> = {
     ...rest,
     organization_id: orgId,
     current_stock: Number.isFinite(stockIn) ? stockIn : 0,
     unit_price: Number.isFinite(priceIn) ? priceIn : 0,
+    product_group: productGroupName,
   }
 
   if (category === '토너' || category === '드럼') {
@@ -350,6 +354,7 @@ export async function upsertConsumableAction(formData: any) {
       if (Number.isFinite(priceIn) && priceIn > 0 && !(Number(existing.unit_price) > 0)) {
         patch.unit_price = priceIn
       }
+      if (productGroupName) patch.product_group = productGroupName
 
       await supabase.from('consumables').update(patch).eq('id', existing.id).eq('organization_id', orgId)
       const link = await replaceCompatibleModels(supabase, orgId, existing.id, mergedModels)

@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import InventoryList from '@/components/inventory/InventoryList'
 import ConsumableList from '@/components/inventory/ConsumableList'
 import InventoryForm from '@/components/inventory/InventoryForm'
+import PendingStockPanel from '@/components/inventory/PendingStockPanel'
 import ClientExcelModal from '@/components/client/ClientExcelModal'
 import styles from './inventory.module.css'
 
@@ -16,6 +17,8 @@ export default function InventoryPage() {
 
   return (
     <div className={styles.container}>
+      <PendingStockPanel onGoConsumables={() => setActiveTab('consumables')} />
+
       <div className={styles.tabs}>
         <div
           className={`${styles.tab} ${activeTab === 'machines' ? styles.tabActive : ''}`}

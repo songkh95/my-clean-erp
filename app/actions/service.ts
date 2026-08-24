@@ -1290,6 +1290,7 @@ export async function getPendingPartsAction() {
   const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
   if (!profile?.organization_id) return { success: false, data: [] as any[], message: '조직 없음' }
 
+  const orgId = profile.organization_id
   const { data, error } = await supabase
     .from('service_parts_usage')
     .select(`
@@ -1298,9 +1299,17 @@ export async function getPendingPartsAction() {
       stock_status,
       consumable_id,
       consumable:consumables(id, model_name, category, current_stock, code, product_group, color, is_regenerated),
-      service_log:service_logs(id, visit_date, status, client:clients(name), inventory:inventory(model_name, serial_number, department))
+      service_log:service_logs!inner(
+        id,
+        visit_date,
+        status,
+        organization_id,
+        client:clients(id, name),
+        inventory:inventory(model_name, serial_number, department)
+      )
     `)
     .eq('stock_status', 'pending')
+    .eq('service_log.organization_id', orgId)
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -1311,16 +1320,7 @@ export async function getPendingPartsAction() {
     return { success: false, data: [], message: error.message }
   }
 
-  // 조직 필터 (조인으로 한 번에 못 걸 수 있어 클라이언트 측 보강)
-  const orgId = profile.organization_id
-  const { data: orgLogs } = await supabase
-    .from('service_logs')
-    .select('id')
-    .eq('organization_id', orgId)
-  const logIds = new Set((orgLogs || []).map((l) => l.id))
-  const filtered = (data || []).filter((row: any) => logIds.has(row.service_log?.id || row.service_log_id))
-
-  return { success: true, data: filtered, message: '' }
+  return { success: true, data: data || [], message: '' }
 }
 
 /**

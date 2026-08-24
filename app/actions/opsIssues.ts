@@ -120,15 +120,20 @@ export async function getOpsIssuesSummaryAction(lowStockThreshold = 5): Promise<
   if (pending.length > 0) {
     groups.push({
       id: 'pending_stock',
-      title: '미입고(가출고) 대기',
+      title: '미입고(재고 없이 등록) — 소모품 입고 필요',
       count: pending.length,
       href: '/inventory',
       severity: 'error',
-      items: pending.slice(0, 8).map((p: any) => ({
-        id: String(p.id),
-        label: p.consumable?.model_name || '소모품',
-        detail: `${p.quantity || 0}개 · ${p.service_log?.client?.name || ''}`.trim(),
-      })),
+      items: pending.slice(0, 8).map((p: any) => {
+        const client = p.service_log?.client?.name || '거래처 미확인'
+        const item = p.consumable?.model_name || '소모품'
+        const qty = p.quantity || 0
+        return {
+          id: String(p.id),
+          label: `${client} · ${item}`,
+          detail: `${qty}개 · 재고 없이 등록됨 → 입고/등록 필요`,
+        }
+      }),
     })
   }
 
