@@ -8,11 +8,16 @@ import {
   updateServicePartsAction,
 } from '@/app/actions/service'
 import {
+  getMachineModelOptionsAction,
   rollbackDraftConsumablesAction,
 } from '@/app/actions/consumable'
 import { ServiceLog } from '@/app/types'
 import styles from '@/app/service/service.module.css'
-import { toMachineModelName } from '@/utils/suggestMatch'
+import {
+  collectKnownMachineModels,
+  rawMachineModelFromLog,
+  resolveMachineModel,
+} from '@/utils/machineModelResolve'
 
 interface Props {
   isOpen: boolean
@@ -25,6 +30,7 @@ interface Props {
 export default function PartsEditModal({ isOpen, log, locked = false, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false)
   const [consumables, setConsumables] = useState<any[]>([])
+  const [knownModels, setKnownModels] = useState<string[]>([])
   const [usedParts, setUsedParts] = useState<UsedPartRow[]>([])
   const sessionCreatedRef = useRef<string[]>([])
   const sessionLinkedRef = useRef<{ consumable_id: string; machine_model: string }[]>([])
@@ -42,10 +48,15 @@ export default function PartsEditModal({ isOpen, log, locked = false, onClose, o
     return map
   }, [log])
 
+  const rawModel = useMemo(() => rawMachineModelFromLog(log), [log])
+
   const machineModel = useMemo(() => {
-    const name = log?.inventory?.model_name || ''
-    return toMachineModelName(String(name)).trim() || null
-  }, [log?.inventory?.model_name])
+    const known = collectKnownMachineModels({
+      inventoryModels: knownModels,
+      consumables,
+    })
+    return resolveMachineModel(rawModel, known)
+  }, [rawModel, knownModels, consumables])
 
   useEffect(() => {
     if (!isOpen || !log) return
@@ -54,8 +65,12 @@ export default function PartsEditModal({ isOpen, log, locked = false, onClose, o
     sessionLinkedRef.current = []
 
     const load = async () => {
-      const list = await getConsumablesAction()
+      const [list, models] = await Promise.all([
+        getConsumablesAction(),
+        getMachineModelOptionsAction(),
+      ])
       setConsumables(list)
+      setKnownModels(models)
 
       const wasDone = log.status === '완료'
       const parts = (log.parts_usage || []).map((p: any) => {
@@ -90,7 +105,6 @@ export default function PartsEditModal({ isOpen, log, locked = false, onClose, o
   const handleCancel = async () => {
     if (!savedRef.current) {
       const created = [...sessionCreatedRef.current]
-      const linked = [...sessionLinkedRef.current]
       if (created.length > 0) {
         const remove = confirm(
           `이번 화면에서 새로 등록한 소모품 ${created.length}건이 있습니다.\n` +
@@ -126,6 +140,12 @@ export default function PartsEditModal({ isOpen, log, locked = false, onClose, o
 
   if (!isOpen || !log) return null
 
+  const clientLabel = log.client?.name || log.client_name || '거래처'
+  const machineLabel =
+    log.inventory
+      ? `${log.inventory.model_name} (${log.inventory.serial_number})`
+      : machineModel || rawModel || '기기 미지정'
+
   return (
     <div className={styles.modalOverlay} onClick={handleCancel}>
       <div
@@ -137,11 +157,17 @@ export default function PartsEditModal({ isOpen, log, locked = false, onClose, o
           교체 / 배송 · 소모품
         </h2>
         <p style={{ margin: '0 0 14px', fontSize: '0.78rem', color: '#6b7280' }}>
-          {log.client?.name || '거래처'}
-          {log.inventory ? ` · ${log.inventory.model_name} (${log.inventory.serial_number})` : ''}
+          {clientLabel}
+          {' · '}
+          {machineLabel}
           {' · '}상태: {log.status}
           {' — 「부품 저장」을 눌러야 일지에 반영됩니다.'}
         </p>
+        {!machineModel ? (
+          <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#b45309' }}>
+            일지에 기기 모델이 없습니다. 일지를 열어 대상 기기를 입력·선택한 뒤 다시 시도해 주세요.
+          </p>
+        ) : null}
 
         <PartsUsagePicker
           consumables={consumables}
@@ -149,6 +175,7 @@ export default function PartsEditModal({ isOpen, log, locked = false, onClose, o
           onChange={setUsedParts}
           onConsumablesChange={setConsumables}
           machineModel={machineModel}
+          productGroup={machineModel}
           status={log.status}
           creditById={creditById}
           disabled={locked}

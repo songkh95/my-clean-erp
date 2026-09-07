@@ -17,6 +17,35 @@ COMMENT ON COLUMN service_logs.memo IS '서비스 일지 메모';
 COMMENT ON COLUMN service_logs.spare_stock IS '거래처 현장 여유분 토너 등 (현재 재고)';
 COMMENT ON COLUMN service_logs.spare_stock_at IS '여유분 재고를 기록한 날짜';
 
+-- 1b) 서비스/판매/출장 구분 + 미등록 거래처명
+ALTER TABLE service_logs
+  ADD COLUMN IF NOT EXISTS log_kind text NOT NULL DEFAULT 'service';
+
+ALTER TABLE service_logs
+  ADD COLUMN IF NOT EXISTS client_name text;
+
+COMMENT ON COLUMN service_logs.log_kind IS 'service=렌탈/서비스, sales_trip=판매_출장';
+COMMENT ON COLUMN service_logs.client_name IS '거래처 미등록 시 자유 입력 상호명 (client_id NULL 가능)';
+
+UPDATE service_logs SET log_kind = 'sales_trip' WHERE log_kind IN ('sales', 'trip');
+UPDATE service_logs SET log_kind = 'service' WHERE log_kind IS NULL OR trim(log_kind) = '';
+
+DO $$
+BEGIN
+  ALTER TABLE service_logs ALTER COLUMN client_id DROP NOT NULL;
+EXCEPTION
+  WHEN others THEN
+    NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS service_logs_org_kind_idx
+  ON service_logs (organization_id, log_kind, visit_date DESC);
+
+ALTER TABLE service_logs
+  ADD COLUMN IF NOT EXISTS machine_model text;
+
+COMMENT ON COLUMN service_logs.machine_model IS '직접 입력 또는 선택 기기 모델명 (소모품 호환 연결용)';
+
 -- 2) 부품 사용: 재고 반영 상태 (미입고/가출고)
 ALTER TABLE service_parts_usage
   ADD COLUMN IF NOT EXISTS stock_status text NOT NULL DEFAULT 'none';

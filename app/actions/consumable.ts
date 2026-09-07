@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { toMachineModelName, toManagementCode, toConsumableModelName } from '@/utils/suggestMatch'
+import { canonicalizeMachineModel } from '@/utils/machineModelResolve'
 import { detectColor, isRegeneratedName } from '@/utils/consumableMatch'
 
 function normalizeCompatibleModels(raw: unknown): string[] {
@@ -71,7 +72,7 @@ export async function linkConsumableCompatibleModelAction(
   const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
   if (!profile?.organization_id) return { success: false as const, message: '조직 정보 없음' }
 
-  const model = toMachineModelName(machineModel).trim()
+  const model = canonicalizeMachineModel(machineModel)
   if (!model) return { success: false as const, message: '기기 모델명이 없습니다.' }
 
   const { error } = await supabase.from('consumable_compatible_models' as any).upsert(

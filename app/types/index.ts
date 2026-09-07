@@ -228,7 +228,12 @@ export interface ServicePartUsage {
 export interface ServiceLog {
   id: string;
   organization_id: string;
-  client_id: string;
+  log_kind?: 'service' | 'sales_trip' | 'sales' | 'trip' | null;
+  client_id: string | null;
+  /** 미등록 거래처 또는 표시용 상호명 */
+  client_name?: string | null;
+  /** 직접 입력/선택 기기 모델 (소모품 호환) */
+  machine_model?: string | null;
   inventory_id: string | null;
   status: '접수' | '완료' | '보류' | '미방문'; // '미방문' 추가됨
   service_type: string;

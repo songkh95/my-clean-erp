@@ -14,6 +14,7 @@ import { Client, Inventory } from '@/app/types'
 // ✅ [추가] 서버 액션 임포트
 import { deleteClientAction } from '@/app/actions/client'
 import ClientExcelModal from './ClientExcelModal'
+import PanelRefreshButton from '@/components/ui/PanelRefreshButton'
 import {
   detectClientIssues,
   groupClientIssues,
@@ -196,6 +197,7 @@ export default function ClientList() {
       <div className={styles.header}>
         <span>거래처</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <PanelRefreshButton onRefresh={fetchClients} />
           <Button variant="outline" size="sm" onClick={() => setExcelModalOpen(true)}>
             엑셀
           </Button>
@@ -255,7 +257,7 @@ export default function ClientList() {
       <div className={styles.listHeader}>
         <div>거래처명</div>
         <div>연락처/주소</div>
-        <div>기기</div>
+        <div>기기(대수)</div>
         <div style={{ textAlign: 'right' }}>관리</div>
       </div>
 
@@ -264,6 +266,10 @@ export default function ClientList() {
       ) : filteredClients.map((client) => {
         const isExpanded = expandedRows.has(client.id)
         const assets = assetsMap[client.id] || []
+        const machineNames = assets
+          .map((a) => String(a.model_name || '').trim())
+          .filter(Boolean)
+          .join(', ')
 
         return (
           <div key={client.id} className={styles.clientRow}>
@@ -289,7 +295,16 @@ export default function ClientList() {
               <div style={{ fontSize: '0.85rem', color: 'var(--notion-sub-text)' }}>
                 {client.phone || client.contact_person || '-'}
               </div>
-              <div>{assets.length}대</div>
+              <div className={styles.machineCell}>
+                <div className={styles.machineCount}>{assets.length}대</div>
+                {machineNames ? (
+                  <div className={styles.machineNames} title={machineNames}>
+                    {machineNames}
+                  </div>
+                ) : (
+                  <div className={styles.machineNames}>-</div>
+                )}
+              </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
                 <Button variant="ghost" size="sm" onClick={(e) => handleEdit(e, client)}>수정</Button>
                 <Button variant="danger" size="sm" onClick={(e) => handleDelete(e, client.id, client.name)}>삭제</Button>

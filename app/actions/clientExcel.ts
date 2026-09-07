@@ -80,7 +80,7 @@ export async function importClientsMachinesFromExcelAction(
   let clientSkipped = 0
   let clientUpdated = 0
   let machineCreated = 0
-  let machineSkipped = 0
+  let machineUpdated = 0
 
   try {
     const { data: existingClients } = await supabase
@@ -107,7 +107,8 @@ export async function importClientsMachinesFromExcelAction(
       const existingId = clientIdByName.get(key)
 
       if (existingId) {
-        const resolution = clientResolutions[key] || 'keep'
+        // 충돌 UI에서 선택하지 않은 기존 거래처도, 내용이 다르면 기본 덮어쓰기
+        const resolution = clientResolutions[key] ?? 'overwrite'
         if (resolution === 'keep') {
           clientSkipped += 1
           const parentName = row.소속본사?.trim()
@@ -205,11 +206,11 @@ export async function importClientsMachinesFromExcelAction(
       .select('id, serial_number')
       .eq('organization_id', orgId)
 
-    const serialSet = new Set(
-      (existingMachines || [])
-        .map((m) => String(m.serial_number || '').trim().toLowerCase())
-        .filter(Boolean)
-    )
+    const machineIdBySerial = new Map<string, string>()
+    for (const m of existingMachines || []) {
+      const s = String(m.serial_number || '').trim().toLowerCase()
+      if (s) machineIdBySerial.set(s, m.id)
+    }
 
     for (let i = 0; i < machines.length; i++) {
       const row = machines[i]
@@ -221,17 +222,14 @@ export async function importClientsMachinesFromExcelAction(
         continue
       }
 
-      const modelName = toMachineModelName(modelRaw)
+      const modelName = toMachineModelName(modelRaw) || modelRaw.trim().toUpperCase()
       if (!modelName) {
-        errors.push(`기기 "${serial}": 기종(모델명)은 영어·숫자만 가능합니다.`)
+        errors.push(`기기 "${serial}": 기종(모델명)을 확인하세요.`)
         continue
       }
 
       const serialKey = serial.toLowerCase()
-      if (serialSet.has(serialKey)) {
-        machineSkipped += 1
-        continue
-      }
+      const existingMachineId = machineIdBySerial.get(serialKey)
 
       const statusRaw = row.상태?.trim() || ''
       let clientId: string | null = null
@@ -259,7 +257,6 @@ export async function importClientsMachinesFromExcelAction(
       }
 
       const payload: Record<string, unknown> = {
-        organization_id: orgId,
         type: row.종류?.trim() || 'A3 레이저복합기',
         category: row.구분?.trim() || '컬러',
         brand,
@@ -283,10 +280,42 @@ export async function importClientsMachinesFromExcelAction(
         contract_end_date: end,
         contract_years: yearsNum,
         memo: row.비고?.trim() || null,
-        created_at: new Date().toISOString(),
       }
 
-      const { error } = await supabase.from('inventory').insert(payload as any)
+      if (existingMachineId) {
+        const { error } = await supabase
+          .from('inventory')
+          .update(payload as any)
+          .eq('id', existingMachineId)
+          .eq('organization_id', orgId)
+
+        if (error) {
+          const msg = error.message || '수정 실패'
+          if (
+            msg.includes('contract_type') ||
+            msg.includes('deposit') ||
+            msg.includes('sale_price') ||
+            msg.includes('contract_years') ||
+            msg.includes('schema cache')
+          ) {
+            errors.push(
+              `기기 "${serial}" 덮어쓰기: DB 컬럼이 없습니다. supabase/migrations/add_excel_contract_fields.sql 을 실행하세요. (${msg})`
+            )
+          } else {
+            errors.push(`기기 "${serial}" 덮어쓰기 실패: ${msg}`)
+          }
+          continue
+        }
+
+        machineUpdated += 1
+        continue
+      }
+
+      const { error } = await supabase.from('inventory').insert({
+        ...payload,
+        organization_id: orgId,
+        created_at: new Date().toISOString(),
+      } as any)
       if (error) {
         const msg = error.message || '등록 실패'
         if (
@@ -305,7 +334,7 @@ export async function importClientsMachinesFromExcelAction(
         continue
       }
 
-      serialSet.add(serialKey)
+      machineIdBySerial.set(serialKey, 'new')
       machineCreated += 1
     }
 
@@ -314,10 +343,10 @@ export async function importClientsMachinesFromExcelAction(
     revalidatePath('/')
 
     const parts = [`거래처 신규 ${clientCreated}건`]
-    if (clientUpdated) parts.push(`덮어쓰기 ${clientUpdated}건`)
-    if (clientSkipped) parts.push(`기존 유지 ${clientSkipped}건`)
+    if (clientUpdated) parts.push(`거래처 덮어쓰기 ${clientUpdated}건`)
+    if (clientSkipped) parts.push(`거래처 유지 ${clientSkipped}건`)
     parts.push(`기기 등록 ${machineCreated}건`)
-    if (machineSkipped) parts.push(`시리얼 중복 스킵 ${machineSkipped}건`)
+    if (machineUpdated) parts.push(`기기 덮어쓰기 ${machineUpdated}건`)
 
     return {
       success: true,
@@ -327,6 +356,7 @@ export async function importClientsMachinesFromExcelAction(
       clientUpdated,
       clientSkipped,
       machineCreated,
+      machineUpdated,
     }
   } catch (e: any) {
     return {

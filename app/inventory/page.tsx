@@ -1,46 +1,79 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import InventoryList from '@/components/inventory/InventoryList'
 import ConsumableList from '@/components/inventory/ConsumableList'
 import InventoryForm from '@/components/inventory/InventoryForm'
 import PendingStockPanel from '@/components/inventory/PendingStockPanel'
 import ClientExcelModal from '@/components/client/ClientExcelModal'
+import PanelRefreshButton from '@/components/ui/PanelRefreshButton'
 import styles from './inventory.module.css'
 
+type InventoryTab = 'machines' | 'consumables' | 'parts' | 'others'
+const TAB_KEY = 'inventory-active-tab'
+
+function loadTab(): InventoryTab {
+  try {
+    const v = sessionStorage.getItem(TAB_KEY)
+    if (v === 'machines' || v === 'consumables' || v === 'parts' || v === 'others') return v
+  } catch { /* ignore */ }
+  return 'machines'
+}
+
 export default function InventoryPage() {
-  const [activeTab, setActiveTab] = useState<'machines' | 'consumables' | 'parts' | 'others'>('machines')
+  const [activeTab, setActiveTab] = useState<InventoryTab>('machines')
+  const [tabReady, setTabReady] = useState(false)
 
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false)
   const [excelModalOpen, setExcelModalOpen] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [pendingRefresh, setPendingRefresh] = useState(0)
+
+  useEffect(() => {
+    setActiveTab(loadTab())
+    setTabReady(true)
+  }, [])
+
+  const selectTab = (tab: InventoryTab) => {
+    setActiveTab(tab)
+    try {
+      sessionStorage.setItem(TAB_KEY, tab)
+    } catch { /* ignore */ }
+  }
+
+  if (!tabReady) {
+    return <div className={styles.container} />
+  }
 
   return (
     <div className={styles.container}>
-      <PendingStockPanel onGoConsumables={() => setActiveTab('consumables')} />
+      <PendingStockPanel
+        refreshKey={pendingRefresh}
+        onGoConsumables={() => selectTab('consumables')}
+      />
 
       <div className={styles.tabs}>
         <div
           className={`${styles.tab} ${activeTab === 'machines' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('machines')}
+          onClick={() => selectTab('machines')}
         >
           🖨️ 기기
         </div>
         <div
           className={`${styles.tab} ${activeTab === 'consumables' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('consumables')}
+          onClick={() => selectTab('consumables')}
         >
           🧴 소모품
         </div>
         <div
           className={`${styles.tab} ${activeTab === 'parts' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('parts')}
+          onClick={() => selectTab('parts')}
         >
           ⚙️ 부품
         </div>
         <div
           className={`${styles.tab} ${activeTab === 'others' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('others')}
+          onClick={() => selectTab('others')}
         >
           🔧 기타
         </div>
@@ -51,6 +84,12 @@ export default function InventoryPage() {
           <div className={styles.headerSection}>
             <h2 className={styles.title}>전체 자산 목록</h2>
             <div style={{ display: 'flex', gap: 8 }}>
+              <PanelRefreshButton
+                onRefresh={async () => {
+                  setRefreshTrigger((prev) => prev + 1)
+                  setPendingRefresh((prev) => prev + 1)
+                }}
+              />
               <button
                 type="button"
                 onClick={() => setExcelModalOpen(true)}

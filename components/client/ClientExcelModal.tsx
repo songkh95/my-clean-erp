@@ -282,8 +282,10 @@ export default function ClientExcelModal({
       const newCount = parsed.clients.length
       if (
         !confirm(
-          `거래처 ${newCount}곳 · 기기 ${parsed.machines.length}대를 등록할까요?\n` +
-            `(동일 회사명·내용이 같으면 유지, 기계번호 중복은 건너뜁니다)`
+          `거래처 ${newCount}곳 · 기기 ${parsed.machines.length}대를 반영할까요?\n` +
+            `· 동일 회사명: 엑셀 내용으로 덮어씁니다\n` +
+            `· 동일 기계번호: 기종·계약 등 엑셀 내용으로 덮어씁니다\n` +
+            `· 없는 항목만 신규 등록합니다`
         )
       ) {
         return
@@ -590,11 +592,11 @@ export default function ClientExcelModal({
             {mode === 'import' && (
               <div style={{ marginTop: 16 }}>
                 <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: 12, lineHeight: 1.5 }}>
-                  일괄등록 양식을 올리면 거래처와 기계를 <strong>한 번에</strong> 등록합니다.
+                  일괄등록 양식을 올리면 거래처와 기계를 <strong>한 번에</strong> 등록/수정합니다.
                   <br />
                   이미 있는 회사명이면 <strong>내용을 비교</strong>한 뒤 기존 유지 / 엑셀 덮어쓰기를 고릅니다.
                   <br />
-                  기계번호가 같으면 해당 기기는 건너뜁니다.
+                  <strong>기계번호가 같으면</strong> 기종·계약 등 엑셀 내용으로 <strong>덮어씁니다</strong>.
                 </p>
                 <input
                   ref={fileRef}

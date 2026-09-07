@@ -15,6 +15,7 @@ export type ConsumableLike = {
   compatible_models?: string[] | null
   /** @deprecated product_group 단일값 — 마이그레이션용 */
   product_group?: string | null
+  is_active?: boolean | null
 }
 
 const COLOR_NAME: Record<TonerDrumColor, RegExp> = {
@@ -45,7 +46,17 @@ export function isCompatibleWithMachine(
 ): boolean {
   const m = normalizeMachineModel(machineModel)
   if (!m) return false
-  return getCompatibleModels(c).includes(m)
+  const mCompact = m.replace(/[\s\-_./]/g, '')
+  return getCompatibleModels(c).some((cm) => {
+    if (cm === m) return true
+    const cCompact = cm.replace(/[\s\-_./]/g, '')
+    if (cCompact && mCompact && cCompact === mCompact) return true
+    // 한쪽이 다른 쪽을 포함 (예: APEOSPORT C2060 ↔ APEOSPORT-C2060 / 부분 표기)
+    if (mCompact.length >= 5 && cCompact.length >= 5) {
+      if (mCompact.includes(cCompact) || cCompact.includes(mCompact)) return true
+    }
+    return false
+  })
 }
 
 /** 해당 기기와 호환되는 소모품만 */
@@ -159,14 +170,36 @@ export function findTonerDrumConsumable(
   return pickBest(legacy)
 }
 
-/** 호환 여부와 무관하게 동일 색상·재생 품목 (호환 연결용) */
+/** 호환 여부와 무관하게 동일 색상·재생 품목 목록 (기존 재고 선택용) */
+export function listTonerDrumCandidates(
+  list: ConsumableLike[],
+  kind: TonerDrumKind,
+  color: TonerDrumColor,
+  regenerated: boolean
+): ConsumableLike[] {
+  const byColorCol = list.filter((c) => {
+    if ((c.category || '').trim() !== kind) return false
+    if (c.color == null || String(c.color).trim() === '') return false
+    if (String(c.color).toUpperCase() !== color) return false
+    return Boolean(c.is_regenerated) === regenerated
+  })
+  if (byColorCol.length > 0) return byColorCol
+
+  return list.filter((c) => {
+    if ((c.category || '').trim() !== kind) return false
+    if (c.color != null && String(c.color).trim() !== '') return false
+    return matchesKindColorRegen(c, kind, color, regenerated)
+  })
+}
+
+/** 호환 여부와 무관하게 동일 색상·재생 품목 1건 (레거시) */
 export function findTonerDrumAny(
   list: ConsumableLike[],
   kind: TonerDrumKind,
   color: TonerDrumColor,
   regenerated: boolean
 ): ConsumableLike | undefined {
-  return findTonerDrumConsumable(list, kind, color, regenerated, null)
+  return listTonerDrumCandidates(list, kind, color, regenerated)[0]
 }
 
 export function isPartsCategory(category: string): boolean {
@@ -179,4 +212,39 @@ export function partsConsumables(
 ): ConsumableLike[] {
   const parts = list.filter((c) => isPartsCategory(c.category || ''))
   return filterByCompatibleMachine(parts, machineModel)
+}
+
+/** 토너·드럼·부품 외 소모품 (폐토너통·현상기·용지 등) */
+export const OTHER_CONSUMABLE_CATEGORIES = ['현상기', '폐토너통', '용지', '기타'] as const
+
+export function normalizeConsumableCategory(category: string | null | undefined): string {
+  const raw = String(category || '').trim()
+  if (!raw) return ''
+  // 등록 시 「폐토너」로 적은 경우도 폐토너통으로 취급
+  if (raw === '폐토너' || /^폐\s*토너/.test(raw)) return '폐토너통'
+  return raw
+}
+
+export function isOtherConsumableCategory(category: string | null | undefined): boolean {
+  const cat = normalizeConsumableCategory(category)
+  if (!cat) return false
+  if (cat === '토너' || cat === '드럼') return false
+  if (isPartsCategory(cat)) return false
+  return (
+    (OTHER_CONSUMABLE_CATEGORIES as readonly string[]).includes(cat) ||
+    cat.includes('폐토너')
+  )
+}
+
+export function otherConsumables(
+  list: ConsumableLike[],
+  machineModel?: string | null
+): ConsumableLike[] {
+  const others = list.filter((c) => isOtherConsumableCategory(c.category))
+  return filterByCompatibleMachine(others, machineModel)
+}
+
+/** 호환 여부와 무관 — 기존 재고에서 기타 소모품 선택용 */
+export function listOtherConsumableCandidates(list: ConsumableLike[]): ConsumableLike[] {
+  return list.filter((c) => isOtherConsumableCategory(c.category) && c.is_active !== false)
 }

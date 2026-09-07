@@ -142,22 +142,22 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
             <table className={styles.table}>
               <thead>
                 <tr className={styles.theadTr}>
-                  <th className={styles.th}>번호</th>
-                  <th className={styles.th}>부서</th>
-                  <th className={styles.th}>분류</th>
-                  <th className={styles.th}>브랜드</th>
+                  <th className={styles.th}>No</th>
                   <th className={styles.th}>제품명</th>
                   <th className={styles.th}>S/N</th>
                   <th className={styles.th}>상태</th>
                   <th className={styles.th}>설치처</th>
+                  <th className={styles.th}>부서</th>
+                  <th className={styles.th}>계약 구분</th>
+                  <th className={styles.th}>분류</th>
+                  <th className={styles.th}>브랜드</th>
                   <th className={styles.th}>매입가</th>
-                  {/* 관리 컬럼 추가 */}
                   <th className={styles.th} style={{textAlign: 'center'}}>관리</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredItems.length === 0 ? (
-                  <tr><td colSpan={10} className={styles.noDataRow}>검색 결과가 없습니다.</td></tr>
+                  <tr><td colSpan={11} className={styles.noDataRow}>검색 결과가 없습니다.</td></tr>
                 ) : (
                   filteredItems.map((item, index) => {
                     const isExpanded = expandedId === item.id
@@ -169,9 +169,6 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                           className={`${styles.dataRow} ${isExpanded ? styles.dataRowExpanded : ''}`}
                         >
                           <td className={styles.td}>{index + 1}</td>
-                          <td className={styles.td}>{(item as any).department || '-'}</td>
-                          <td className={styles.td}>{item.category}</td>
-                          <td className={styles.td}>{item.brand}</td>
                           <td className={`${styles.td} ${styles.modelName}`}>{item.model_name}</td>
                           <td className={styles.td}>{item.serial_number}</td>
                           <td className={styles.td}>
@@ -180,9 +177,11 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                             </span>
                           </td>
                           <td className={styles.td}>{item.client?.name || '-'}</td>
+                          <td className={styles.td}>{(item as any).department || '-'}</td>
+                          <td className={styles.td}>{item.contract_type || '-'}</td>
+                          <td className={styles.td}>{item.category}</td>
+                          <td className={styles.td}>{item.brand}</td>
                           <td className={styles.td}>{item.purchase_price?.toLocaleString()}원</td>
-                          
-                          {/* ✅ 관리 버튼 (수정/삭제) */}
                           <td className={styles.td} style={{textAlign: 'center'}}>
                              <div style={{display:'flex', gap:'6px', justifyContent:'center'}}>
                                 <Button 
@@ -205,10 +204,9 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                           </td>
                         </tr>
 
-                        {/* ✅ 상세 보기 영역 (수정 기능 제거 -> 순수 조회용, 누락 정보 표시) */}
                         {isExpanded && (
                           <tr className={styles.expandedRow}>
-                            <td colSpan={10} className={styles.expandedCell}>
+                            <td colSpan={11} className={styles.expandedCell}>
                               <div className={styles.formGrid}>
                                 <DetailField label="부서" value={(item as any).department} />
                                 <DetailField label="종류" value={item.type} />

@@ -124,7 +124,7 @@
 /* 리스트 헤더 (컬럼명): 청구일 제외 4개 컬럼으로 조정 */
 .listHeader {
   display: grid;
-  grid-template-columns: 2fr 2fr 1fr 1.5fr;
+  grid-template-columns: 1.6fr 1.6fr 2fr 1.2fr;
   padding: 10px 20px;
   background-color: var(--notion-bg);
   border-bottom: 1px solid var(--notion-border);
@@ -141,12 +141,34 @@
 /* 요약 영역: 청구일 제외 4개 컬럼으로 조정 */
 .clientSummary {
   display: grid;
-  grid-template-columns: 2fr 2fr 1fr 1.5fr;
+  grid-template-columns: 1.6fr 1.6fr 2fr 1.2fr;
   padding: 14px 20px;
   cursor: pointer;
   align-items: center;
   background-color: var(--notion-bg);
   transition: background-color 0.2s;
+}
+
+.machineCell {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.machineCount {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--notion-main-text);
+}
+
+.machineNames {
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--notion-sub-text);
+  line-height: 1.3;
 }
 
 .clientSummary:hover {

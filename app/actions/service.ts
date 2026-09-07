@@ -17,8 +17,19 @@ type PartUsage = { consumable_id: string; quantity: number }
 type StockStatus = 'none' | 'deducted' | 'pending'
 type PartRow = PartUsage & { stock_status: StockStatus }
 
+export type ServiceLogKind = 'service' | 'sales_trip'
+
+const SERVICE_LOG_KINDS: ServiceLogKind[] = ['service', 'sales_trip']
+
+function normalizeLogKind(value: unknown): ServiceLogKind {
+  const v = String(value || 'service').trim().toLowerCase()
+  if (v === 'sales' || v === 'trip' || v === 'sales_trip') return 'sales_trip'
+  return SERVICE_LOG_KINDS.includes(v as ServiceLogKind) ? (v as ServiceLogKind) : 'service'
+}
+
 function revalidateServiceAndInventory() {
   revalidatePath('/service')
+  revalidatePath('/service/sales-trip')
   revalidatePath('/inventory')
 }
 
@@ -231,7 +242,10 @@ async function fetchLogWithParts(
 }
 
 const SERVICE_LOG_BASE_FIELDS = [
+  'log_kind',
   'client_id',
+  'client_name',
+  'machine_model',
   'inventory_id',
   'status',
   'service_type',
@@ -253,6 +267,9 @@ function pickLogFields(formData: Record<string, any>, keys: readonly string[]) {
     let value = formData[key]
     if (value === '') {
       if (
+        key === 'client_id' ||
+        key === 'client_name' ||
+        key === 'machine_model' ||
         key === 'inventory_id' ||
         key === 'manager_id' ||
         key === 'spare_stock_at' ||
@@ -267,6 +284,62 @@ function pickLogFields(formData: Record<string, any>, keys: readonly string[]) {
     payload[key] = value
   }
   return payload
+}
+
+/** client_id 또는 client_name 중 하나는 필수. 등록 거래처면 client_name도 동기화 */
+async function resolveClientFields(
+  supabase: AppSupabase,
+  orgId: string,
+  formData: Record<string, any>
+): Promise<{ ok: true; fields: Record<string, any> } | { ok: false; message: string }> {
+  const logKind = normalizeLogKind(formData.log_kind)
+  const clientId = formData.client_id ? String(formData.client_id) : null
+  let clientName = String(formData.client_name || '').trim() || null
+  let inventoryId = formData.inventory_id ? String(formData.inventory_id) : null
+  let machineModel =
+    toMachineModelName(String(formData.machine_model || '')).trim() ||
+    String(formData.machine_model || '').trim() ||
+    null
+
+  if (clientId) {
+    const { data: client } = await supabase
+      .from('clients')
+      .select('id, name')
+      .eq('id', clientId)
+      .eq('organization_id', orgId)
+      .maybeSingle()
+    if (!client) return { ok: false, message: '선택한 거래처를 찾을 수 없습니다.' }
+    clientName = client.name || clientName
+  } else if (!clientName) {
+    return { ok: false, message: '거래처를 선택하거나 거래처명을 입력해 주세요.' }
+  }
+
+  if (inventoryId) {
+    const { data: inv } = await supabase
+      .from('inventory')
+      .select('id, model_name, organization_id')
+      .eq('id', inventoryId)
+      .eq('organization_id', orgId)
+      .maybeSingle()
+    if (!inv) return { ok: false, message: '선택한 기기를 찾을 수 없습니다.' }
+    if (!machineModel) {
+      machineModel = toMachineModelName(String(inv.model_name || '')).trim() || inv.model_name || null
+    }
+  } else if (machineModel) {
+    machineModel = toMachineModelName(machineModel).trim() || machineModel
+  }
+
+  return {
+    ok: true,
+    fields: {
+      ...formData,
+      log_kind: logKind,
+      client_id: clientId,
+      client_name: clientName,
+      inventory_id: inventoryId,
+      machine_model: machineModel,
+    },
+  }
 }
 
 function sanitizeServiceLogPayload(formData: Record<string, any>) {
@@ -316,6 +389,29 @@ async function updateServiceLogRow(
           .eq('organization_id', orgId)
         error = retry.error
       }
+    }
+
+    // log_kind / client_name / machine_model 미적용: 서비스 일지만 해당 필드 제외 후 재시도
+    if (
+      error &&
+      (/log_kind|client_name|machine_model/i.test(error.message) ||
+        isMissingColumnError(error, 'log_kind') ||
+        isMissingColumnError(error, 'client_name') ||
+        isMissingColumnError(error, 'machine_model'))
+    ) {
+      if (normalizeLogKind(base.log_kind) !== 'service' || !base.client_id) {
+        return {
+          message:
+            '판매_출장·미등록 거래처 기능을 쓰려면 sql/add_service_log_kinds.sql 을 Supabase에서 실행해 주세요.',
+        } as any
+      }
+      const { log_kind, client_name, machine_model, ...rest } = base
+      const retry = await supabase
+        .from('service_logs')
+        .update(rest)
+        .eq('id', logId)
+        .eq('organization_id', orgId)
+      error = retry.error
     }
 
     if (error) return error
@@ -465,7 +561,8 @@ export async function checkServiceSchemaAction() {
 }
 
 // 1. 서비스 일지 조회
-export async function getServiceLogsAction() {
+export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') {
+  const kind = normalizeLogKind(logKind)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, data: [] }
@@ -501,20 +598,51 @@ export async function getServiceLogsAction() {
       )
     `
 
-  let { data: logs, error } = await supabase
-    .from('service_logs')
-    .select(selectWithStatus)
-    .eq('organization_id', orgId)
-    .order('visit_date', { ascending: false })
-    .order('created_at', { ascending: false })
+  const runQuery = async (select: string, withKindFilter: boolean) => {
+    let q = supabase
+      .from('service_logs')
+      .select(select)
+      .eq('organization_id', orgId)
+    if (withKindFilter) {
+      if (kind === 'sales_trip') {
+        q = q.in('log_kind', ['sales_trip', 'sales', 'trip'])
+      } else {
+        q = q.eq('log_kind', kind)
+      }
+    }
+    return q.order('visit_date', { ascending: false }).order('created_at', { ascending: false })
+  }
+
+  let { data: logs, error } = await runQuery(selectWithStatus, true)
+
+  // log_kind 컬럼 미적용 환경: 서비스 메뉴만 전체 조회, 판매/출장은 안내
+  if (error && /log_kind/i.test(error.message)) {
+    if (kind !== 'service') {
+      return {
+        success: false,
+        data: [],
+        message:
+          '판매_출장 일지용 DB 컬럼이 없습니다. Supabase SQL Editor에서 sql/add_service_log_kinds.sql 을 실행해 주세요.',
+      }
+    }
+    const fallback = await runQuery(selectWithStatus, false)
+    logs = fallback.data as typeof logs
+    error = fallback.error
+  }
 
   if (error && (/stock_status|service_log_images/i.test(error.message))) {
-    const retry = await supabase
-      .from('service_logs')
-      .select(selectLegacy)
-      .eq('organization_id', orgId)
-      .order('visit_date', { ascending: false })
-      .order('created_at', { ascending: false })
+    let retry = await runQuery(selectLegacy, true)
+    if (retry.error && /log_kind/i.test(retry.error.message)) {
+      if (kind !== 'service') {
+        return {
+          success: false,
+          data: [],
+          message:
+            '판매_출장 일지용 DB 컬럼이 없습니다. Supabase SQL Editor에서 sql/add_service_log_kinds.sql 을 실행해 주세요.',
+        }
+      }
+      retry = await runQuery(selectLegacy, false)
+    }
     logs = retry.data as typeof logs
     error = retry.error
   }
@@ -525,7 +653,13 @@ export async function getServiceLogsAction() {
   }
 
   // A-2. 동일 기기(없으면 거래처) 기준 직전 방문일 계산
-  const realLogs = (logs || []).map((l: any) => ({ ...l, images: l.images || [] }))
+  const realLogs = (logs || []).map((l: any) => ({
+    ...l,
+    log_kind: normalizeLogKind(l.log_kind || kind),
+    client_name: l.client_name || l.client?.name || null,
+    machine_model: l.machine_model || l.inventory?.model_name || null,
+    images: l.images || [],
+  }))
 
   // 이미지 개수: embed가 비는 경우가 있어 별도 조회로 보정
   const realIds = realLogs.map((l) => l.id).filter(Boolean)
@@ -551,7 +685,11 @@ export async function getServiceLogsAction() {
 
   const groups = new Map<string, any[]>()
   for (const log of realLogs) {
-    const key = log.inventory_id ? `i:${log.inventory_id}` : `c:${log.client_id}`
+    const key = log.inventory_id
+      ? `i:${log.inventory_id}`
+      : log.client_id
+        ? `c:${log.client_id}`
+        : `n:${log.client_name || log.id}`
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(log)
   }
@@ -571,6 +709,11 @@ export async function getServiceLogsAction() {
   const lastVisitByKey = new Map<string, string>()
   for (const [key, arr] of groups) {
     if (arr.length > 0) lastVisitByKey.set(key, arr[arr.length - 1].visit_date)
+  }
+
+  // 판매/출장: 미방문 더미 행 없음
+  if (kind !== 'service') {
+    return { success: true, data: realLogs }
   }
 
   // B. 미방문 기계 데이터 생성
@@ -600,7 +743,7 @@ export async function getServiceLogsAction() {
 
   // 3. 일지가 존재하는 ID 수집
   const inventoryIdsInLogs = new Set(realLogs.map((l: any) => l.inventory_id).filter(Boolean))
-  const clientIdsInLogs = new Set(realLogs.map((l: any) => l.client_id))
+  const clientIdsInLogs = new Set(realLogs.map((l: any) => l.client_id).filter(Boolean))
 
   // 4. [기계 기준] 미방문 데이터 생성
   const machineDummyLogs = (allMachines || [])
@@ -608,7 +751,9 @@ export async function getServiceLogsAction() {
     .map((m: any) => ({
       id: `dummy_machine_${m.id}`,
       organization_id: orgId,
+      log_kind: 'service' as const,
       client_id: m.client_id,
+      client_name: m.client?.name || null,
       client: { name: m.client?.name },
       inventory_id: m.id,
       inventory: { 
@@ -645,7 +790,9 @@ export async function getServiceLogsAction() {
     .map((c: any) => ({
       id: `dummy_client_${c.id}`,
       organization_id: orgId,
+      log_kind: 'service' as const,
       client_id: c.id,
+      client_name: c.name,
       client: { name: c.name },
       inventory_id: null,
       inventory: null,
@@ -718,8 +865,8 @@ export async function patchServiceLogAction(
 
     const allowed = [
       'status', 'service_type', 'visit_date', 'symptom', 'action_detail', 'memo',
-      'manager_id', 'inventory_id', 'meter_bw', 'meter_col', 'client_id',
-      'spare_stock', 'spare_stock_at',
+      'manager_id', 'inventory_id', 'meter_bw', 'meter_col', 'client_id', 'client_name',
+      'machine_model', 'spare_stock', 'spare_stock_at',
     ] as const
 
     const payload: Record<string, string | number | null> = {}
@@ -792,6 +939,10 @@ export async function updateServiceLogAction(logId: string, formData: any, parts
       return { success: false, message: '저장되지 않은 일지입니다. 먼저 표에서 저장해 주세요.' }
     }
 
+    const resolved = await resolveClientFields(supabase, orgId, formData)
+    if (!resolved.ok) return { success: false, message: resolved.message }
+    const resolvedForm = resolved.fields
+
     const normalized = normalizeParts(parts || [])
     if (!normalized.ok) return { success: false, message: normalized.message }
     const nextParts = normalized.parts
@@ -801,7 +952,7 @@ export async function updateServiceLogAction(logId: string, formData: any, parts
 
     const oldRows = oldLog.parts_usage || []
     const wasDone = oldLog.status === '완료'
-    const willBeDone = formData.status === '완료'
+    const willBeDone = resolvedForm.status === '완료'
     const oldDeducted = deductedPartsFromRows(oldRows, wasDone)
 
     const plan = await planPartsAllocation(
@@ -817,7 +968,7 @@ export async function updateServiceLogAction(logId: string, formData: any, parts
       await applyStockChange(supabase, oldDeducted, 'in')
     }
 
-    const updateError = await updateServiceLogRow(supabase, logId, orgId, formData)
+    const updateError = await updateServiceLogRow(supabase, logId, orgId, resolvedForm)
     if (updateError) throw updateError
 
     await supabase.from('service_parts_usage').delete().eq('service_log_id', logId)
@@ -850,6 +1001,11 @@ export async function createServiceLogAction(formData: any, parts: { consumable_
   const orgId = profile.organization_id
 
   try {
+    const resolved = await resolveClientFields(supabase, orgId, formData)
+    if (!resolved.ok) return { success: false, message: resolved.message }
+    const resolvedForm = resolved.fields
+    const logKind = normalizeLogKind(resolvedForm.log_kind)
+
     const normalized = normalizeParts(parts || [])
     if (!normalized.ok) return { success: false, message: normalized.message }
     const nextParts = normalized.parts
@@ -858,13 +1014,13 @@ export async function createServiceLogAction(formData: any, parts: { consumable_
       supabase,
       orgId,
       nextParts,
-      formData.status === '완료',
+      resolvedForm.status === '완료',
       {}
     )
     if (!plan.ok) return { success: false, message: plan.message }
 
-    const baseFields = pickLogFields(formData, SERVICE_LOG_BASE_FIELDS)
-    const spareFields = pickLogFields(formData, SERVICE_LOG_SPARE_FIELDS)
+    const baseFields = pickLogFields(resolvedForm, SERVICE_LOG_BASE_FIELDS)
+    const spareFields = pickLogFields(resolvedForm, SERVICE_LOG_SPARE_FIELDS)
 
     // 가능하면 현재재고까지 한 번에 insert
     let logData: { id: string } | null = null
@@ -880,7 +1036,41 @@ export async function createServiceLogAction(formData: any, parts: { consumable_
         return { success: false, message: missingColumnMessage('현재 재고(spare_stock)') }
       }
 
-      if (first.error && (isMissingColumnError(first.error, 'memo') || /memo/i.test(first.error.message))) {
+      if (
+        first.error &&
+        (/log_kind|client_name|machine_model/i.test(first.error.message) ||
+          isMissingColumnError(first.error, 'log_kind') ||
+          isMissingColumnError(first.error, 'client_name') ||
+          isMissingColumnError(first.error, 'machine_model'))
+      ) {
+        if (logKind !== 'service' || !baseFields.client_id) {
+          return {
+            success: false,
+            message:
+              '판매_출장·미등록 거래처 기능을 쓰려면 sql/add_service_log_kinds.sql 을 Supabase에서 실행해 주세요.',
+          }
+        }
+        const { log_kind, client_name, machine_model, ...restBase } = baseFields
+        const retryKind = await supabase
+          .from('service_logs')
+          .insert({ ...restBase, ...spareFields, organization_id: orgId } as any)
+          .select('id')
+          .single()
+        if (retryKind.error && (isMissingColumnError(retryKind.error, 'memo') || /memo/i.test(retryKind.error.message))) {
+          const { memo, ...rest } = restBase
+          const retryMemo = await supabase
+            .from('service_logs')
+            .insert({ ...rest, ...spareFields, organization_id: orgId } as any)
+            .select('id')
+            .single()
+          if (retryMemo.error) throw new Error(retryMemo.error.message)
+          logData = retryMemo.data
+        } else if (retryKind.error) {
+          throw new Error(retryKind.error.message)
+        } else {
+          logData = retryKind.data
+        }
+      } else if (first.error && (isMissingColumnError(first.error, 'memo') || /memo/i.test(first.error.message))) {
         const { memo, ...rest } = baseFields
         const retry = await supabase
           .from('service_logs')
@@ -923,11 +1113,12 @@ export async function createServiceLogAction(formData: any, parts: { consumable_
     }
 
     const deductedQty = plan.toDeduct.reduce((s, p) => s + p.quantity, 0)
+    const kindLabel = logKind === 'sales_trip' ? '판매_출장 일지' : '서비스 일지'
     revalidateServiceAndInventory()
     return {
       success: true,
       id: logData.id,
-      message: buildPartsMessage('서비스 일지가 등록되었습니다', plan.pendingCount, deductedQty),
+      message: buildPartsMessage(`${kindLabel}가 등록되었습니다`, plan.pendingCount, deductedQty),
     }
   } catch (e: any) {
     return { success: false, message: e.message }
@@ -990,6 +1181,24 @@ export async function getClientMachinesAction(clientId: string) {
   return data || []
 }
 
+/** 사무실(창고) 재고 기기 — 판매_출장 일지 모델 선택용 */
+export async function getOfficeMachinesAction() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return []
+
+  const { data } = await supabase
+    .from('inventory')
+    .select('id, model_name, serial_number, department, status')
+    .eq('organization_id', profile.organization_id)
+    .eq('status', '창고')
+    .order('model_name', { ascending: true })
+
+  return data || []
+}
+
 export async function getEmployeesAction() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -1026,7 +1235,9 @@ export async function ensureTonerDrumConsumableAction(input: {
   const orgId = profile.organization_id
 
   const machineModel =
-    toMachineModelName(String(input.machine_model || input.product_group || '')).trim() || null
+    toMachineModelName(String(input.machine_model || input.product_group || '')).trim() ||
+    String(input.machine_model || input.product_group || '').trim() ||
+    null
   if (!machineModel) {
     return { success: false as const, message: '기기 모델이 필요합니다.', linked: false, created: false }
   }

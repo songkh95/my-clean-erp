@@ -11,9 +11,10 @@ import styles from './PendingStockPanel.module.css'
 
 type Props = {
   onGoConsumables?: () => void
+  refreshKey?: number
 }
 
-export default function PendingStockPanel({ onGoConsumables }: Props) {
+export default function PendingStockPanel({ onGoConsumables, refreshKey = 0 }: Props) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [hint, setHint] = useState('')
@@ -32,7 +33,7 @@ export default function PendingStockPanel({ onGoConsumables }: Props) {
 
   useEffect(() => {
     load()
-  }, [load])
+  }, [load, refreshKey])
 
   const summary = useMemo(() => {
     const clients = new Set<string>()

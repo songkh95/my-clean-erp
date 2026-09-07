@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import Button from '../ui/Button'
 import InputField from '../ui/Input'
 import SuggestInput from '../ui/SuggestInput'
@@ -73,19 +74,31 @@ export default function ConsumableForm({
 
   const showColorFields = formData.category === '토너' || formData.category === '드럼'
 
-  const reloadProductGroups = () => {
-    listProductGroupsAction().then((res) => {
-      setProductGroups(res.data || [])
-    })
+  const reloadProductGroups = async (): Promise<ProductGroupRow[]> => {
+    const res = await listProductGroupsAction()
+    const rows = res.data || []
+    setProductGroups(rows)
+    return rows
   }
 
-  const applyProductGroup = (groupName: string) => {
-    setProductGroup(groupName)
-    if (!groupName) return
-    const found = productGroups.find((g) => g.name === groupName)
-    if (found && found.machine_models.length > 0) {
-      setCompatibleModels([...found.machine_models])
-    }
+  /** 제품군 선택 = 호환 기기 목록을 제품군 기기로 통째로 교체 */
+  const applyProductGroup = (groupName: string, groups: ProductGroupRow[] = productGroups) => {
+    const name = groupName.trim()
+    setProductGroup(name)
+    if (!name) return
+    const found = groups.find((g) => g.name === name)
+    const models = Array.from(
+      new Set(
+        (found?.machine_models || [])
+          .map((m) => toMachineModelName(String(m)).trim())
+          .filter(Boolean)
+      )
+    )
+    setCompatibleModels(models)
+  }
+
+  const clearProductGroupSelection = () => {
+    setProductGroup('')
   }
 
   useEffect(() => {
@@ -110,7 +123,6 @@ export default function ConsumableForm({
       setCompatibleModels(
         Array.from(new Set(models.map((m) => toMachineModelName(String(m)).trim()).filter(Boolean)))
       )
-      // product_group 컬럼이 실제 제품군 이름인 경우만 유지 (예전엔 단일 모델명이 들어갔을 수 있음)
       setProductGroup(String(editData.product_group || '').trim())
     } else {
       const cat = preset?.category || defaultCategory || categories[0] || '토너'
@@ -148,7 +160,14 @@ export default function ConsumableForm({
       setProductGroup('')
     }
     setMachineDraft('')
-    reloadProductGroups()
+
+    void reloadProductGroups().then((rows) => {
+      // 수정 화면: 제품군이 있으면 호환기기를 제품군 기준으로 다시 맞춤
+      const pg = editData ? String(editData.product_group || '').trim() : ''
+      if (pg && rows.some((g) => g.name === pg)) {
+        applyProductGroup(pg, rows)
+      }
+    })
 
     getConsumablesAction().then((res) => {
       if (!res.success || !res.data) return
@@ -183,10 +202,13 @@ export default function ConsumableForm({
     if (!m) return
     setCompatibleModels((prev) => (prev.includes(m) ? prev : [...prev, m]))
     setMachineDraft('')
+    // 직접 추가하면 제품군 일괄 지정 상태를 해제 (수동 편집)
+    clearProductGroupSelection()
   }
 
   const removeCompatibleModel = (m: string) => {
     setCompatibleModels((prev) => prev.filter((x) => x !== m))
+    clearProductGroupSelection()
   }
 
   const applyColorMeta = (next: Partial<typeof formData>) => {
@@ -214,9 +236,13 @@ export default function ConsumableForm({
     e.preventDefault()
     if (!formData.model_name.trim()) return alert('모델명(품명)을 입력해주세요.')
     if (compatibleModels.length === 0) {
-      if (!formData.id) {
-        return alert('호환 기기를 1개 이상 추가해주세요.\n(여러 모델이 같은 소모품을 쓰면 모두 추가)')
+      if (productGroup) {
+        return alert(
+          `제품군 「${productGroup}」에 등록된 호환 기기가 없습니다.\n` +
+            `「제품군 정리/등록」에서 기기를 넣거나, 아래에서 기기를 직접 추가해 주세요.`
+        )
       }
+      return alert('호환 기기를 1개 이상 추가하거나 제품군을 선택해 주세요.')
     }
     if (showColorFields && !formData.color) {
       return alert('토너/드럼은 색상(K/C/M/Y)을 선택해주세요.')
@@ -248,8 +274,9 @@ export default function ConsumableForm({
   }
 
   if (!isOpen) return null
+  if (typeof document === 'undefined') return null
 
-  return (
+  return createPortal(
     <div className={styles.overlay} style={{ zIndex: 1200 }}>
       <div className={styles.modal} style={{ width: '520px', maxWidth: '96vw' }}>
         <h2 className={styles.title}>{editData ? '자재 수정' : '자재 등록'}</h2>
@@ -342,14 +369,41 @@ export default function ConsumableForm({
             onChange={(e) => setFormData({ ...formData, unit_price: Number(e.target.value) })}
           />
 
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <label style={{
-                display: 'block', fontSize: '0.75rem',
-                fontWeight: 500, color: 'var(--notion-sub-text)',
-              }}>
-                제품군
-              </label>
+          <div
+            style={{
+              marginBottom: 16,
+              padding: 12,
+              border: '1px solid #e5e7eb',
+              borderRadius: 8,
+              background: '#fafafa',
+            }}
+          >
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 6,
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: 'var(--notion-sub-text)',
+              }}
+            >
+              호환 기기 *
+            </label>
+            <p style={{ margin: '0 0 10px', fontSize: '0.72rem', color: '#6b7280', lineHeight: 1.45 }}>
+              일지에서 이 기기들을 선택하면 이 재고가 차감됩니다.
+              제품군을 고르면 <strong>아래 호환 기기가 제품군 목록으로 바뀝니다</strong>.
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 4,
+              }}
+            >
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#374151' }}>제품군으로 일괄 지정</span>
               <button
                 type="button"
                 onClick={() => setGroupManagerOpen(true)}
@@ -368,7 +422,14 @@ export default function ConsumableForm({
             </div>
             <select
               value={productGroup}
-              onChange={(e) => applyProductGroup(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value
+                if (!v) {
+                  setProductGroup('')
+                  return
+                }
+                applyProductGroup(v)
+              }}
               style={{
                 width: '100%',
                 height: 38,
@@ -377,9 +438,10 @@ export default function ConsumableForm({
                 padding: '0 10px',
                 fontSize: '0.9rem',
                 background: '#fff',
+                marginBottom: 10,
               }}
             >
-              <option value="">선택 안 함 (호환기기 직접 지정)</option>
+              <option value="">선택 안 함 (아래에서 기기 직접 추가)</option>
               {productGroup && !productGroups.some((g) => g.name === productGroup) ? (
                 <option value={productGroup}>{productGroup} (기존 값)</option>
               ) : null}
@@ -389,21 +451,10 @@ export default function ConsumableForm({
                 </option>
               ))}
             </select>
-            <p style={{ margin: '6px 0 0', fontSize: '0.72rem', color: '#6b7280' }}>
-              제품군을 선택하면 호환 기기가 자동으로 채워집니다. 필요하면 아래에서 기기를 더 추가/제거할 수 있습니다.
-            </p>
-          </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label style={{
-              display: 'block', marginBottom: 4, fontSize: '0.75rem',
-              fontWeight: 500, color: 'var(--notion-sub-text)',
-            }}>
-              호환 기기 *
-            </label>
-            <p style={{ margin: '0 0 8px', fontSize: '0.72rem', color: '#6b7280' }}>
-              일지에서 이 기기들을 선택하면 이 재고가 차감됩니다. 호환 모델은 여러 개 추가할 수 있습니다.
-            </p>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+              기기 직접 추가
+            </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <SuggestInput
@@ -430,7 +481,7 @@ export default function ConsumableForm({
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: 6,
-                  background: '#f9fafb',
+                  background: '#fff',
                   cursor: 'pointer',
                   fontSize: '0.85rem',
                   whiteSpace: 'nowrap',
@@ -439,12 +490,15 @@ export default function ConsumableForm({
                 추가
               </button>
             </div>
+
             {compatibleModels.length === 0 ? (
-              <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: '#b45309' }}>
-                호환 기기가 없습니다. 최소 1개 추가해 주세요.
+              <p style={{ margin: '8px 0 0', fontSize: '0.72rem', color: '#b45309' }}>
+                {productGroup
+                  ? `제품군 「${productGroup}」에 기기가 없습니다. 제품군을 수정하거나 기기를 직접 추가하세요.`
+                  : '제품군을 선택하거나 기기를 직접 추가해 주세요.'}
               </p>
             ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                 {compatibleModels.map((m) => (
                   <span
                     key={m}
@@ -482,6 +536,11 @@ export default function ConsumableForm({
                 ))}
               </div>
             )}
+            {productGroup && compatibleModels.length > 0 ? (
+              <p style={{ margin: '8px 0 0', fontSize: '0.7rem', color: '#059669' }}>
+                제품군 「{productGroup}」 기준 · {compatibleModels.length}대
+              </p>
+            ) : null}
           </div>
 
           <div className={styles.footer}>
@@ -494,9 +553,12 @@ export default function ConsumableForm({
         isOpen={groupManagerOpen}
         onClose={() => setGroupManagerOpen(false)}
         onChanged={() => {
-          reloadProductGroups()
+          void reloadProductGroups().then((rows) => {
+            if (productGroup) applyProductGroup(productGroup, rows)
+          })
         }}
       />
-    </div>
+    </div>,
+    document.body
   )
 }

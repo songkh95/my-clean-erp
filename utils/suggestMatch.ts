@@ -88,12 +88,13 @@ export function toManagementCode(input: string): string {
 }
 
 /**
- * 자재 품명 입력: 영문은 대문자로, 한글(재생 등)은 유지
- * 영문·숫자·한글·공백·일부 기호만 허용
+ * 자재 품명 입력: 영문은 대문자로, 한글·특수기호 유지
+ * 제어문자만 제거하고 일반 특수기호는 허용
  */
 export function toConsumableModelName(input: string): string {
   return (input || '')
     .toUpperCase()
-    .replace(/[^A-Z0-9가-힣\s\-_./]/g, '')
+    .replace(/[\u0000-\u001F\u007F]/g, '')
     .replace(/\s+/g, ' ')
+    .trim()
 }

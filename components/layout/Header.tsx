@@ -15,6 +15,9 @@ function getPageTitle(path: string, compact: boolean) {
   if (path === '/') return compact ? '홈' : '홈 (대시보드)'
   if (path.startsWith('/clients')) return compact ? '거래처' : '거래처 관리'
   if (path.startsWith('/inventory')) return compact ? '재고' : '자산 및 재고 관리'
+  if (path.startsWith('/service/sales-trip') || path.startsWith('/service/sales') || path.startsWith('/service/trip')) {
+    return compact ? '판매출장' : '판매_출장 일지'
+  }
   if (path.startsWith('/service')) return compact ? '일지' : '서비스 일지'
   if (path.startsWith('/accounting/registration')) return compact ? '정산' : '월 정산 등록'
   if (path.startsWith('/accounting/history')) return compact ? '청구' : '청구 이력/수정'

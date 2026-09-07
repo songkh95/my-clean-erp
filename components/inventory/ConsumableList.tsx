@@ -8,6 +8,7 @@ import {
 } from '@/app/actions/consumable'
 import ConsumableForm from './ConsumableForm'
 import ProductGroupManager from './ProductGroupManager'
+import PanelRefreshButton from '@/components/ui/PanelRefreshButton'
 import styles from './InventoryList.module.css'
 import { useAppSettings } from '@/hooks/useAppSettings'
 
@@ -179,6 +180,7 @@ export default function ConsumableList({ tab }: Props) {
           </label>
         </span>
         <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <PanelRefreshButton onRefresh={fetchItems} />
         <button
           onClick={() => setGroupManagerOpen(true)}
           style={{
@@ -232,13 +234,13 @@ export default function ConsumableList({ tab }: Props) {
           <thead>
             <tr className={styles.theadTr}>
               <th className={styles.th} style={{ width: '50px', textAlign: 'center' }}>No.</th>
+              <th className={styles.th}>모델명</th>
               <th className={styles.th} style={{ width: '80px' }}>종류</th>
               <th className={styles.th} style={{ width: '56px', textAlign: 'center' }}>색상</th>
-              <th className={styles.th} style={{ minWidth: '110px' }}>제품군</th>
-              <th className={styles.th} style={{ minWidth: '140px' }}>호환 기기</th>
-              <th className={styles.th}>모델명 (품명)</th>
               <th className={styles.th} style={{ width: '100px' }}>관리코드</th>
-              <th className={styles.th} style={{ width: '100px', textAlign: 'right', backgroundColor: '#f0f8ff' }}>현재고</th>
+              <th className={styles.th} style={{ minWidth: '110px' }}>제품군</th>
+              <th className={styles.th} style={{ minWidth: '140px' }}>호환기기</th>
+              <th className={styles.th} style={{ width: '100px', textAlign: 'right', backgroundColor: '#f0f8ff' }}>현재 재고</th>
               <th className={styles.th} style={{ width: '120px', textAlign: 'right' }}>단가</th>
               <th className={styles.th} style={{ width: '120px', textAlign: 'right' }}>재고금액</th>
               <th className={styles.th} style={{ width: '120px', textAlign: 'center' }}>관리</th>
@@ -257,6 +259,12 @@ export default function ConsumableList({ tab }: Props) {
                   style={item.is_active === false ? { opacity: 0.55, background: '#f9fafb' } : undefined}
                 >
                   <td className={styles.td} style={{ textAlign: 'center', color: '#888' }}>{index + 1}</td>
+                  <td className={styles.td} style={{ fontWeight: '600', color: '#333' }}>
+                    {item.model_name}
+                    {item.is_active === false ? (
+                      <span style={{ marginLeft: 6, fontSize: '0.7rem', color: '#9ca3af' }}>(숨김)</span>
+                    ) : null}
+                  </td>
                   <td className={styles.td} style={{ textAlign: 'center' }}>
                     <span style={{
                       padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '500',
@@ -269,6 +277,9 @@ export default function ConsumableList({ tab }: Props) {
                     {item.color || '-'}
                     {item.is_regenerated ? <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280' }}>재생</span> : null}
                   </td>
+                  <td className={styles.td} style={{ color: '#666', fontSize: '0.85rem' }}>
+                    {item.code || '-'}
+                  </td>
                   <td className={styles.td} style={{ fontWeight: 600, color: '#0f766e', fontSize: '0.8rem' }}>
                     {item.product_group || '-'}
                   </td>
@@ -276,15 +287,6 @@ export default function ConsumableList({ tab }: Props) {
                     {Array.isArray(item.compatible_models) && item.compatible_models.length > 0
                       ? item.compatible_models.join(', ')
                       : '-'}
-                  </td>
-                  <td className={styles.td} style={{ fontWeight: '600', color: '#333' }}>
-                    {item.model_name}
-                    {item.is_active === false ? (
-                      <span style={{ marginLeft: 6, fontSize: '0.7rem', color: '#9ca3af' }}>(숨김)</span>
-                    ) : null}
-                  </td>
-                  <td className={styles.td} style={{ color: '#666', fontSize: '0.85rem' }}>
-                    {item.code || '-'}
                   </td>
                   <td className={styles.td} style={{
                     textAlign: 'right', fontWeight: 'bold', backgroundColor: '#f9fdff',

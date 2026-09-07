@@ -22,6 +22,11 @@ import {
 
 type TabId = 'account' | 'general' | 'clients' | 'inventory' | 'stock' | 'service' | 'accounting' | 'quotes'
 
+const TAB_KEY = 'settings-active-tab'
+const TAB_IDS: TabId[] = [
+  'account', 'general', 'clients', 'inventory', 'stock', 'service', 'accounting', 'quotes',
+]
+
 const TABS: { id: TabId; label: string }[] = [
   { id: 'account', label: '계정' },
   { id: 'general', label: '일반' },
@@ -32,6 +37,14 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'accounting', label: '정산' },
   { id: 'quotes', label: '견적서' },
 ]
+
+function loadSettingsTab(): TabId {
+  try {
+    const v = sessionStorage.getItem(TAB_KEY)
+    if (v && (TAB_IDS as string[]).includes(v)) return v as TabId
+  } catch { /* ignore */ }
+  return 'account'
+}
 
 const MACHINE_TYPES = [
   'A3 레이저복합기', 'A4 레이저복합기',
@@ -49,9 +62,17 @@ export default function SettingsPage() {
   const [savedFlash, setSavedFlash] = useState(false)
 
   useEffect(() => {
+    setTab(loadSettingsTab())
     setDraft(loadAppSettings())
     setReady(true)
   }, [])
+
+  const selectTab = (id: TabId) => {
+    setTab(id)
+    try {
+      sessionStorage.setItem(TAB_KEY, id)
+    } catch { /* ignore */ }
+  }
 
   const patch = <K extends keyof AppSettings>(key: K, partial: Partial<AppSettings[K]>) => {
     setDraft((prev) => ({ ...prev, [key]: { ...prev[key], ...partial } }))
@@ -121,7 +142,7 @@ export default function SettingsPage() {
             type="button"
             role="tab"
             className={`${styles.tab} ${tab === t.id ? styles.tabActive : ''}`}
-            onClick={() => setTab(t.id)}
+            onClick={() => selectTab(t.id)}
           >
             {t.label}
           </button>
