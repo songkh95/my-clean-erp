@@ -19,10 +19,17 @@ export const exportHistoryToExcel = (historyList: Settlement[]) => {
 
   const rows = historyList.map((hist, index) => {
     // client가 없거나 세부 정보가 없을 경우를 대비해 기본값 설정
-    const client = hist.client || { 
-      business_number: '', name: '', representative_name: '', address: '', email: '' 
-    };
-    
+    const client = hist.client || {
+      business_number: '',
+      name: '',
+      representative_name: '',
+      address: '',
+      address_detail: '',
+      email: '',
+    }
+    const addressDetail =
+      'address_detail' in client ? (client as { address_detail?: string | null }).address_detail : null
+
     // 작성일자 (데이터가 없으면 해당 월 말일로 계산)
     const lastDay = new Date(hist.billing_year, hist.billing_month, 0).getDate();
     const dateStr = `${hist.billing_year}${String(hist.billing_month).padStart(2, '0')}${String(lastDay)}`;
@@ -51,7 +58,10 @@ export const exportHistoryToExcel = (historyList: Settlement[]) => {
       '종사업장번호': '',
       '상호(법인명)': client.name || '',
       '성명': client.representative_name || '',
-      '사업장주소': [client.address, client.address_detail].map((s) => String(s || '').trim()).filter(Boolean).join(' '),
+      '사업장주소': [client.address, addressDetail]
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+        .join(' '),
       '업태': '',
       '종목': '',
       '이메일1': client.email || '',
