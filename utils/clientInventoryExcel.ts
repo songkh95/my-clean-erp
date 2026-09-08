@@ -9,6 +9,7 @@ export const COMBINED_EXCEL_HEADERS = [
   '담당자연락처',
   '일반연락처',
   '주소',
+  '상세주소',
   '소속본사',
   '사업자번호',
   '대표자명',
@@ -45,6 +46,7 @@ export const CLIENT_EXCEL_HEADERS = [
   '담당자연락처',
   '일반연락처',
   '주소',
+  '상세주소',
   '소속본사',
   '사업자번호',
   '대표자명',
@@ -174,6 +176,7 @@ function toCombinedRow(
     row.담당자연락처 = client.phone || ''
     row.일반연락처 = client.office_phone || ''
     row.주소 = client.address || ''
+    row.상세주소 = client.address_detail || ''
     row.소속본사 = client.parent_id ? parentNameById.get(client.parent_id) || '' : ''
     row.사업자번호 = client.business_number || ''
     row.대표자명 = client.representative_name || ''
@@ -265,7 +268,8 @@ export function downloadClientsMachinesTemplate() {
   base.직책 = '과장'
   base.담당자연락처 = '010-1234-5678'
   base.일반연락처 = '02-123-4567'
-  base.주소 = '서울특별시 강남구'
+  base.주소 = '서울특별시 금천구 가산디지털2로 15'
+  base.상세주소 = '가산드림타워 e1 지하1층 관리사무소'
   base.사업자번호 = '123-45-67890'
   base.대표자명 = '홍길동'
   base.이메일 = 'sample@example.com'
@@ -328,6 +332,7 @@ function parseClientFromRow(row: Record<string, unknown>): ClientExcelRow | null
     담당자연락처: getCell(row, '담당자연락처', '연락처', '휴대폰', '전화'),
     일반연락처: getCell(row, '일반연락처', '사무실전화', '회사전화', '일반전화'),
     주소: getCell(row, '주소', 'address'),
+    상세주소: getCell(row, '상세주소', 'address_detail'),
     소속본사: getCell(row, '소속본사', '본사', 'parent'),
     사업자번호: getCell(row, '사업자번호', '사업자등록번호'),
     대표자명: getCell(row, '대표자명', '대표'),
@@ -424,6 +429,7 @@ export function parseClientsMachinesExcel(buffer: ArrayBuffer): {
             담당자연락처: prev.담당자연락처 || client.담당자연락처,
             일반연락처: prev.일반연락처 || client.일반연락처,
             주소: prev.주소 || client.주소,
+            상세주소: prev.상세주소 || client.상세주소,
             소속본사: prev.소속본사 || client.소속본사,
             사업자번호: prev.사업자번호 || client.사업자번호,
             대표자명: prev.대표자명 || client.대표자명,

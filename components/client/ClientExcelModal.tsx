@@ -14,6 +14,7 @@ import {
   type ClientExcelRow,
   type MachineExcelRow,
 } from '@/utils/clientInventoryExcel'
+import { EXCEL_SYNC_RULE_LINES, excelSyncRulesText } from '@/utils/excelSyncRules'
 import type { Client, Inventory } from '@/app/types'
 import styles from '@/app/login/auth.module.css'
 
@@ -45,6 +46,7 @@ const CLIENT_COMPARE_KEYS: Array<{
   { label: '담당자 연락처', excelKey: '담당자연락처', existingKey: 'phone' },
   { label: '일반 연락처', excelKey: '일반연락처', existingKey: 'office_phone' },
   { label: '주소', excelKey: '주소', existingKey: 'address' },
+  { label: '상세주소', excelKey: '상세주소', existingKey: 'address_detail' },
   { label: '소속본사', excelKey: '소속본사', existingKey: 'parent_name' },
   { label: '사업자번호', excelKey: '사업자번호', existingKey: 'business_number' },
   { label: '대표자명', excelKey: '대표자명', existingKey: 'representative_name' },
@@ -140,6 +142,11 @@ export default function ClientExcelModal({
   const [pendingClients, setPendingClients] = useState<ClientExcelRow[] | null>(null)
   const [pendingMachines, setPendingMachines] = useState<MachineExcelRow[] | null>(null)
   const [conflicts, setConflicts] = useState<ClientConflict[] | null>(null)
+  const [syncDelete, setSyncDelete] = useState(false)
+  const [existingSnapshot, setExistingSnapshot] = useState<{
+    clients: Client[]
+    machineSerials: string[]
+  } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   if (!isOpen) return null
@@ -153,6 +160,78 @@ export default function ClientExcelModal({
     setPendingClients(null)
     setPendingMachines(null)
     setConflicts(null)
+    setExistingSnapshot(null)
+  }
+
+  const buildSyncPreview = (
+    excelClients: ClientExcelRow[],
+    excelMachines: MachineExcelRow[],
+    existingClients: Client[],
+    machineSerials: string[],
+    doDelete: boolean
+  ) => {
+    const excelClientKeys = new Set(
+      excelClients.map((c) => c.회사명.trim().toLowerCase()).filter(Boolean)
+    )
+    const excelSerials = new Set(
+      excelMachines.map((m) => m.기계번호.trim().toLowerCase()).filter(Boolean)
+    )
+    const existingClientKeys = existingClients
+      .map((c) => String(c.name || '').trim().toLowerCase())
+      .filter(Boolean)
+    const existingSerials = machineSerials.map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    const clientNew = [...excelClientKeys].filter((k) => !existingClientKeys.includes(k)).length
+    const clientOverwrite = [...excelClientKeys].filter((k) => existingClientKeys.includes(k)).length
+    const clientDelete = doDelete
+      ? existingClientKeys.filter((k) => !excelClientKeys.has(k)).length
+      : 0
+    const machineNew = [...excelSerials].filter((k) => !existingSerials.includes(k)).length
+    const machineOverwrite = [...excelSerials].filter((k) => existingSerials.includes(k)).length
+    const machineDelete = doDelete
+      ? existingSerials.filter((k) => !excelSerials.has(k)).length
+      : 0
+
+    return {
+      clientNew,
+      clientOverwrite,
+      clientDelete,
+      machineNew,
+      machineOverwrite,
+      machineDelete,
+    }
+  }
+
+  const confirmSync = (
+    excelClients: ClientExcelRow[],
+    excelMachines: MachineExcelRow[],
+    existingClients: Client[],
+    machineSerials: string[],
+    doDelete: boolean
+  ) => {
+    const p = buildSyncPreview(
+      excelClients,
+      excelMachines,
+      existingClients,
+      machineSerials,
+      doDelete
+    )
+    const lines = [
+      '엑셀 동기화 규칙',
+      excelSyncRulesText(),
+      '',
+      `거래처: 신규 ${p.clientNew} · 덮어쓰기 ${p.clientOverwrite}` +
+        (doDelete ? ` · 삭제 ${p.clientDelete}` : ' · 삭제 안 함'),
+      `기기: 신규 ${p.machineNew} · 덮어쓰기 ${p.machineOverwrite}` +
+        (doDelete ? ` · 삭제 ${p.machineDelete}` : ' · 삭제 안 함'),
+      '',
+      doDelete
+        ? '※ 삭제 시 거래처는 목록에서 숨김, 기기는 삭제(불가 시 창고 회수)합니다.'
+        : '※ 엑셀에 없는 기존 항목은 그대로 둡니다.',
+      '',
+      '계속할까요?',
+    ]
+    return confirm(lines.join('\n'))
   }
 
   const handleClose = () => {
@@ -216,9 +295,13 @@ export default function ClientExcelModal({
   const runImport = async (
     clients: ClientExcelRow[],
     machines: MachineExcelRow[],
-    resolutions: Record<string, ClientImportResolution>
+    resolutions: Record<string, ClientImportResolution>,
+    doDelete: boolean
   ) => {
-    const result = await importClientsMachinesFromExcelAction(clients, machines, resolutions)
+    const result = await importClientsMachinesFromExcelAction(clients, machines, {
+      clientResolutions: resolutions,
+      syncDelete: doDelete,
+    })
     if (!result.success) {
       setError(result.message)
       return
@@ -267,31 +350,46 @@ export default function ClientExcelModal({
 
       if (fetchErr) throw new Error(fetchErr.message)
 
-      const found = buildConflicts(parsed.clients, (existingClients || []) as Client[])
+      const { data: existingMachines } = await supabase
+        .from('inventory')
+        .select('serial_number')
+        .eq('organization_id', profile.organization_id)
+
+      const machineSerials = (existingMachines || [])
+        .map((m) => String(m.serial_number || '').trim())
+        .filter(Boolean)
+
+      const snapshot = {
+        clients: (existingClients || []) as Client[],
+        machineSerials,
+      }
+      setExistingSnapshot(snapshot)
+
+      const found = buildConflicts(parsed.clients, snapshot.clients)
 
       if (found.length > 0) {
         setPendingClients(parsed.clients)
         setPendingMachines(parsed.machines)
         setConflicts(found)
         setMessage(
-          `중복 거래처 ${found.length}건이 있습니다. 기존 정보와 엑셀 내용을 비교한 뒤 선택하세요.`
+          `내용이 다른 거래처 ${found.length}건이 있습니다. 덮어쓸 항목을 확인한 뒤 가져오세요.`
         )
         return
       }
 
-      const newCount = parsed.clients.length
       if (
-        !confirm(
-          `거래처 ${newCount}곳 · 기기 ${parsed.machines.length}대를 반영할까요?\n` +
-            `· 동일 회사명: 엑셀 내용으로 덮어씁니다\n` +
-            `· 동일 기계번호: 기종·계약 등 엑셀 내용으로 덮어씁니다\n` +
-            `· 없는 항목만 신규 등록합니다`
+        !confirmSync(
+          parsed.clients,
+          parsed.machines,
+          snapshot.clients,
+          snapshot.machineSerials,
+          syncDelete
         )
       ) {
         return
       }
 
-      await runImport(parsed.clients, parsed.machines, {})
+      await runImport(parsed.clients, parsed.machines, {}, syncDelete)
     } catch (e) {
       setError(e instanceof Error ? e.message : '불러오기 실패')
     } finally {
@@ -310,22 +408,107 @@ export default function ClientExcelModal({
     )
   }
 
-  const handleConfirmConflicts = async () => {
-    if (!pendingClients || !pendingMachines || !conflicts) return
+  const runConflictImport = async (resolutions: Record<string, ClientImportResolution>) => {
+    if (!pendingClients || !pendingMachines) return
     setBusy(true)
     clearMsg()
     try {
-      const resolutions: Record<string, ClientImportResolution> = {}
-      for (const c of conflicts) {
-        resolutions[c.key] = c.choice
+      const snap = existingSnapshot || { clients: [], machineSerials: [] }
+      if (
+        !confirmSync(
+          pendingClients,
+          pendingMachines,
+          snap.clients,
+          snap.machineSerials,
+          syncDelete
+        )
+      ) {
+        return
       }
-      // 내용이 같아 목록에 안 오른 중복은 기본 keep
-      await runImport(pendingClients, pendingMachines, resolutions)
+      await runImport(pendingClients, pendingMachines, resolutions, syncDelete)
     } catch (e) {
       setError(e instanceof Error ? e.message : '불러오기 실패')
     } finally {
       setBusy(false)
     }
+  }
+
+  const handleOverwriteAll = async () => {
+    if (!pendingClients || !pendingMachines || !conflicts) return
+    const snap = existingSnapshot || { clients: [], machineSerials: [] }
+    const p = buildSyncPreview(
+      pendingClients,
+      pendingMachines,
+      snap.clients,
+      snap.machineSerials,
+      syncDelete
+    )
+    const ok = confirm(
+      [
+        '정말 모두 엑셀의 내용으로 덮어쓰시겠습니까?',
+        '',
+        `거래처 덮어쓰기 ${conflicts.length}건`,
+        `기기: 신규 ${p.machineNew} · 덮어쓰기 ${p.machineOverwrite}` +
+          (syncDelete ? ` · 삭제 ${p.machineDelete}` : ''),
+        syncDelete
+          ? `거래처 삭제(엑셀에 없음) ${p.clientDelete}건`
+          : '엑셀에 없는 기존 항목은 그대로 둡니다.',
+      ].join('\n')
+    )
+    if (!ok) return
+
+    setAllChoices('overwrite')
+    const resolutions: Record<string, ClientImportResolution> = {}
+    for (const c of conflicts) resolutions[c.key] = 'overwrite'
+
+    setBusy(true)
+    clearMsg()
+    try {
+      await runImport(pendingClients, pendingMachines, resolutions, syncDelete)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '불러오기 실패')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleKeepAll = async () => {
+    if (!pendingClients || !pendingMachines || !conflicts) return
+    if (
+      !confirm(
+        '정말 모두 기존 정보를 유지할까요?\n(중복 거래처의 엑셀 내용은 반영되지 않습니다. 신규·기기는 계속 반영됩니다)'
+      )
+    ) {
+      return
+    }
+    setAllChoices('keep')
+    const resolutions: Record<string, ClientImportResolution> = {}
+    for (const c of conflicts) resolutions[c.key] = 'keep'
+    await runConflictImport(resolutions)
+  }
+
+  const handleConfirmConflicts = async () => {
+    if (!pendingClients || !pendingMachines || !conflicts) return
+    const resolutions: Record<string, ClientImportResolution> = {}
+    for (const c of conflicts) {
+      resolutions[c.key] = c.choice
+    }
+    const overwriteCount = conflicts.filter((c) => c.choice === 'overwrite').length
+    const keepCount = conflicts.filter((c) => c.choice === 'keep').length
+    if (overwriteCount > 0) {
+      if (
+        !confirm(
+          `선택한 대로 진행할까요?\n· 엑셀로 덮어쓰기 ${overwriteCount}건\n· 기존 유지 ${keepCount}건`
+        )
+      ) {
+        return
+      }
+    } else if (
+      !confirm('선택한 거래처는 모두 기존 유지입니다. 이대로 가져올까요?')
+    ) {
+      return
+    }
+    await runConflictImport(resolutions)
   }
 
   const showingConflicts = !!conflicts && conflicts.length > 0
@@ -365,27 +548,54 @@ export default function ClientExcelModal({
             <p className={styles.subtitle}>
               이미 등록된 거래처와 엑셀 내용이 다릅니다.
               <br />
-              거래처마다 <strong>기존 유지</strong> 또는 <strong>엑셀로 덮어쓰기</strong>를 선택하세요.
+              기본은 <strong>엑셀로 덮어쓰기</strong>입니다. 필요하면 기존 유지를 선택하세요.
             </p>
+
+            <label
+              style={{
+                display: 'flex',
+                gap: 8,
+                alignItems: 'flex-start',
+                marginBottom: 12,
+                fontSize: '0.85rem',
+                color: '#444',
+                lineHeight: 1.45,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={syncDelete}
+                onChange={(e) => setSyncDelete(e.target.checked)}
+                disabled={busy}
+                style={{ marginTop: 3 }}
+              />
+              <span>
+                엑셀에 없는 거래처·기기도 <strong>삭제 동기화</strong>
+                <br />
+                <span style={{ color: '#666' }}>
+                  (거래처 숨김 삭제 · 기기 삭제, 불가 시 창고 회수)
+                </span>
+              </span>
+            </label>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setAllChoices('keep')}
+                onClick={handleKeepAll}
                 disabled={busy}
               >
                 모두 기존 유지
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="primary"
                 size="sm"
-                onClick={() => setAllChoices('overwrite')}
+                onClick={handleOverwriteAll}
                 disabled={busy}
               >
-                모두 엑셀로
+                {busy ? '적용 중...' : '모두 엑셀로'}
               </Button>
             </div>
 
@@ -592,12 +802,42 @@ export default function ClientExcelModal({
             {mode === 'import' && (
               <div style={{ marginTop: 16 }}>
                 <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: 12, lineHeight: 1.5 }}>
-                  일괄등록 양식을 올리면 거래처와 기계를 <strong>한 번에</strong> 등록/수정합니다.
+                  <strong>불러오기 규칙</strong>
                   <br />
-                  이미 있는 회사명이면 <strong>내용을 비교</strong>한 뒤 기존 유지 / 엑셀 덮어쓰기를 고릅니다.
-                  <br />
-                  <strong>기계번호가 같으면</strong> 기종·계약 등 엑셀 내용으로 <strong>덮어씁니다</strong>.
+                  {EXCEL_SYNC_RULE_LINES.map((line) => (
+                    <span key={line}>
+                      · {line}
+                      <br />
+                    </span>
+                  ))}
+                  키: 거래처=<strong>회사명</strong>, 기기=<strong>기계번호</strong>
                 </p>
+                <label
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    alignItems: 'flex-start',
+                    marginBottom: 12,
+                    fontSize: '0.85rem',
+                    color: '#444',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={syncDelete}
+                    onChange={(e) => setSyncDelete(e.target.checked)}
+                    disabled={busy}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span>
+                    엑셀에 없는 거래처·기기도 <strong>삭제 동기화</strong>
+                    <br />
+                    <span style={{ color: '#b45309' }}>
+                      켠 채로 부분 엑셀만 올리면 나머지 데이터가 지워질 수 있습니다.
+                    </span>
+                  </span>
+                </label>
                 <input
                   ref={fileRef}
                   type="file"

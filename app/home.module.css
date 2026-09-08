@@ -234,6 +234,35 @@
   font-weight: 600;
 }
 
+.todoFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px 0;
+}
+
+.todoFilterBtn {
+  padding: 5px 10px;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.todoFilterBtn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.todoFilterBtnActive {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
 .todoForm {
   display: flex;
   gap: 8px;
@@ -294,6 +323,12 @@
   gap: 8px;
   padding: 10px 14px;
   border-bottom: 1px solid #f0f0f0;
+  transition: opacity 0.35s ease, background-color 0.35s ease;
+}
+
+.todoRowLinger {
+  opacity: 0.45;
+  background: #f9fafb;
 }
 
 .todoRow:last-child {
@@ -343,6 +378,11 @@
   background: #f3f4f6;
   padding: 1px 6px;
   border-radius: 4px;
+}
+
+.todoDateTagOverdue {
+  color: #b91c1c;
+  background: #fef2f2;
 }
 
 .todoUndatedTag {
@@ -418,6 +458,29 @@
   color: #b91c1c;
 }
 
+.todoDoneBar {
+  display: flex;
+  justify-content: center;
+  padding: 8px 14px 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.todoDoneToggle {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.todoDoneToggle:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
 .todoPager {
   display: flex;
   justify-content: center;
@@ -452,6 +515,37 @@
 
 .todoPageBtnActive:hover {
   background: #0060d1;
+}
+
+.calHeadRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.calDoneToggle {
+  padding: 5px 10px;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.calDoneToggle:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.calDoneToggleOn {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
 }
 
 .calNav {

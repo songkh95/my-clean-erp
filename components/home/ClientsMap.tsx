@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase'
-import { geocodeAddress, getCachedGeocode, type GeocodePoint } from '@/utils/geocode'
+import { saveClientMapCoordsAction } from '@/app/actions/client'
+import { geocodeMany, getCachedGeocodeMap, setCachedGeocodeMany, type GeocodePoint } from '@/utils/geocode'
 import styles from '@/app/home.module.css'
 
 type ClientPin = {
   id: string
   name: string
   address: string
+  addressDetail: string
   point: GeocodePoint
 }
 
@@ -17,6 +19,9 @@ type ClientRow = {
   id: string
   name: string | null
   address: string | null
+  address_detail: string | null
+  map_lat: number | null
+  map_lng: number | null
 }
 
 function escapeHtml(s: string) {
@@ -27,17 +32,47 @@ function escapeHtml(s: string) {
     .replace(/"/g, '&quot;')
 }
 
+function isValidPoint(lat: unknown, lng: unknown): GeocodePoint | null {
+  const a = Number(lat)
+  const b = Number(lng)
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null
+  if (a < 33 || a > 39 || b < 124 || b > 132) return null
+  return { lat: a, lng: b }
+}
+
 export default function ClientsMap() {
   const mapEl = useRef<HTMLDivElement>(null)
   const mapRef = useRef<import('leaflet').Map | null>(null)
+  const markersRef = useRef<import('leaflet').Layer[]>([])
+  const pinIdsRef = useRef<Set<string>>(new Set())
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
   const [message, setMessage] = useState('거래처 위치를 불러오는 중...')
   const [pins, setPins] = useState<ClientPin[]>([])
   const [failed, setFailed] = useState(0)
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [progress, setProgress] = useState<{ done: number; total: number; found: number } | null>(null)
 
   useEffect(() => {
     let cancelled = false
+
+    const pinsFrom = (
+      rows: { row: ClientRow; address: string }[],
+      points: Map<string, GeocodePoint>
+    ) => {
+      const next: ClientPin[] = []
+      for (const { row, address } of rows) {
+        const key = address.replace(/\s+/g, ' ')
+        const point = points.get(key) || points.get(address)
+        if (!point) continue
+        next.push({
+          id: row.id,
+          name: row.name || '거래처',
+          address,
+          addressDetail: String(row.address_detail || '').trim(),
+          point,
+        })
+      }
+      return next
+    }
 
     const run = async () => {
       try {
@@ -62,13 +97,26 @@ export default function ClientsMap() {
           return
         }
 
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('clients')
-          .select('id, name, address')
+          .select('id, name, address, address_detail, map_lat, map_lng')
           .eq('organization_id', orgId)
           .eq('is_deleted', false)
           .not('address', 'is', null)
           .order('name', { ascending: true })
+
+        // map_lat 컬럼 미적용 환경 호환
+        if (error && /map_lat|map_lng|schema cache/i.test(error.message)) {
+          const retry = await supabase
+            .from('clients')
+            .select('id, name, address, address_detail')
+            .eq('organization_id', orgId)
+            .eq('is_deleted', false)
+            .not('address', 'is', null)
+            .order('name', { ascending: true })
+          data = (retry.data || []).map((r: any) => ({ ...r, map_lat: null, map_lng: null }))
+          error = retry.error
+        }
 
         if (error) throw error
 
@@ -84,44 +132,122 @@ export default function ClientsMap() {
           return
         }
 
-        const nextPins: ClientPin[] = []
-        let miss = 0
-        setProgress({ done: 0, total: rows.length })
+        const cache = getCachedGeocodeMap()
+        const readyPins: ClientPin[] = []
+        const missing: { row: ClientRow; address: string }[] = []
+        const toPersist: { id: string; lat: number; lng: number }[] = []
 
-        for (let i = 0; i < rows.length; i++) {
-          if (cancelled) return
-          const row = rows[i]
+        for (const row of rows) {
           const address = row.address!.trim()
-          const cached = getCachedGeocode(address)
-          const point = cached || (await geocodeAddress(address))
+          const key = address.replace(/\s+/g, ' ')
+          const fromDb = isValidPoint(row.map_lat, row.map_lng)
+          const fromCache = isValidPoint(cache[key]?.lat, cache[key]?.lng)
+          const point = fromDb || fromCache
           if (point) {
-            nextPins.push({
+            readyPins.push({
               id: row.id,
               name: row.name || '거래처',
               address,
+              addressDetail: String(row.address_detail || '').trim(),
               point,
             })
+            if (!fromDb) toPersist.push({ id: row.id, lat: point.lat, lng: point.lng })
+            if (fromDb && !fromCache) {
+              setCachedGeocodeMany([[key, point]])
+            }
           } else {
-            miss += 1
-          }
-          if (!cancelled) setProgress({ done: i + 1, total: rows.length })
-          if (!cached) {
-            await new Promise((r) => setTimeout(r, 1100))
+            missing.push({ row, address })
           }
         }
 
+        const applyPins = (
+          found: ClientPin[],
+          opts?: { processed?: number; total?: number; finished?: boolean }
+        ) => {
+          if (cancelled) return
+          setPins(found)
+          setFailed(Math.max(0, rows.length - found.length))
+          if (found.length > 0) {
+            setStatus('ready')
+            setMessage('')
+          }
+          const total = opts?.total ?? rows.length
+          const processed = opts?.processed
+          if (opts?.finished) {
+            setProgress(null)
+          } else if (processed != null) {
+            setProgress({ done: processed, total, found: found.length })
+          }
+        }
+
+        if (readyPins.length > 0) {
+          applyPins(readyPins, {
+            processed: readyPins.length,
+            total: rows.length,
+            finished: missing.length === 0,
+          })
+        }
+
+        if (toPersist.length > 0) {
+          saveClientMapCoordsAction(toPersist).catch(() => {})
+        }
+
+        if (missing.length === 0) {
+          applyPins(readyPins, { finished: true })
+          return
+        }
+
+        if (readyPins.length === 0 && !cancelled) {
+          setMessage(`거래처 ${rows.length}곳 위치를 불러오는 중... (첫 변환은 수 분 걸릴 수 있어요)`)
+          setProgress({ done: 0, total: rows.length, found: 0 })
+        }
+
+        const points = await geocodeMany(
+          missing.map((m) => m.address),
+          (done, total, found) => {
+            if (cancelled) return
+            const merged = [...readyPins, ...pinsFrom(missing, found)]
+            const seen = new Set<string>()
+            const uniquePins = merged.filter((p) => {
+              if (seen.has(p.id)) return false
+              seen.add(p.id)
+              return true
+            })
+            // done = 지오코딩 처리 건수(캐시 포함), 핀과 별도로 게이지 진행
+            const processed = readyPins.length + done
+            applyPins(uniquePins, {
+              processed: Math.min(processed, rows.length),
+              total: rows.length,
+            })
+            if (uniquePins.length === 0 && !cancelled) {
+              setMessage(`거래처 ${rows.length}곳 위치를 불러오는 중...`)
+            }
+          }
+        )
         if (cancelled) return
 
-        setPins(nextPins)
-        setFailed(miss)
-        if (nextPins.length === 0) {
+        const nextPins = [...readyPins, ...pinsFrom(missing, points)]
+        const seen = new Set<string>()
+        const uniquePins = nextPins.filter((p) => {
+          if (seen.has(p.id)) return false
+          seen.add(p.id)
+          return true
+        })
+        applyPins(uniquePins, { finished: true })
+
+        const newlyFound = pinsFrom(missing, points).map((p) => ({
+          id: p.id,
+          lat: p.point.lat,
+          lng: p.point.lng,
+        }))
+        if (newlyFound.length > 0) {
+          saveClientMapCoordsAction(newlyFound).catch(() => {})
+        }
+
+        if (uniquePins.length === 0) {
           setStatus('empty')
           setMessage('주소를 지도 좌표로 변환하지 못했습니다. 주소를 확인해 주세요.')
-        } else {
-          setStatus('ready')
-          setMessage('')
         }
-        setProgress(null)
       } catch (e) {
         console.error(e)
         if (!cancelled) {
@@ -141,11 +267,9 @@ export default function ClientsMap() {
     if (status !== 'ready' || pins.length === 0 || !mapEl.current) return
 
     let cancelled = false
-    let map: import('leaflet').Map | null = null
 
-    const init = async () => {
+    const sync = async () => {
       const L = (await import('leaflet')).default
-      // CSS는 한 번만
       if (!document.getElementById('leaflet-css')) {
         const link = document.createElement('link')
         link.id = 'leaflet-css'
@@ -156,69 +280,71 @@ export default function ClientsMap() {
 
       if (cancelled || !mapEl.current) return
 
-      if (mapRef.current) {
-        mapRef.current.remove()
-        mapRef.current = null
+      let map = mapRef.current
+      if (!map) {
+        map = L.map(mapEl.current, {
+          scrollWheelZoom: true,
+          zoomControl: true,
+        })
+        mapRef.current = map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap',
+          maxZoom: 19,
+        }).addTo(map)
       }
 
-      map = L.map(mapEl.current, {
-        scrollWheelZoom: true,
-        zoomControl: true,
-      })
-      mapRef.current = map
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
-        maxZoom: 19,
-      }).addTo(map)
-
       const bounds = L.latLngBounds([])
-      const markers: import('leaflet').Layer[] = []
-
+      let added = 0
       for (const pin of pins) {
+        bounds.extend([pin.point.lat, pin.point.lng])
+        if (pinIdsRef.current.has(pin.id)) continue
+        pinIdsRef.current.add(pin.id)
+        added += 1
+        const fullAddress = [pin.address, pin.addressDetail].filter(Boolean).join(' ')
         const icon = L.divIcon({
           className: styles.mapPinIcon,
           html: `
             <div class="${styles.mapPin}">
-              <div class="${styles.mapPinMarker}" title="${escapeHtml(pin.address)}"></div>
+              <div class="${styles.mapPinMarker}" title="${escapeHtml(fullAddress)}"></div>
               <div class="${styles.mapPinLabel}">${escapeHtml(pin.name)}</div>
             </div>
           `,
           iconSize: [0, 0],
           iconAnchor: [0, 28],
         })
-
         const marker = L.marker([pin.point.lat, pin.point.lng], { icon })
           .bindPopup(
-            `<strong>${escapeHtml(pin.name)}</strong><br/><span style="color:#666;font-size:12px">${escapeHtml(pin.address)}</span>`
+            `<strong>${escapeHtml(pin.name)}</strong><br/><span style="color:#666;font-size:12px">${escapeHtml(fullAddress)}</span>`
           )
           .addTo(map)
-        markers.push(marker)
-        bounds.extend([pin.point.lat, pin.point.lng])
+        markersRef.current.push(marker)
       }
 
       if (pins.length === 1) {
         map.setView([pins[0].point.lat, pins[0].point.lng], 15)
-      } else if (bounds.isValid()) {
+      } else if (bounds.isValid() && (added > 0 || markersRef.current.length === pins.length)) {
         map.fitBounds(bounds.pad(0.2))
-      } else {
-        map.setView([37.5665, 126.978], 11)
       }
 
-      // 레이아웃 안정화 후 리사이즈
       setTimeout(() => map?.invalidateSize(), 100)
     }
 
-    init()
-
+    sync()
     return () => {
       cancelled = true
+    }
+  }, [status, pins])
+
+  useEffect(() => {
+    return () => {
+      markersRef.current = []
+      pinIdsRef.current.clear()
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
       }
     }
-  }, [status, pins])
+  }, [])
 
   return (
     <section className={styles.section}>
@@ -232,7 +358,9 @@ export default function ClientsMap() {
         {status === 'loading' && (
           <div className={styles.mapStatus}>
             {message}
-            {progress ? ` (${progress.done}/${progress.total})` : ''}
+            {progress
+              ? ` (${progress.done}/${progress.total}${progress.found > 0 ? `, 표시 ${progress.found}` : ''})`
+              : ''}
           </div>
         )}
         {status === 'empty' && <div className={styles.mapStatus}>{message}</div>}
@@ -242,7 +370,11 @@ export default function ClientsMap() {
             <div ref={mapEl} className={styles.mapCanvas} />
             <div className={styles.mapFooter}>
               표시 {pins.length}곳
-              {failed > 0 ? ` · 위치 변환 실패 ${failed}곳` : ''}
+              {progress
+                ? ` · 변환 중 ${progress.done}/${progress.total}`
+                : failed > 0
+                  ? ` · 주소 확인 필요 ${failed}곳`
+                  : ''}
             </div>
           </>
         )}

@@ -35,6 +35,7 @@ interface ClientFormState {
   office_phone: string
   email: string
   address: string
+  address_detail: string
   memo: string
   parent_id: string
   status: string
@@ -55,7 +56,7 @@ type WarehouseMachine = {
 function buildInitialClientForm(): ClientFormState {
   return {
     name: '', business_number: '', representative_name: '', contact_person: '',
-    job_title: '', phone: '', office_phone: '', email: '', address: '', memo: '', parent_id: '',
+    job_title: '', phone: '', office_phone: '', email: '', address: '', address_detail: '', memo: '', parent_id: '',
     status: loadAppSettings().clients.defaultStatus,
   }
 }
@@ -188,6 +189,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
         office_phone: editData.office_phone || '',
         email: editData.email || '',
         address: editData.address || '',
+        address_detail: editData.address_detail || '',
         memo: editData.memo || '',
         parent_id: editData.parent_id || '',
         status: editData.status || 'active',
@@ -415,7 +417,18 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
             <InputField label="일반 연락처" value={formData.office_phone} onChange={(e) => setFormData({ ...formData, office_phone: e.target.value })} placeholder="02-000-0000" />
           </div>
           <InputField label="이메일" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-          <InputField label="주소" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
+          <InputField
+            label="주소"
+            value={formData.address}
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            placeholder="예: 서울 금천구 가산디지털2로 15"
+          />
+          <InputField
+            label="상세주소"
+            value={formData.address_detail}
+            onChange={(e) => setFormData({ ...formData, address_detail: e.target.value })}
+            placeholder="예: 가산드림타워 e1 지하1층 관리사무소"
+          />
           <InputField
             label="상태"
             as="select"

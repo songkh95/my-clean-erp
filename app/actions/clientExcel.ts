@@ -12,6 +12,13 @@ import {
 
 export type ClientImportResolution = 'keep' | 'overwrite'
 
+export type ClientMachineImportOptions = {
+  /** 충돌 시 거래처별 keep/overwrite (기본 overwrite) */
+  clientResolutions?: Record<string, ClientImportResolution>
+  /** 엑셀에 없는 거래처·기기도 삭제(동기화) */
+  syncDelete?: boolean
+}
+
 async function requireOrg() {
   const supabase = await createClient()
   const {
@@ -55,6 +62,7 @@ function clientPayloadFromExcel(row: ClientExcelRow, orgId: string) {
     phone: row.담당자연락처?.trim() || null,
     office_phone: row.일반연락처?.trim() || null,
     address: row.주소?.trim() || null,
+    address_detail: row.상세주소?.trim() || null,
     business_number: row.사업자번호?.trim() || null,
     representative_name: row.대표자명?.trim() || null,
     email: row.이메일?.trim() || null,
@@ -68,8 +76,22 @@ function clientPayloadFromExcel(row: ClientExcelRow, orgId: string) {
 export async function importClientsMachinesFromExcelAction(
   clients: ClientExcelRow[],
   machines: MachineExcelRow[],
-  clientResolutions: Record<string, ClientImportResolution> = {}
+  clientResolutionsOrOptions:
+    | Record<string, ClientImportResolution>
+    | ClientMachineImportOptions = {}
 ) {
+  const options: ClientMachineImportOptions = Array.isArray(clientResolutionsOrOptions)
+    ? {}
+    : typeof clientResolutionsOrOptions === 'object' &&
+        clientResolutionsOrOptions !== null &&
+        ('syncDelete' in clientResolutionsOrOptions ||
+          'clientResolutions' in clientResolutionsOrOptions)
+      ? (clientResolutionsOrOptions as ClientMachineImportOptions)
+      : { clientResolutions: clientResolutionsOrOptions as Record<string, ClientImportResolution> }
+
+  const clientResolutions = options.clientResolutions || {}
+  const syncDelete = !!options.syncDelete
+
   const { supabase, error: authErr, orgId } = await requireOrg()
   if (authErr || !orgId) {
     return { success: false, message: authErr || '조직 정보 없음', errors: [] as string[] }
@@ -79,8 +101,11 @@ export async function importClientsMachinesFromExcelAction(
   let clientCreated = 0
   let clientSkipped = 0
   let clientUpdated = 0
+  let clientDeleted = 0
   let machineCreated = 0
   let machineUpdated = 0
+  let machineDeleted = 0
+  let machineWithdrawn = 0
 
   try {
     const { data: existingClients } = await supabase
@@ -95,6 +120,7 @@ export async function importClientsMachinesFromExcelAction(
     }
 
     const pendingParent: { name: string; parentName: string }[] = []
+    const excelClientKeys = new Set<string>()
 
     for (let i = 0; i < clients.length; i++) {
       const row = clients[i]
@@ -104,6 +130,7 @@ export async function importClientsMachinesFromExcelAction(
         continue
       }
       const key = name.toLowerCase()
+      excelClientKeys.add(key)
       const existingId = clientIdByName.get(key)
 
       if (existingId) {
@@ -125,6 +152,9 @@ export async function importClientsMachinesFromExcelAction(
             phone: payload.phone,
             office_phone: payload.office_phone,
             address: payload.address,
+            address_detail: payload.address_detail,
+            map_lat: null,
+            map_lng: null,
             business_number: payload.business_number,
             representative_name: payload.representative_name,
             email: payload.email,
@@ -136,9 +166,9 @@ export async function importClientsMachinesFromExcelAction(
 
         if (error) {
           const msg = error.message || '수정 실패'
-          if (msg.includes('job_title') || msg.includes('schema cache')) {
+          if (msg.includes('job_title') || msg.includes('schema cache') || msg.includes('address_detail')) {
             errors.push(
-              `거래처 "${name}": DB에 job_title 컬럼이 없습니다. supabase/migrations/add_excel_contract_fields.sql 을 실행하세요.`
+              `거래처 "${name}": DB 컬럼이 없습니다. sql/add_client_address_detail.sql 또는 add_excel_contract_fields.sql 을 실행하세요. (${msg})`
             )
           } else {
             errors.push(`거래처 "${name}" 덮어쓰기 실패: ${msg}`)
@@ -165,9 +195,9 @@ export async function importClientsMachinesFromExcelAction(
 
       if (error || !created) {
         const msg = error?.message || '등록 실패'
-        if (msg.includes('job_title') || msg.includes('schema cache')) {
+        if (msg.includes('job_title') || msg.includes('schema cache') || msg.includes('address_detail')) {
           errors.push(
-            `거래처 "${name}": DB에 job_title 컬럼이 없습니다. supabase/migrations/add_excel_contract_fields.sql 을 실행하세요.`
+            `거래처 "${name}": DB 컬럼이 없습니다. sql/add_client_address_detail.sql 또는 add_excel_contract_fields.sql 을 실행하세요. (${msg})`
           )
         } else {
           errors.push(`거래처 "${name}": ${msg}`)
@@ -203,7 +233,7 @@ export async function importClientsMachinesFromExcelAction(
 
     const { data: existingMachines } = await supabase
       .from('inventory')
-      .select('id, serial_number')
+      .select('id, serial_number, client_id, status')
       .eq('organization_id', orgId)
 
     const machineIdBySerial = new Map<string, string>()
@@ -211,6 +241,8 @@ export async function importClientsMachinesFromExcelAction(
       const s = String(m.serial_number || '').trim().toLowerCase()
       if (s) machineIdBySerial.set(s, m.id)
     }
+
+    const excelSerialKeys = new Set<string>()
 
     for (let i = 0; i < machines.length; i++) {
       const row = machines[i]
@@ -229,6 +261,7 @@ export async function importClientsMachinesFromExcelAction(
       }
 
       const serialKey = serial.toLowerCase()
+      excelSerialKeys.add(serialKey)
       const existingMachineId = machineIdBySerial.get(serialKey)
 
       const statusRaw = row.상태?.trim() || ''
@@ -338,6 +371,65 @@ export async function importClientsMachinesFromExcelAction(
       machineCreated += 1
     }
 
+    if (syncDelete) {
+      // 엑셀에 거래처/기기 행이 하나도 없으면 전체 삭제를 막음 (실수 방지)
+      if (excelClientKeys.size > 0) {
+        for (const c of existingClients || []) {
+          const key = String(c.name || '').trim().toLowerCase()
+          if (!key || excelClientKeys.has(key)) continue
+          const { error } = await supabase
+            .from('clients')
+            .update({ is_deleted: true })
+            .eq('id', c.id)
+            .eq('organization_id', orgId)
+          if (error) {
+            errors.push(`거래처 "${c.name}" 삭제 실패: ${error.message}`)
+            continue
+          }
+          clientDeleted += 1
+        }
+      } else {
+        errors.push('거래처 행이 없어 거래처 삭제 동기화는 건너뛰었습니다.')
+      }
+
+      if (excelSerialKeys.size > 0) {
+        for (const m of existingMachines || []) {
+          const key = String(m.serial_number || '').trim().toLowerCase()
+          if (!key || excelSerialKeys.has(key)) continue
+          const { error: delErr } = await supabase
+            .from('inventory')
+            .delete()
+            .eq('id', m.id)
+            .eq('organization_id', orgId)
+          if (!delErr) {
+            machineDeleted += 1
+            continue
+          }
+          const { error: wdErr } = await supabase
+            .from('inventory')
+            .update({
+              client_id: null,
+              status: '창고',
+              memo: [String((m as any).memo || '').trim(), '엑셀 동기화로 창고 회수']
+                .filter(Boolean)
+                .join(' · '),
+            })
+            .eq('id', m.id)
+            .eq('organization_id', orgId)
+          if (wdErr) {
+            errors.push(`기기 "${m.serial_number}" 삭제/회수 실패: ${delErr.message}`)
+          } else {
+            machineWithdrawn += 1
+            errors.push(
+              `기기 "${m.serial_number}": 삭제 불가(${delErr.message}) → 창고로 회수했습니다.`
+            )
+          }
+        }
+      } else {
+        errors.push('기기 행이 없어 기기 삭제 동기화는 건너뛰었습니다.')
+      }
+    }
+
     revalidatePath('/clients')
     revalidatePath('/inventory')
     revalidatePath('/')
@@ -345,8 +437,11 @@ export async function importClientsMachinesFromExcelAction(
     const parts = [`거래처 신규 ${clientCreated}건`]
     if (clientUpdated) parts.push(`거래처 덮어쓰기 ${clientUpdated}건`)
     if (clientSkipped) parts.push(`거래처 유지 ${clientSkipped}건`)
+    if (clientDeleted) parts.push(`거래처 삭제 ${clientDeleted}건`)
     parts.push(`기기 등록 ${machineCreated}건`)
     if (machineUpdated) parts.push(`기기 덮어쓰기 ${machineUpdated}건`)
+    if (machineDeleted) parts.push(`기기 삭제 ${machineDeleted}건`)
+    if (machineWithdrawn) parts.push(`기기 창고회수 ${machineWithdrawn}건`)
 
     return {
       success: true,
@@ -355,8 +450,11 @@ export async function importClientsMachinesFromExcelAction(
       clientCreated,
       clientUpdated,
       clientSkipped,
+      clientDeleted,
       machineCreated,
       machineUpdated,
+      machineDeleted,
+      machineWithdrawn,
     }
   } catch (e: any) {
     return {

@@ -324,4 +324,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS consumables_org_code_regen_uidx
 -- 색상 유일 인덱스는 사용하지 않음 (품명이 다르면 같은 색상 토너 여러 개 허용)
 DROP INDEX IF EXISTS consumables_org_toner_color_uidx;
 
+-- 거래처: 지도용 주소 / 상세주소 분리
+ALTER TABLE clients
+  ADD COLUMN IF NOT EXISTS address_detail text;
+
+COMMENT ON COLUMN clients.address IS '지도·지오코딩용 주소 (도로명·건물번호 등)';
+COMMENT ON COLUMN clients.address_detail IS '층·호·관리사무소 등 상세 위치 (지도 검색에 사용하지 않음)';
+
+-- 거래처 지도 좌표 캐시
+ALTER TABLE clients
+  ADD COLUMN IF NOT EXISTS map_lat double precision;
+
+ALTER TABLE clients
+  ADD COLUMN IF NOT EXISTS map_lng double precision;
+
+COMMENT ON COLUMN clients.map_lat IS '지도 위도 (주소 지오코딩 캐시)';
+COMMENT ON COLUMN clients.map_lng IS '지도 경도 (주소 지오코딩 캐시)';
+
 -- 완료: 앱에서 현재 재고 / 메모 / 사진 / 미입고 / 원자적 재고 기능을 사용할 수 있습니다.

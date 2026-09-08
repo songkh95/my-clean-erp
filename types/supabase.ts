@@ -15,6 +15,9 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          address_detail: string | null
+          map_lat: number | null
+          map_lng: number | null
           billing_date: string | null
           business_number: string | null
           contact_person: string | null
@@ -38,6 +41,9 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_detail?: string | null
+          map_lat?: number | null
+          map_lng?: number | null
           billing_date?: string | null
           business_number?: string | null
           contact_person?: string | null
@@ -61,6 +67,9 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_detail?: string | null
+          map_lat?: number | null
+          map_lng?: number | null
           billing_date?: string | null
           business_number?: string | null
           contact_person?: string | null

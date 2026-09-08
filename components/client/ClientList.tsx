@@ -173,7 +173,8 @@ export default function ClientList() {
         .filter(
           (c) =>
             c.name.toLowerCase().includes(q) ||
-            (c.address && c.address.toLowerCase().includes(q))
+            (c.address && c.address.toLowerCase().includes(q)) ||
+            (c.address_detail && c.address_detail.toLowerCase().includes(q))
         )
         .map((c) => c.id)
     )
@@ -347,6 +348,10 @@ export default function ClientList() {
                   <div className={styles.fieldContainer} style={{ gridColumn: '1 / -1' }}>
                     <span className={styles.label}>주소</span>
                     <span className={styles.valueText}>{client.address || '-'}</span>
+                  </div>
+                  <div className={styles.fieldContainer} style={{ gridColumn: '1 / -1' }}>
+                    <span className={styles.label}>상세주소</span>
+                    <span className={styles.valueText}>{client.address_detail || '-'}</span>
                   </div>
                 </div>
 

@@ -717,8 +717,10 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
   }
 
   // B. 미방문 기계 데이터 생성
+  // 설치 기기마다 더미를 항상 둠. 월/기간 필터에서 해당 기간 실일지가 없으면
+  // 더미가 대표 행이 되고, 실일지가 있으면 UI가 실일지를 대표로 씀.
   
-  // 1. 현재 '설치' 상태인 모든 기계 조회
+  // 1. 현재 '설치' 상태인 모든 기계 조회 (삭제된 거래처 제외)
   const { data: allMachines } = await supabase
     .from('inventory')
     .select(`
@@ -728,7 +730,7 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
       department,
       status, 
       client_id, 
-      client:clients(id, name)
+      client:clients(id, name, is_deleted)
     `)
     .eq('organization_id', orgId)
     .eq('status', '설치')
@@ -741,14 +743,12 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
     .eq('organization_id', orgId)
     .eq('is_deleted', false)
 
-  // 3. 일지가 존재하는 ID 수집
-  const inventoryIdsInLogs = new Set(realLogs.map((l: any) => l.inventory_id).filter(Boolean))
-  const clientIdsInLogs = new Set(realLogs.map((l: any) => l.client_id).filter(Boolean))
+  const activeMachines = (allMachines || []).filter(
+    (m: any) => m.client && m.client.is_deleted !== true
+  )
 
-  // 4. [기계 기준] 미방문 데이터 생성
-  const machineDummyLogs = (allMachines || [])
-    .filter((m: any) => !inventoryIdsInLogs.has(m.id))
-    .map((m: any) => ({
+  // 3. [기계 기준] 미방문 더미 — 설치 기기 전원 (과거 방문 유무와 무관)
+  const machineDummyLogs = activeMachines.map((m: any) => ({
       id: `dummy_machine_${m.id}`,
       organization_id: orgId,
       log_kind: 'service' as const,
@@ -779,14 +779,11 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
       prev_visit_date: lastVisitByKey.get(`i:${m.id}`) || null,
     }))
 
-  // 5. [거래처 기준] 기계 없는 거래처의 미방문 데이터 생성
-  const clientIdsWithMachines = new Set(allMachines?.map((m: any) => m.client_id))
+  // 4. [거래처 기준] 기계 없는 거래처의 미방문 더미 (과거 일지 유무와 무관)
+  const clientIdsWithMachines = new Set(activeMachines.map((m: any) => m.client_id))
   
   const clientDummyLogs = (allClients || [])
-    .filter((c: any) => 
-      !clientIdsInLogs.has(c.id) &&
-      !clientIdsWithMachines.has(c.id)
-    )
+    .filter((c: any) => !clientIdsWithMachines.has(c.id))
     .map((c: any) => ({
       id: `dummy_client_${c.id}`,
       organization_id: orgId,
@@ -1644,23 +1641,24 @@ export type ServiceLogImportRow = {
   일지ID: string
 }
 
-/** 엑셀에서 파싱한 일지 행을 기간 필터 후 일괄 등록/수정 */
+/** 엑셀에서 파싱한 일지 행을 기간 필터 후 일괄 등록/수정/삭제 */
 export async function importServiceLogsFromExcelAction(
   rows: ServiceLogImportRow[],
-  opts?: { from?: string | null; to?: string | null }
+  opts?: { from?: string | null; to?: string | null; syncDelete?: boolean }
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false as const, message: '로그인이 필요합니다.', created: 0, updated: 0, skipped: 0, errors: [] as string[] }
+  if (!user) return { success: false as const, message: '로그인이 필요합니다.', created: 0, updated: 0, skipped: 0, deleted: 0, errors: [] as string[] }
 
   const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
   if (!profile?.organization_id) {
-    return { success: false as const, message: '조직 정보가 없습니다.', created: 0, updated: 0, skipped: 0, errors: [] as string[] }
+    return { success: false as const, message: '조직 정보가 없습니다.', created: 0, updated: 0, skipped: 0, deleted: 0, errors: [] as string[] }
   }
   const orgId = profile.organization_id
 
   const from = opts?.from || null
   const to = opts?.to || null
+  const syncDelete = !!opts?.syncDelete
 
   const filtered = rows.filter((r) => {
     if (!r.거래처?.trim() && !r.일지ID?.trim()) return false
@@ -1676,6 +1674,7 @@ export async function importServiceLogsFromExcelAction(
       created: 0,
       updated: 0,
       skipped: 0,
+      deleted: 0,
       errors: [] as string[],
     }
   }
@@ -1706,7 +1705,9 @@ export async function importServiceLogsFromExcelAction(
   let created = 0
   let updated = 0
   let skipped = 0
+  let deleted = 0
   const errors: string[] = []
+  const keptLogIds = new Set<string>()
 
   const allowedStatus = new Set(['접수', '완료', '보류', '미방문'])
 
@@ -1777,6 +1778,7 @@ export async function importServiceLogsFromExcelAction(
           const err = await updateServiceLogRow(supabase, logId, orgId, payload)
           if (err) throw new Error(err.message)
           updated += 1
+          keptLogIds.add(existing.id)
           continue
         }
       }
@@ -1797,6 +1799,7 @@ export async function importServiceLogsFromExcelAction(
         const err = await updateServiceLogRow(supabase, dup.id, orgId, payload)
         if (err) throw new Error(err.message)
         updated += 1
+        keptLogIds.add(dup.id)
         continue
       }
 
@@ -1807,19 +1810,47 @@ export async function importServiceLogsFromExcelAction(
         continue
       }
       created += 1
+      if (result.success && 'id' in result && result.id) keptLogIds.add(String(result.id))
     } catch (e: any) {
       errors.push(`${line}행: ${e.message || '실패'}`)
       skipped += 1
     }
   }
 
+  if (syncDelete && from && to) {
+    let q = supabase
+      .from('service_logs')
+      .select('id')
+      .eq('organization_id', orgId)
+      .gte('visit_date', from)
+      .lte('visit_date', to)
+
+    const { data: periodLogs, error: periodErr } = await q
+    if (periodErr) {
+      errors.push(`기간 내 삭제 대상 조회 실패: ${periodErr.message}`)
+    } else {
+      for (const log of periodLogs || []) {
+        if (keptLogIds.has(log.id)) continue
+        // 엑셀에 일지ID로 명시된 경우도 kept에 있음. 없으면 삭제
+        const del = await deleteServiceLogAction(log.id)
+        if (del.success) deleted += 1
+        else errors.push(`일지 삭제 실패(${log.id.slice(0, 8)}…): ${del.message}`)
+      }
+    }
+  } else if (syncDelete && (!from || !to)) {
+    errors.push('전체 기간에서는 삭제 동기화를 하지 않습니다. 월/기간을 지정하세요.')
+  }
+
   revalidatePath('/service')
   return {
     success: true as const,
-    message: `가져오기 완료 — 신규 ${created}, 수정 ${updated}, 건너뜀 ${skipped}`,
+    message:
+      `가져오기 완료 — 신규 ${created}, 수정 ${updated}, 건너뜀 ${skipped}` +
+      (deleted ? `, 삭제 ${deleted}` : ''),
     created,
     updated,
     skipped,
+    deleted,
     errors: errors.slice(0, 30),
   }
 }

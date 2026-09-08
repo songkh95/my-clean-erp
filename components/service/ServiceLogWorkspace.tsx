@@ -305,12 +305,19 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
 
   const periodLogs = useMemo(() => {
     const { from, to, includeUnvisited } = periodRange
-    if (!from || !to) return displayLogs
-    return displayLogs.filter((log) => {
-      const isUnvisited = log.status === '미방문' || isDummyId(log.id) || !log.visit_date
-      if (isUnvisited) return includeUnvisited
-      return log.visit_date >= from && log.visit_date <= to
-    })
+    const inPeriod = !from || !to
+      ? displayLogs
+      : displayLogs.filter((log) => {
+          const isUnvisited = log.status === '미방문' || isDummyId(log.id) || !log.visit_date
+          if (isUnvisited) return includeUnvisited
+          return log.visit_date >= from && log.visit_date <= to
+        })
+
+    // 같은 기기/거래처에 기간 내 실일지가 있으면 미방문 더미는 숨김 (통계·목록 중복 방지)
+    const keysWithReal = new Set(
+      inPeriod.filter((l) => !isDummyId(l.id)).map((l) => groupKeyOf(l))
+    )
+    return inPeriod.filter((l) => !isDummyId(l.id) || !keysWithReal.has(groupKeyOf(l)))
   }, [displayLogs, periodRange])
 
   const filteredLogs = useMemo(() => {
@@ -389,18 +396,34 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     })
   }, [sortedLogs])
 
-  const currentMonthPrefix = useMemo(() => {
+  const statsMonthPrefix = useMemo(() => {
+    if (periodPreset === 'month') {
+      return `${periodYear}-${String(periodMonth).padStart(2, '0')}`
+    }
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  }, [])
+  }, [periodPreset, periodYear, periodMonth])
 
-  const isMonthUnvisitedLog = (log: ServiceLog) =>
-    log.status === '미방문' || isDummyId(log.id) || !log.visit_date
+  const isPeriodStatLog = (log: ServiceLog) => {
+    if (log.status === '미방문' || isDummyId(log.id) || !log.visit_date) return true
+    const visit = String(log.visit_date || '')
+    if (periodPreset === 'custom') {
+      const { from, to } = periodRange
+      if (!from || !to) return true
+      return visit >= from && visit <= to
+    }
+    return visit.startsWith(statsMonthPrefix)
+  }
 
+  /** 선택 기간 방문 완료: 상태가 완료인 건 */
   const isMonthVisitedLog = (log: ServiceLog) =>
-    !isMonthUnvisitedLog(log) && String(log.visit_date || '').startsWith(currentMonthPrefix)
+    log.status === '완료' && isPeriodStatLog(log)
 
-  /** 이번 달 방문/미방문 클릭 시 해당 그룹을 위로 / 상태 정렬 시 상태끼리 묶음 */
+  /** 선택 기간 미방문: 완료 이외(접수·보류·미방문 등) */
+  const isMonthUnvisitedLog = (log: ServiceLog) =>
+    log.status !== '완료' && isPeriodStatLog(log)
+
+  /** 이번 달 방문 완료/미방문 클릭 시 해당 그룹을 위로 / 상태 정렬 시 상태끼리 묶음 */
   const displayRowGroups = useMemo(() => {
     let groups = rowGroups
 
@@ -430,7 +453,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     }
 
     return groups
-  }, [rowGroups, visitPin, currentMonthPrefix, sortBy, statusSort, clientSort])
+  }, [rowGroups, visitPin, statsMonthPrefix, periodPreset, periodRange, sortBy, statusSort, clientSort])
 
   const summaryStats = useMemo(() => {
     const source = periodLogs
@@ -460,7 +483,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       monthUnvisited,
       rowCount: rowGroups.length,
     }
-  }, [periodLogs, rowGroups.length, currentMonthPrefix])
+  }, [periodLogs, rowGroups.length, statsMonthPrefix, periodPreset, periodRange])
 
   const toggleExpand = (key: string) => {
     setExpandedKeys((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -1280,16 +1303,16 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           <button
             type="button"
             className={`${styles.statBtn} ${visitPin === 'visited' ? styles.statBtnActive : ''}`}
-            title="클릭: 이번 달 방문한 거래처를 위로"
+            title="클릭: 이번 달 방문 완료한 건을 위로"
             onClick={() => setVisitPin((v) => (v === 'visited' ? 'none' : 'visited'))}
           >
-            이번 달 방문 <strong>{summaryStats.monthVisited}</strong>
+            이번 달 방문 완료 <strong>{summaryStats.monthVisited}</strong>
           </button>
           <span className={styles.statDivider} />
           <button
             type="button"
             className={`${styles.statBtn} ${styles.statWarnBtn} ${visitPin === 'unvisited' ? styles.statBtnActiveWarn : ''}`}
-            title="클릭: 이번 달 미방문을 위로"
+            title="클릭: 이번 달 미방문(완료 이외)을 위로"
             onClick={() => setVisitPin((v) => (v === 'unvisited' ? 'none' : 'unvisited'))}
           >
             이번 달 미방문 <strong>{summaryStats.monthUnvisited}</strong>

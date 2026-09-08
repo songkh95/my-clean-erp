@@ -55,6 +55,22 @@ export async function updateClientAction(id: string, data: Partial<Client>) {
   try {
     const { id: _, organization_id, created_at, ...updateData } = data
 
+    // 주소가 바뀌면 지도 좌표 캐시 초기화
+    if ('address' in updateData) {
+      const { data: prev } = await supabase
+        .from('clients')
+        .select('address')
+        .eq('id', id)
+        .eq('organization_id', orgId)
+        .maybeSingle()
+      const nextAddr = String(updateData.address ?? '').trim()
+      const prevAddr = String(prev?.address ?? '').trim()
+      if (nextAddr !== prevAddr) {
+        ;(updateData as any).map_lat = null
+        ;(updateData as any).map_lng = null
+      }
+    }
+
     const { error } = await supabase
       .from('clients')
       .update(updateData)
@@ -63,6 +79,7 @@ export async function updateClientAction(id: string, data: Partial<Client>) {
     if (error) throw error
 
     revalidatePath('/clients')
+    revalidatePath('/')
     return { success: true, message: '수정되었습니다.' }
   } catch (e: any) {
     return { success: false, message: '수정 실패: ' + e.message }
@@ -327,5 +344,48 @@ export async function attachMachinesToClientAction(
     }
   } catch (e: any) {
     return { success: false, message: e.message || '기계 연결 실패' }
+  }
+}
+
+/** 홈 지도 지오코딩 결과를 거래처에 저장 (다음 로드 시 즉시 표시) */
+export async function saveClientMapCoordsAction(
+  points: { id: string; lat: number; lng: number }[]
+) {
+  const { supabase, error: authErr, orgId } = await requireOrg()
+  if (authErr || !orgId) return { success: false, message: authErr || '조직 정보 없음', saved: 0 }
+
+  const rows = (points || []).filter(
+    (p) => p?.id && Number.isFinite(p.lat) && Number.isFinite(p.lng)
+  )
+  if (rows.length === 0) return { success: true, message: '저장할 좌표 없음', saved: 0 }
+
+  let saved = 0
+  const errors: string[] = []
+  for (const p of rows) {
+    const { error } = await supabase
+      .from('clients')
+      .update({ map_lat: p.lat, map_lng: p.lng })
+      .eq('id', p.id)
+      .eq('organization_id', orgId)
+      .eq('is_deleted', false)
+    if (error) {
+      if (/map_lat|map_lng|schema cache/i.test(error.message)) {
+        return {
+          success: false,
+          message: 'map_lat/map_lng 컬럼이 없습니다. sql/add_client_map_coords.sql 을 실행하세요.',
+          saved,
+        }
+      }
+      errors.push(error.message)
+      continue
+    }
+    saved += 1
+  }
+
+  return {
+    success: true,
+    message: `지도 좌표 ${saved}건 저장`,
+    saved,
+    errors: errors.slice(0, 5),
   }
 }

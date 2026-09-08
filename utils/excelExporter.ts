@@ -51,7 +51,7 @@ export const exportHistoryToExcel = (historyList: Settlement[]) => {
       '종사업장번호': '',
       '상호(법인명)': client.name || '',
       '성명': client.representative_name || '',
-      '사업장주소': client.address || '',
+      '사업장주소': [client.address, client.address_detail].map((s) => String(s || '').trim()).filter(Boolean).join(' '),
       '업태': '',
       '종목': '',
       '이메일1': client.email || '',

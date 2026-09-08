@@ -10,6 +10,7 @@ import {
   filterLogsByPeriod,
   parseServiceLogExcel,
 } from '@/utils/serviceLogExcel'
+import { EXCEL_SYNC_RULE_LINES, excelSyncRulesText } from '@/utils/excelSyncRules'
 import styles from '@/app/login/auth.module.css'
 
 type Mode = 'export' | 'import'
@@ -50,6 +51,7 @@ export default function ServiceExcelModal({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [syncDelete, setSyncDelete] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   if (!isOpen) return null
@@ -90,12 +92,30 @@ export default function ServiceExcelModal({
         setError('선택한 기간에 해당하는 행이 없습니다.')
         return
       }
-      if (!confirm(`${range.label} 기준 ${filtered.length}건을 가져오겠습니까?\n(거래처·시리얼·담당자 이름으로 매칭합니다)`)) {
+      if (syncDelete && periodKind === 'all') {
+        setError('삭제 동기화는 월/기간 지정일 때만 가능합니다. 기간을 바꾸거나 삭제 동기화를 끄세요.')
+        return
+      }
+      const confirmLines = [
+        `${range.label} 기준 ${filtered.length}건을 가져옵니다.`,
+        '',
+        excelSyncRulesText(
+          syncDelete
+            ? '· 선택한 기간 안에서 엑셀에 없는 일지는 삭제합니다.'
+            : '· 엑셀에 없는 기존 일지는 그대로 둡니다.'
+        ),
+        '',
+        '키: 일지ID → 없으면 거래처+방문일+기기',
+        '',
+        '계속할까요?',
+      ]
+      if (!confirm(confirmLines.join('\n'))) {
         return
       }
       const result = await importServiceLogsFromExcelAction(filtered, {
         from: range.from,
         to: range.to,
+        syncDelete,
       })
       if (!result.success) {
         setError(result.message)
@@ -245,9 +265,46 @@ export default function ServiceExcelModal({
           ) : (
             <>
               <p className={styles.hint}>
-                엑셀의 방문일자가 선택 기간에 해당하는 행만 가져옵니다.
-                거래처명·시리얼·담당자명으로 매칭하며, 같은 날·같은 기기는 수정됩니다.
+                <strong>불러오기 규칙</strong>
+                <br />
+                {EXCEL_SYNC_RULE_LINES.map((line) => (
+                  <span key={line}>
+                    · {line}
+                    <br />
+                  </span>
+                ))}
+                키: <strong>일지ID</strong> → 없으면 거래처+방문일+기기
+                <br />
+                삭제 동기화는 <strong>월/기간 지정</strong>일 때만 적용됩니다.
               </p>
+              <label
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'flex-start',
+                  marginBottom: 10,
+                  fontSize: '0.85rem',
+                  color: '#444',
+                  lineHeight: 1.45,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={syncDelete}
+                  onChange={(e) => setSyncDelete(e.target.checked)}
+                  disabled={busy || periodKind === 'all'}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  선택한 기간에서 엑셀에 없는 일지도 <strong>삭제 동기화</strong>
+                  {periodKind === 'all' ? (
+                    <>
+                      <br />
+                      <span style={{ color: '#b45309' }}>전체 기간에서는 사용할 수 없습니다.</span>
+                    </>
+                  ) : null}
+                </span>
+              </label>
               <input
                 ref={fileRef}
                 type="file"
