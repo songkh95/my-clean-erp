@@ -43,6 +43,7 @@ export default function Sidebar({
       children: [
         { name: '서비스 일지', path: '/service' },
         { name: '판매_출장일지', path: '/service/sales-trip' },
+        { name: '단기 렌탈', path: '/service/short-rental' },
       ],
     },
     { name: '견적서', path: '/quotes', icon: '📄' },

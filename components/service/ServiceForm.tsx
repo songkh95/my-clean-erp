@@ -47,6 +47,7 @@ type MachineOpt = {
 const KIND_FORM_TITLE: Record<ServiceLogKind, { create: string; edit: string }> = {
   service: { create: '서비스 일지 작성', edit: '서비스 일지 수정' },
   sales_trip: { create: '판매_출장 일지 작성', edit: '판매_출장 일지 수정' },
+  short_rental: { create: '단기 렌탈 일지 작성', edit: '단기 렌탈 일지 수정' },
 }
 
 const inputBoxStyle: CSSProperties = {
@@ -110,8 +111,8 @@ export default function ServiceForm({
   const machineBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const supabase = createClient()
-  const isSalesTrip = logKind === 'sales_trip'
-  const allowSkipClient = isSalesTrip
+  const isVisitStyle = logKind === 'sales_trip' || logKind === 'short_rental'
+  const allowSkipClient = isVisitStyle
   const formTitle = KIND_FORM_TITLE[logKind] || KIND_FORM_TITLE.service
   const serviceTypes = settings.service.serviceTypes.length > 0
     ? settings.service.serviceTypes
@@ -218,12 +219,12 @@ export default function ServiceForm({
       ...prev,
       client_id: client.id,
       client_name: client.name,
-      inventory_id: sameClient ? prev.inventory_id : isSalesTrip ? prev.inventory_id : '',
-      machine_model: sameClient ? prev.machine_model : isSalesTrip ? prev.machine_model : '',
+      inventory_id: sameClient ? prev.inventory_id : isVisitStyle ? prev.inventory_id : '',
+      machine_model: sameClient ? prev.machine_model : isVisitStyle ? prev.machine_model : '',
     }))
     setClientQuery(client.name)
     setClientMenuOpen(false)
-    if (!sameClient && !isSalesTrip) setMachineQuery('')
+    if (!sameClient && !isVisitStyle) setMachineQuery('')
   }
 
   const clearClient = () => {
@@ -231,8 +232,8 @@ export default function ServiceForm({
       ...prev,
       client_id: '',
       client_name: skipClientRegister ? clientQuery : '',
-      inventory_id: isSalesTrip ? prev.inventory_id : '',
-      machine_model: isSalesTrip ? prev.machine_model : '',
+      inventory_id: isVisitStyle ? prev.inventory_id : '',
+      machine_model: isVisitStyle ? prev.machine_model : '',
     }))
     setClientQuery('')
     setClientMenuOpen(!skipClientRegister)
@@ -275,7 +276,7 @@ export default function ServiceForm({
       const employeeData = await getEmployeesAction()
       setEmployees(employeeData)
 
-      if (isSalesTrip) {
+      if (isVisitStyle) {
         const office = await getOfficeMachinesAction()
         setOfficeMachines(office)
       } else {
@@ -360,7 +361,7 @@ export default function ServiceForm({
       }
     }
     loadData()
-  }, [isOpen, editData, logKind, allowSkipClient, isSalesTrip, settings.service.defaultServiceType, settings.service.defaultStatus])
+  }, [isOpen, editData, logKind, allowSkipClient, isVisitStyle, settings.service.defaultServiceType, settings.service.defaultStatus])
 
   useEffect(() => {
     if (!formData.client_id || !clients.length) return
@@ -555,8 +556,8 @@ export default function ServiceForm({
                         ...prev,
                         client_id: '',
                         client_name: '',
-                        inventory_id: isSalesTrip ? prev.inventory_id : '',
-                        machine_model: isSalesTrip ? prev.machine_model : '',
+                        inventory_id: isVisitStyle ? prev.inventory_id : '',
+                        machine_model: isVisitStyle ? prev.machine_model : '',
                       }))
                     }
                   }}
@@ -682,7 +683,7 @@ export default function ServiceForm({
               ) : null}
             </div>
 
-            {isSalesTrip ? (
+            {isVisitStyle ? (
               <div style={{ marginBottom: 16, position: 'relative' }}>
                 <label
                   style={{
@@ -999,5 +1000,7 @@ export default function ServiceForm({
 function normalizeEditKind(value: unknown, fallback: ServiceLogKind): ServiceLogKind {
   const v = String(value || fallback).toLowerCase()
   if (v === 'sales' || v === 'trip' || v === 'sales_trip') return 'sales_trip'
-  return 'service'
+  if (v === 'short_rental' || v === 'short-rental' || v === 'shortrental') return 'short_rental'
+  if (v === 'service') return 'service'
+  return fallback
 }

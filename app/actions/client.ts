@@ -160,7 +160,7 @@ export async function getClientInstalledMachinesAction(clientId: string) {
 
   const { data, error } = await supabase
     .from('inventory')
-    .select('id, type, category, brand, model_name, serial_number, status, billing_date, plan_basic_fee')
+    .select('*')
     .eq('organization_id', orgId)
     .eq('client_id', clientId)
     .order('model_name')

@@ -38,6 +38,8 @@ export default function ClientList() {
   
   const [addMachineModalOpen, setAddMachineModalOpen] = useState(false)
   const [clientForMachineAdd, setClientForMachineAdd] = useState<Client | null>(null)
+  const [editMachineModalOpen, setEditMachineModalOpen] = useState(false)
+  const [selectedAssetForEdit, setSelectedAssetForEdit] = useState<Inventory | null>(null)
 
   const [replaceModalOpen, setReplaceModalOpen] = useState(false)
   const [selectedAssetForReplace, setSelectedAssetForReplace] = useState<Inventory | null>(null)
@@ -115,6 +117,11 @@ export default function ClientList() {
     e.stopPropagation()
     setClientForMachineAdd(client)
     setAddMachineModalOpen(true)
+  }
+
+  const handleEditMachineClick = (asset: Inventory) => {
+    setSelectedAssetForEdit(asset)
+    setEditMachineModalOpen(true)
   }
 
   const handleReplaceClick = (asset: Inventory) => {
@@ -415,7 +422,8 @@ export default function ClientList() {
                             </div>
                           </td>
                           <td className={styles.assetTd} style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: '4px' }}>
+                            <div style={{ display: 'inline-flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '4px' }}>
+                              <Button variant="outline" size="sm" onClick={() => handleEditMachineClick(asset)}>수정</Button>
                               <Button variant="outline" size="sm" onClick={() => { 
                                 if (client.id) {
                                   setSelectedAssetForPlan({ id: asset.id, clientId: client.id }); 
@@ -440,6 +448,14 @@ export default function ClientList() {
       {isRegModalOpen && <ClientForm isOpen={isRegModalOpen} onClose={() => setIsRegModalOpen(false)} onSuccess={fetchClients} editData={selectedClient} />}
       {planModalOpen && selectedAssetForPlan && <PlanSettingModal inventoryId={selectedAssetForPlan.id} clientId={selectedAssetForPlan.clientId} onClose={() => { setPlanModalOpen(false); setSelectedAssetForPlan(null) }} onUpdate={fetchClients} />}
       {addMachineModalOpen && clientForMachineAdd && <InventoryForm isOpen={addMachineModalOpen} onClose={() => { setAddMachineModalOpen(false); setClientForMachineAdd(null) }} onSuccess={fetchClients} editData={{ status: '설치', client_id: clientForMachineAdd.id }} />}
+      {editMachineModalOpen && selectedAssetForEdit && (
+        <InventoryForm
+          isOpen={editMachineModalOpen}
+          onClose={() => { setEditMachineModalOpen(false); setSelectedAssetForEdit(null) }}
+          onSuccess={fetchClients}
+          editData={selectedAssetForEdit}
+        />
+      )}
       {replaceModalOpen && selectedAssetForReplace && selectedAssetForReplace.client_id && <MachineReplaceModal oldAsset={selectedAssetForReplace} clientId={selectedAssetForReplace.client_id} onClose={() => { setReplaceModalOpen(false); setSelectedAssetForReplace(null) }} onSuccess={fetchClients} />}
       {withdrawModalOpen && selectedAssetForWithdraw && selectedAssetForWithdraw.client_id && <MachineWithdrawModal asset={selectedAssetForWithdraw} clientId={selectedAssetForWithdraw.client_id} onClose={() => { setWithdrawModalOpen(false); setSelectedAssetForWithdraw(null) }} onSuccess={fetchClients} />}
       <ClientExcelModal

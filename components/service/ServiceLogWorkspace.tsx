@@ -30,6 +30,7 @@ export type { ServiceLogKind }
 const KIND_META: Record<ServiceLogKind, { title: string; writeLabel: string; showUnvisited: boolean }> = {
   service: { title: '서비스 일지', writeLabel: '+ 일지 작성', showUnvisited: true },
   sales_trip: { title: '판매_출장 일지', writeLabel: '+ 판매_출장 일지 작성', showUnvisited: false },
+  short_rental: { title: '단기 렌탈', writeLabel: '+ 단기 렌탈 일지 작성', showUnvisited: false },
 }
 
 function clientLabel(log: Partial<ServiceLog> | null | undefined) {

@@ -1,7 +1,10 @@
-/** 토너/드럼 KCMY · 재생 소모품 매칭 (호환 기기 모델 기준) */
-
-export type TonerDrumColor = 'K' | 'C' | 'M' | 'Y'
+/** 토너/드럼 색상 · 재생 소모품 매칭 (호환 기기 모델 기준)
+ * KCMY = 4색 공용(특히 드럼) */
+export type TonerDrumColor = 'K' | 'C' | 'M' | 'Y' | 'KCMY'
 export type TonerDrumKind = '토너' | '드럼'
+
+/** 등록·일지 선택용 색상 목록 (KCMY=공용) */
+export const TONER_DRUM_COLORS: TonerDrumColor[] = ['K', 'C', 'M', 'Y', 'KCMY']
 
 export type ConsumableLike = {
   id: string
@@ -19,6 +22,8 @@ export type ConsumableLike = {
 }
 
 const COLOR_NAME: Record<TonerDrumColor, RegExp> = {
+  // KCMY를 단일 K보다 먼저 검사하도록 detectColor에서 순서 보장
+  KCMY: /(?:^|[\s\-_/])(KCMY|공용)(?:$|[\s\-_/])/i,
   K: /(?:^|[\s\-_/])(K|블랙|black|검정)(?:$|[\s\-_/])/i,
   C: /(?:^|[\s\-_/])(C|시안|cyan|청록)(?:$|[\s\-_/])/i,
   M: /(?:^|[\s\-_/])(M|마젠타|magenta|빨강)(?:$|[\s\-_/])/i,
@@ -93,21 +98,27 @@ export function detectColor(name: string): TonerDrumColor | null {
   const n = String(name || '')
   if (!n.trim()) return null
 
+  // 공용색 KCMY를 단일 문자(K 등)보다 먼저 판별
+  if (/KCMY/i.test(n) || /(?:^|[\s\-_/])공용(?:$|[\s\-_/])/.test(n)) {
+    return 'KCMY'
+  }
+
   // 한글 붙여쓰기: K토너, 토너K, C드럼 등
   const glued: Array<[TonerDrumColor, RegExp]> = [
-    ['K', /K\s*(토너|드럼)|(?:토너|드럼)\s*K|블랙|검정|black/i],
-    ['C', /C\s*(토너|드럼)|(?:토너|드럼)\s*C|시안|청록|cyan/i],
-    ['M', /M\s*(토너|드럼)|(?:토너|드럼)\s*M|마젠타|magenta/i],
-    ['Y', /Y\s*(토너|드럼)|(?:토너|드럼)\s*Y|옐로|노랑|yellow/i],
+    ['K', /(?:^|[\s\-_/])K\s*(토너|드럼)|(?:토너|드럼)\s*K(?:$|[\s\-_/])|블랙|검정|black/i],
+    ['C', /(?:^|[\s\-_/])C\s*(토너|드럼)|(?:토너|드럼)\s*C(?:$|[\s\-_/])|시안|청록|cyan/i],
+    ['M', /(?:^|[\s\-_/])M\s*(토너|드럼)|(?:토너|드럼)\s*M(?:$|[\s\-_/])|마젠타|magenta/i],
+    ['Y', /(?:^|[\s\-_/])Y\s*(토너|드럼)|(?:토너|드럼)\s*Y(?:$|[\s\-_/])|옐로|노랑|yellow/i],
   ]
   for (const [c, re] of glued) {
     if (re.test(n)) return c
   }
 
-  for (const c of ['K', 'C', 'M', 'Y'] as TonerDrumColor[]) {
+  const singles: TonerDrumColor[] = ['K', 'C', 'M', 'Y']
+  for (const c of singles) {
     if (new RegExp(`(?:^|[\\s\\-_/])${c}(?:$|[\\s\\-_/])`).test(n)) return c
   }
-  for (const c of ['K', 'C', 'M', 'Y'] as TonerDrumColor[]) {
+  for (const c of ['KCMY', ...singles] as TonerDrumColor[]) {
     if (COLOR_NAME[c].test(n)) return c
   }
   return null

@@ -14,6 +14,7 @@ import {
   otherConsumables,
   partsConsumables,
   standardConsumableName,
+  TONER_DRUM_COLORS,
   type TonerDrumColor,
   type TonerDrumKind,
 } from '@/utils/consumableMatch'
@@ -52,7 +53,7 @@ interface Props {
   onSessionLinked?: (pair: { consumable_id: string; machine_model: string }) => void
 }
 
-const COLORS: TonerDrumColor[] = ['K', 'C', 'M', 'Y']
+const COLORS: TonerDrumColor[] = TONER_DRUM_COLORS
 const KINDS: TonerDrumKind[] = ['토너', '드럼']
 
 function creditFor(creditById: Record<string, number> | undefined, id: string) {

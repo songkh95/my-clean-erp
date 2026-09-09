@@ -7,7 +7,7 @@ ALTER TABLE consumables
 ALTER TABLE consumables
   ADD COLUMN IF NOT EXISTS is_regenerated boolean DEFAULT false;
 
-COMMENT ON COLUMN consumables.color IS 'K/C/M/Y (토너·드럼)';
+COMMENT ON COLUMN consumables.color IS 'K/C/M/Y/KCMY(공용) (토너·드럼)';
 COMMENT ON COLUMN consumables.is_regenerated IS '재생품 여부';
 
 -- 2) 서비스 일지 이미지 메타

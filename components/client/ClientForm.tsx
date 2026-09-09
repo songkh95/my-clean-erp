@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, type KeyboardEvent, type FormEvent } 
 import { createClient } from '@/utils/supabase'
 import Button from './../ui/Button'
 import InputField from './../ui/Input'
-import { Client } from '@/app/types'
+import { Client, Inventory } from '@/app/types'
 import {
   createClientAction,
   updateClientAction,
@@ -17,6 +17,7 @@ import { loadAppSettings } from '@/utils/appSettings'
 import SuggestInput from '@/components/ui/SuggestInput'
 import { toMachineModelName } from '@/utils/suggestMatch'
 import { normalizeInventoryModelNamesAction } from '@/app/actions/inventory'
+import InventoryForm from '@/components/inventory/InventoryForm'
 
 interface Props {
   isOpen: boolean
@@ -92,7 +93,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
   const [warehouseAll, setWarehouseAll] = useState<WarehouseMachine[]>([])
   const [machineSearch, setMachineSearch] = useState('')
   const [selectedWarehouseIds, setSelectedWarehouseIds] = useState<string[]>([])
-  const [installedMachines, setInstalledMachines] = useState<WarehouseMachine[]>([])
+  const [installedMachines, setInstalledMachines] = useState<Inventory[]>([])
   const [newMachines, setNewMachines] = useState<NewMachineDraft[]>([])
   const [showNewMachineForm, setShowNewMachineForm] = useState(false)
   const [draftMachine, setDraftMachine] = useState<NewMachineDraft>(emptyNewMachine)
@@ -101,6 +102,8 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
   const [machineModelSuggestions, setMachineModelSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
   const [machineSnSuggestions, setMachineSnSuggestions] = useState<Array<{ value: string; hint?: string }>>([])
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false)
+  const [editInstalledOpen, setEditInstalledOpen] = useState(false)
+  const [selectedInstalledForEdit, setSelectedInstalledForEdit] = useState<Inventory | null>(null)
 
   const fetchPotentialParents = useCallback(async () => {
     const supabase = createClient()
@@ -159,11 +162,23 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
 
     if (editData?.id) {
       const inst = await getClientInstalledMachinesAction(editData.id)
-      if (inst.success) setInstalledMachines(inst.data as WarehouseMachine[])
+      if (inst.success) setInstalledMachines(inst.data as Inventory[])
     } else {
       setInstalledMachines([])
     }
   }, [editData?.id])
+
+  const handleEditInstalledMachine = (machine: Inventory) => {
+    setSelectedInstalledForEdit(machine)
+    setEditInstalledOpen(true)
+  }
+
+  const handleInstalledMachineSaved = async () => {
+    setEditInstalledOpen(false)
+    setSelectedInstalledForEdit(null)
+    await loadMachines()
+    onSuccess()
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -483,14 +498,29 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                       style={{
                         padding: '8px 10px', background: '#fff', borderRadius: 6,
                         border: '1px solid #e5e5e5', fontSize: '0.85rem',
-                        display: 'flex', justifyContent: 'space-between',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
                       }}
                     >
-                      <span>
+                      <span style={{ minWidth: 0 }}>
                         <strong>{m.model_name}</strong>
                         <span style={{ color: '#888', marginLeft: 8 }}>{m.serial_number}</span>
+                        {m.department ? (
+                          <span style={{ color: '#666', marginLeft: 8, fontSize: '0.75rem' }}>
+                            · {m.department}
+                          </span>
+                        ) : null}
                       </span>
-                      <span style={{ color: '#666', fontSize: '0.75rem' }}>{m.type}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        <span style={{ color: '#666', fontSize: '0.75rem' }}>{m.type}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditInstalledMachine(m)}
+                        >
+                          수정
+                        </Button>
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -736,6 +766,18 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
             </div>
           </div>
         </div>
+      )}
+      {editInstalledOpen && selectedInstalledForEdit && (
+        <InventoryForm
+          isOpen={editInstalledOpen}
+          onClose={() => {
+            setEditInstalledOpen(false)
+            setSelectedInstalledForEdit(null)
+          }}
+          onSuccess={handleInstalledMachineSaved}
+          editData={selectedInstalledForEdit}
+          overlayZIndex={1200}
+        />
       )}
     </div>
   )

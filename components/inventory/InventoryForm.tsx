@@ -18,6 +18,8 @@ interface Props {
   onClose: () => void
   onSuccess: () => void
   editData?: Partial<Inventory> | null
+  /** 다른 모달 위에 띄울 때 (예: 거래처 수정 안) */
+  overlayZIndex?: number
 }
 
 interface InventoryFormState {
@@ -89,7 +91,7 @@ function buildInitialInventoryForm(): InventoryFormState {
   }
 }
 
-export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: Props) {
+export default function InventoryForm({ isOpen, onClose, onSuccess, editData, overlayZIndex }: Props) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
@@ -299,7 +301,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData }: 
   const isEditMode = !!editData?.id;
 
   return (
-    <div className={styles.overlay}>
+    <div className={styles.overlay} style={overlayZIndex != null ? { zIndex: overlayZIndex } : undefined}>
       <div className={styles.modal}>
         <h2 className={styles.title}>{isEditMode ? '✏️ 장비 수정' : '📦 신규 등록'}</h2>
         <form onSubmit={handleSubmit}>

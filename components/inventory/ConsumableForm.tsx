@@ -13,7 +13,11 @@ import {
 } from '@/app/actions/consumable'
 import { listProductGroupsAction, type ProductGroupRow } from '@/app/actions/productGroups'
 import { toMachineModelName, toManagementCode, toConsumableModelName } from '@/utils/suggestMatch'
-import { standardConsumableName, type TonerDrumColor } from '@/utils/consumableMatch'
+import {
+  standardConsumableName,
+  TONER_DRUM_COLORS,
+  type TonerDrumColor,
+} from '@/utils/consumableMatch'
 import ProductGroupManager from './ProductGroupManager'
 
 export type ConsumableFormPreset = {
@@ -38,7 +42,8 @@ interface Props {
   preset?: ConsumableFormPreset | null
 }
 
-const COLORS: Array<TonerDrumColor | ''> = ['', 'K', 'C', 'M', 'Y']
+const COLORS: Array<TonerDrumColor | ''> = ['', ...TONER_DRUM_COLORS]
+const STANDARD_NAME_RE = /^(토너|드럼) (KCMY|[KCMY])( 재생)?$/
 
 export default function ConsumableForm({
   isOpen,
@@ -217,9 +222,7 @@ export default function ConsumableForm({
     if (
       (merged.category === '토너' || merged.category === '드럼') &&
       merged.color &&
-      (!merged.model_name.trim() ||
-        /^토너 [KCMY]( 재생)?$/.test(merged.model_name.trim()) ||
-        /^드럼 [KCMY]( 재생)?$/.test(merged.model_name.trim()))
+      (!merged.model_name.trim() || STANDARD_NAME_RE.test(merged.model_name.trim()))
     ) {
       merged.model_name = toConsumableModelName(
         standardConsumableName(
@@ -245,7 +248,7 @@ export default function ConsumableForm({
       return alert('호환 기기를 1개 이상 추가하거나 제품군을 선택해 주세요.')
     }
     if (showColorFields && !formData.color) {
-      return alert('토너/드럼은 색상(K/C/M/Y)을 선택해주세요.')
+      return alert('토너/드럼은 색상(K/C/M/Y/KCMY)을 선택해주세요.')
     }
     setLoading(true)
 
@@ -308,7 +311,7 @@ export default function ConsumableForm({
           {showColorFields && (
             <div className={styles.grid2}>
               <InputField
-                label="색상 (K/C/M/Y) *"
+                label="색상 (K/C/M/Y · KCMY공용) *"
                 as="select"
                 value={formData.color}
                 onChange={(e) =>
@@ -317,7 +320,9 @@ export default function ConsumableForm({
               >
                 <option value="">선택</option>
                 {COLORS.filter(Boolean).map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>
+                    {c === 'KCMY' ? 'KCMY (공용)' : c}
+                  </option>
                 ))}
               </InputField>
               <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 16 }}>

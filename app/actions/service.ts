@@ -17,19 +17,27 @@ type PartUsage = { consumable_id: string; quantity: number }
 type StockStatus = 'none' | 'deducted' | 'pending'
 type PartRow = PartUsage & { stock_status: StockStatus }
 
-export type ServiceLogKind = 'service' | 'sales_trip'
+export type ServiceLogKind = 'service' | 'sales_trip' | 'short_rental'
 
-const SERVICE_LOG_KINDS: ServiceLogKind[] = ['service', 'sales_trip']
+const SERVICE_LOG_KINDS: ServiceLogKind[] = ['service', 'sales_trip', 'short_rental']
 
 function normalizeLogKind(value: unknown): ServiceLogKind {
   const v = String(value || 'service').trim().toLowerCase()
   if (v === 'sales' || v === 'trip' || v === 'sales_trip') return 'sales_trip'
+  if (v === 'short_rental' || v === 'short-rental' || v === 'shortrental') return 'short_rental'
   return SERVICE_LOG_KINDS.includes(v as ServiceLogKind) ? (v as ServiceLogKind) : 'service'
+}
+
+function logKindLabel(kind: ServiceLogKind): string {
+  if (kind === 'sales_trip') return '판매_출장 일지'
+  if (kind === 'short_rental') return '단기 렌탈'
+  return '서비스 일지'
 }
 
 function revalidateServiceAndInventory() {
   revalidatePath('/service')
   revalidatePath('/service/sales-trip')
+  revalidatePath('/service/short-rental')
   revalidatePath('/inventory')
 }
 
@@ -622,7 +630,7 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
         success: false,
         data: [],
         message:
-          '판매_출장 일지용 DB 컬럼이 없습니다. Supabase SQL Editor에서 sql/add_service_log_kinds.sql 을 실행해 주세요.',
+          '일지용 DB 컬럼이 없습니다. Supabase SQL Editor에서 sql/add_service_log_kinds.sql 을 실행해 주세요.',
       }
     }
     const fallback = await runQuery(selectWithStatus, false)
@@ -638,7 +646,7 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
           success: false,
           data: [],
           message:
-            '판매_출장 일지용 DB 컬럼이 없습니다. Supabase SQL Editor에서 sql/add_service_log_kinds.sql 을 실행해 주세요.',
+            '일지용 DB 컬럼이 없습니다. Supabase SQL Editor에서 sql/add_service_log_kinds.sql 을 실행해 주세요.',
         }
       }
       retry = await runQuery(selectLegacy, false)
@@ -1110,7 +1118,7 @@ export async function createServiceLogAction(formData: any, parts: { consumable_
     }
 
     const deductedQty = plan.toDeduct.reduce((s, p) => s + p.quantity, 0)
-    const kindLabel = logKind === 'sales_trip' ? '판매_출장 일지' : '서비스 일지'
+    const kindLabel = logKindLabel(logKind)
     revalidateServiceAndInventory()
     return {
       success: true,
@@ -1211,10 +1219,10 @@ export async function getEmployeesAction() {
   return data || []
 }
 
-/** 토너/드럼 K·C·M·Y 확보 — 동일 품목이 있으면 호환 기기만 연결, 없으면 생성 */
+/** 토너/드럼 K·C·M·Y·KCMY(공용) 확보 — 동일 품목이 있으면 호환 기기만 연결, 없으면 생성 */
 export async function ensureTonerDrumConsumableAction(input: {
   category: '토너' | '드럼'
-  color: 'K' | 'C' | 'M' | 'Y'
+  color: 'K' | 'C' | 'M' | 'Y' | 'KCMY'
   is_regenerated: boolean
   /** 일지에서 선택한 기기 model_name */
   machine_model?: string | null

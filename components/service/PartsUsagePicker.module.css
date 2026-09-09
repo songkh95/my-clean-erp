@@ -20,7 +20,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -56,9 +56,10 @@
 }
 
 .colorLabel {
-  font-size: 1rem;
+  font-size: 0.88rem;
   font-weight: 800;
   color: #111827;
+  letter-spacing: -0.02em;
 }
 
 .stockLabel {

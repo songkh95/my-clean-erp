@@ -18,6 +18,9 @@ function getPageTitle(path: string, compact: boolean) {
   if (path.startsWith('/service/sales-trip') || path.startsWith('/service/sales') || path.startsWith('/service/trip')) {
     return compact ? '판매출장' : '판매_출장 일지'
   }
+  if (path.startsWith('/service/short-rental')) {
+    return compact ? '단기렌탈' : '단기 렌탈'
+  }
   if (path.startsWith('/service')) return compact ? '일지' : '서비스 일지'
   if (path.startsWith('/accounting/registration')) return compact ? '정산' : '월 정산 등록'
   if (path.startsWith('/accounting/history')) return compact ? '청구' : '청구 이력/수정'

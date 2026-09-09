@@ -34,7 +34,7 @@ export default function ServiceLogGuideModal({
           <h3 style={h3}>A. 이 기기 호환 재고가 있을 때</h3>
           <ol style={ol}>
             <li>서비스 일지 작성</li>
-            <li>사용된 소모품/부품 선택 (토너·드럼 KCMY, 부품, 폐토너통·현상기·용지 등)</li>
+            <li>사용된 소모품/부품 선택 (토너·드럼 K/C/M/Y·KCMY공용, 부품, 폐토너통·현상기·용지 등)</li>
             <li>선택 목록에 수량 반영</li>
             <li>
               <strong>완료</strong> 저장 시 재고 − (부족분은 미입고)

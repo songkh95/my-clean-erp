@@ -73,7 +73,7 @@ ALTER TABLE consumables
 ALTER TABLE consumables
   ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
 
-COMMENT ON COLUMN consumables.color IS 'K/C/M/Y (토너·드럼)';
+COMMENT ON COLUMN consumables.color IS 'K/C/M/Y/KCMY(공용) (토너·드럼)';
 COMMENT ON COLUMN consumables.is_regenerated IS '재생품 여부';
 COMMENT ON COLUMN consumables.product_group IS '제품군 — 기기 model_name과 매칭';
 COMMENT ON COLUMN consumables.is_active IS 'false면 목록에서 숨김(서비스 일지 이력 보존용 소프트 삭제)';

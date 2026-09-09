@@ -228,7 +228,7 @@ export interface ServicePartUsage {
 export interface ServiceLog {
   id: string;
   organization_id: string;
-  log_kind?: 'service' | 'sales_trip' | 'sales' | 'trip' | null;
+  log_kind?: 'service' | 'sales_trip' | 'short_rental' | 'sales' | 'trip' | null;
   client_id: string | null;
   /** 미등록 거래처 또는 표시용 상호명 */
   client_name?: string | null;
