@@ -316,23 +316,27 @@ export async function upsertConsumableAction(formData: any) {
     payload.code = null
   }
 
-  // 신규 등록 시: 품명이 같은 기존 품목만 합침 — 관리코드만 같다고 합치지 않음
-  // (검정 토너 / 검정 재생토너는 품명·가격이 다르므로 별도 등록)
+  // 신규 등록 시: 품명 + 색상 + 정품/재생 여부가 모두 같은 기존 품목만 합침
+  // — 품명만 같고 색상(또는 정품/재생)이 다르면 별도 품목으로 새로 등록
   if (
     isNew &&
     !forceNew &&
     (category === '토너' || category === '드럼') &&
     modelName.trim()
   ) {
-    const { data: existing } = await supabase
+    const { data: nameCandidates } = await supabase
       .from('consumables')
       .select('*')
       .eq('organization_id', orgId)
       .eq('category', category)
       .ilike('model_name', modelName.trim())
       .or('is_active.is.null,is_active.eq.true')
-      .limit(1)
-      .maybeSingle()
+
+    const existing = (nameCandidates || []).find((c: any) => {
+      const sameColor = String(c.color || '').toUpperCase().trim() === color
+      const sameRegen = Boolean(c.is_regenerated) === isRegen
+      return sameColor && sameRegen
+    }) || null
 
     if (existing) {
       const { data: prevLinks } = await supabase

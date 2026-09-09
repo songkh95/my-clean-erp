@@ -15,6 +15,7 @@ import {
 } from '@/app/actions/client'
 import { loadAppSettings } from '@/utils/appSettings'
 import SuggestInput from '@/components/ui/SuggestInput'
+import ComboBoxSelect from '@/components/ui/ComboBoxSelect'
 import { toMachineModelName } from '@/utils/suggestMatch'
 import { normalizeInventoryModelNamesAction } from '@/app/actions/inventory'
 import InventoryForm from '@/components/inventory/InventoryForm'
@@ -214,6 +215,12 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
     }
   }, [editData, isOpen, fetchPotentialParents, loadMachines])
 
+  const parentOptions = potentialParents.map((p) => ({
+    id: p.id,
+    label: p.name,
+    hint: p.address || p.business_number || undefined,
+  }))
+
   const filteredWarehouse = warehouseAll.filter((m) => {
     if (selectedWarehouseIds.includes(m.id)) return true
     const q = machineSearch.trim().toLowerCase()
@@ -397,18 +404,15 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
             padding: '16px', backgroundColor: 'var(--notion-soft-bg)', borderRadius: '8px',
             marginBottom: '16px', border: '1px solid var(--notion-border)',
           }}>
-            <InputField
+            <ComboBoxSelect
               label="소속 본사"
-              as="select"
               value={formData.parent_id}
-              onChange={(e) => setFormData({ ...formData, parent_id: e.target.value })}
+              onChange={(id) => setFormData({ ...formData, parent_id: id })}
+              options={parentOptions}
+              placeholder="거래처명을 입력해 검색하세요"
+              emptyOptionLabel="(독립 거래처)"
               style={{ marginBottom: 0 }}
-            >
-              <option value="">(독립 거래처)</option>
-              {potentialParents.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </InputField>
+            />
           </div>
 
           <SuggestInput
