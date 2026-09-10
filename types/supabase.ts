@@ -255,6 +255,7 @@ export type Database = {
           contract_type: string | null
           contract_years: number | null
           created_at: string
+          deleted_at: string | null
           department: string | null
           deposit: number | null
           id: string
@@ -262,6 +263,7 @@ export type Database = {
           initial_count_bw_a3: number | null
           initial_count_col: number | null
           initial_count_col_a3: number | null
+          is_deleted: boolean
           last_status_updated_at: string | null
           memo: string | null
           model_name: string
@@ -292,6 +294,7 @@ export type Database = {
           contract_type?: string | null
           contract_years?: number | null
           created_at?: string
+          deleted_at?: string | null
           department?: string | null
           deposit?: number | null
           id?: string
@@ -299,6 +302,7 @@ export type Database = {
           initial_count_bw_a3?: number | null
           initial_count_col?: number | null
           initial_count_col_a3?: number | null
+          is_deleted?: boolean
           last_status_updated_at?: string | null
           memo?: string | null
           model_name: string
@@ -329,6 +333,7 @@ export type Database = {
           contract_type?: string | null
           contract_years?: number | null
           created_at?: string
+          deleted_at?: string | null
           department?: string | null
           deposit?: number | null
           id?: string
@@ -336,6 +341,7 @@ export type Database = {
           initial_count_bw_a3?: number | null
           initial_count_col?: number | null
           initial_count_col_a3?: number | null
+          is_deleted?: boolean
           last_status_updated_at?: string | null
           memo?: string | null
           model_name?: string

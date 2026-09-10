@@ -6,20 +6,25 @@ import styles from './InventoryList.module.css'
 import Button from './../ui/Button'
 import { Inventory, Client } from '@/app/types'
 // ✅ Server Actions 임포트
-import { deleteInventoryAction } from '@/app/actions/inventory'
+import { deleteInventoryAction, restoreInventoryAction } from '@/app/actions/inventory'
 // ✅ 팝업 컴포넌트 재사용
 import InventoryForm from './InventoryForm'
+import { useSortableData } from '@/utils/tableSort'
 
 interface InventoryListProps {
   type: string
   refreshTrigger: number
+  onCountChange?: (count: number) => void
 }
 
-export default function InventoryList({ type, refreshTrigger }: InventoryListProps) {
+type SortKey =
+  | 'model_name' | 'serial_number' | 'status' | 'client'
+  | 'department' | 'contract_type' | 'category' | 'brand' | 'purchase_price'
+
+export default function InventoryList({ type, refreshTrigger, onCountChange }: InventoryListProps) {
   const [items, setItems] = useState<Inventory[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [isListOpen, setIsListOpen] = useState(true)
 
   // 상세 보기 상태 (단순 조회용)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -66,13 +71,13 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, refreshTrigger])
 
-  // 삭제 액션
+  // 삭제(휴지통 이동) 액션
   const handleDelete = async (id: string) => {
-    if (confirm('정말 삭제하시겠습니까? 복구할 수 없습니다.')) {
+    if (confirm('삭제하면 휴지통으로 이동합니다. 계속할까요? (거래처에 설치된 기기는 먼저 철수해야 삭제할 수 있습니다)')) {
       try {
         const result = await deleteInventoryAction(id);
         if (result.success) {
-          alert(result.message);
+          alert(result.message); // "휴지통으로 이동되었습니다." — 설정 > 휴지통에서 복구·완전삭제 가능
           fetchItems();
         } else {
           throw new Error(result.message);
@@ -80,6 +85,22 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
       } catch (e: any) {
         alert('삭제 실패: ' + e.message);
       }
+    }
+  }
+
+  // 휴지통에서 복구
+  const handleRestore = async (id: string) => {
+    if (!confirm('이 기기를 휴지통에서 복구할까요?')) return
+    try {
+      const result = await restoreInventoryAction(id);
+      if (result.success) {
+        alert(result.message);
+        fetchItems();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (e: any) {
+      alert('복구 실패: ' + e.message);
     }
   }
 
@@ -101,6 +122,8 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
     fetchItems();
   }
 
+  const displayStatus = (item: Inventory) => (item.is_deleted ? '휴지통' : item.status)
+
   const filteredItems = items.filter(item => {
     const term = searchTerm.toLowerCase()
     return (
@@ -109,27 +132,43 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
       (item.serial_number?.toLowerCase().includes(term)) ||
       ((item as any).department?.toLowerCase().includes(term)) ||
       (item.client?.name?.toLowerCase().includes(term)) ||
-      (item.status?.includes(term))
+      (displayStatus(item)?.includes(term))
     )
   })
+
+  // 표 헤더 클릭 정렬
+  const { sortedItems, requestSort, sortIndicator } = useSortableData<Inventory, SortKey>(
+    filteredItems,
+    (item, key) => {
+      if (key === 'status') return displayStatus(item)
+      if (key === 'client') return item.client?.name || ''
+      if (key === 'department') return (item as any).department || ''
+      if (key === 'purchase_price') return item.purchase_price ?? null
+      return (item as any)[key] ?? ''
+    }
+  )
+
+  const sortableTh = (key: SortKey, label: string, extraStyle?: React.CSSProperties) => (
+    <th
+      className={styles.th}
+      style={{ cursor: 'pointer', userSelect: 'none', ...extraStyle }}
+      onClick={() => requestSort(key)}
+      title="클릭하여 정렬"
+    >
+      {label}{sortIndicator(key)}
+    </th>
+  )
+
+  useEffect(() => {
+    onCountChange?.(filteredItems.length)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredItems.length])
 
   if (loading) return <div className={styles.noDataRow}>데이터를 불러오는 중...</div>
 
   return (
     <div className={styles.container}>
-      <div 
-        onClick={() => setIsListOpen(!isListOpen)} 
-        className={`${styles.header} ${!isListOpen ? styles.headerClosed : ''}`}
-      >
-        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>{isListOpen ? '▼' : '▶'}</span>
-          자산 목록 ({filteredItems.length})
-        </span>
-      </div>
-      
-      {isListOpen && (
-        <>
-          <div className={styles.searchContainer}>
+      <div className={styles.searchContainer}>
             <input 
               placeholder="모델명, 브랜드, S/N, 설치처 등으로 검색..." 
               value={searchTerm}
@@ -143,15 +182,15 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
               <thead>
                 <tr className={styles.theadTr}>
                   <th className={styles.th}>No</th>
-                  <th className={styles.th}>제품명</th>
-                  <th className={styles.th}>S/N</th>
-                  <th className={styles.th}>상태</th>
-                  <th className={styles.th}>설치처</th>
-                  <th className={styles.th}>부서</th>
-                  <th className={styles.th}>계약 구분</th>
-                  <th className={styles.th}>분류</th>
-                  <th className={styles.th}>브랜드</th>
-                  <th className={styles.th}>매입가</th>
+                  {sortableTh('model_name', '제품명')}
+                  {sortableTh('serial_number', 'S/N')}
+                  {sortableTh('status', '상태')}
+                  {sortableTh('client', '설치처')}
+                  {sortableTh('department', '부서')}
+                  {sortableTh('contract_type', '계약 구분')}
+                  {sortableTh('category', '분류')}
+                  {sortableTh('brand', '브랜드')}
+                  {sortableTh('purchase_price', '매입가')}
                   <th className={styles.th} style={{textAlign: 'center'}}>관리</th>
                 </tr>
               </thead>
@@ -159,7 +198,7 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                 {filteredItems.length === 0 ? (
                   <tr><td colSpan={11} className={styles.noDataRow}>검색 결과가 없습니다.</td></tr>
                 ) : (
-                  filteredItems.map((item, index) => {
+                  sortedItems.map((item, index) => {
                     const isExpanded = expandedId === item.id
                     
                     return (
@@ -172,8 +211,16 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                           <td className={`${styles.td} ${styles.modelName}`}>{item.model_name}</td>
                           <td className={styles.td}>{item.serial_number}</td>
                           <td className={styles.td}>
-                            <span className={`${styles.statusBadge} ${item.status === '창고' ? styles.statusWarehouse : styles.statusInstalled}`}>
-                              {item.status}
+                            <span
+                              className={`${styles.statusBadge} ${
+                                item.is_deleted
+                                  ? styles.statusTrash
+                                  : item.status === '창고'
+                                    ? styles.statusWarehouse
+                                    : styles.statusInstalled
+                              }`}
+                            >
+                              {displayStatus(item)}
                             </span>
                           </td>
                           <td className={styles.td}>{item.client?.name || '-'}</td>
@@ -184,22 +231,35 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
                           <td className={styles.td}>{item.purchase_price?.toLocaleString()}원</td>
                           <td className={styles.td} style={{textAlign: 'center'}}>
                              <div style={{display:'flex', gap:'6px', justifyContent:'center'}}>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  onClick={(e) => handleEditClick(e, item)}
-                                  style={{padding: '4px 8px', fontSize: '0.75rem'}}
-                                >
-                                  수정
-                                </Button>
-                                <Button 
-                                  variant="danger" 
-                                  size="sm" 
-                                  onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                                  style={{padding: '4px 8px', fontSize: '0.75rem'}}
-                                >
-                                  삭제
-                                </Button>
+                                {item.is_deleted ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => { e.stopPropagation(); handleRestore(item.id); }}
+                                    style={{padding: '4px 8px', fontSize: '0.75rem'}}
+                                  >
+                                    복구
+                                  </Button>
+                                ) : (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => handleEditClick(e, item)}
+                                      style={{padding: '4px 8px', fontSize: '0.75rem'}}
+                                    >
+                                      수정
+                                    </Button>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                                      style={{padding: '4px 8px', fontSize: '0.75rem'}}
+                                    >
+                                      삭제
+                                    </Button>
+                                  </>
+                                )}
                              </div>
                           </td>
                         </tr>
@@ -249,8 +309,6 @@ export default function InventoryList({ type, refreshTrigger }: InventoryListPro
               </tbody>
             </table>
           </div>
-        </>
-      )}
 
       {/* ✅ 수정용 팝업 (InventoryForm 재사용) */}
       <InventoryForm 

@@ -100,6 +100,45 @@ export async function deleteClientAction(id: string) {
 
     if (countErr) throw countErr
 
+    // H1: 거래처를 지워도 연결된 기기가 남는 문제 방지 — 삭제 전 창고로 회수
+    const { data: linkedMachines, error: machErr } = await supabase
+      .from('inventory')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('client_id', id)
+
+    if (machErr) throw machErr
+
+    let recalled = 0
+    if (linkedMachines && linkedMachines.length > 0) {
+      const machineIds = linkedMachines.map((m) => m.id)
+      const { error: recallErr } = await supabase
+        .from('inventory')
+        .update({ status: '창고', client_id: null })
+        .in('id', machineIds)
+        .eq('organization_id', orgId)
+      if (recallErr) throw recallErr
+
+      const { error: histErr } = await supabase.from('machine_history').insert(
+        machineIds.map((invId) => ({
+          inventory_id: invId,
+          client_id: id,
+          organization_id: orgId,
+          action_type: 'WITHDRAW',
+          bw_count: 0,
+          col_count: 0,
+          bw_a3_count: 0,
+          col_a3_count: 0,
+          memo: '거래처 삭제로 자동 회수',
+          is_replacement: false,
+          recorded_at: new Date().toISOString(),
+        }))
+      )
+      if (histErr) throw histErr
+
+      recalled = machineIds.length
+    }
+
     const { error } = await supabase
       .from('clients')
       .update({ is_deleted: true })
@@ -109,15 +148,17 @@ export async function deleteClientAction(id: string) {
 
     revalidatePath('/clients')
     revalidatePath('/service')
+    revalidatePath('/inventory')
 
+    const parts = ['삭제되었습니다.']
+    if (recalled > 0) parts.push(`연결된 기기 ${recalled}대는 창고로 회수되었습니다.`)
     if ((count || 0) > 0) {
-      return {
-        success: true,
-        message: `삭제되었습니다. 서비스 일지 ${count}건은 그대로 유지되며, 일지에서 거래처명 옆에 경고가 표시됩니다.`,
-      }
+      parts.push(`서비스 일지 ${count}건은 그대로 유지되며, 일지에서 거래처명 옆에 경고가 표시됩니다.`)
+    } else {
+      parts.push('(등록된 서비스 일지 없음)')
     }
 
-    return { success: true, message: '삭제되었습니다. (등록된 서비스 일지 없음)' }
+    return { success: true, message: parts.join(' ') }
   } catch (e: any) {
     return { success: false, message: '삭제 실패: ' + e.message }
   }
@@ -133,6 +174,7 @@ export async function getWarehouseMachinesAction(search?: string) {
     .select('id, type, category, brand, model_name, serial_number, status, billing_date, plan_basic_fee')
     .eq('organization_id', orgId)
     .eq('status', '창고')
+    .eq('is_deleted', false)
     .order('model_name')
 
   const { data, error } = await query
@@ -163,6 +205,7 @@ export async function getClientInstalledMachinesAction(clientId: string) {
     .select('*')
     .eq('organization_id', orgId)
     .eq('client_id', clientId)
+    .eq('is_deleted', false)
     .order('model_name')
 
   if (error) return { success: false, data: [] }
@@ -215,6 +258,7 @@ export async function attachMachinesToClientAction(
         .from('inventory')
         .select('id, status, client_id, model_name, serial_number, initial_count_bw, initial_count_col, initial_count_bw_a3, initial_count_col_a3')
         .eq('organization_id', orgId)
+        .eq('is_deleted', false)
         .in('id', ids)
 
       if (mErr) throw mErr

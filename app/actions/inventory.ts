@@ -64,18 +64,24 @@ export async function createInventoryAction(data: Partial<Inventory>) {
 // ----------------------------------------------------------------------
 export async function updateInventoryAction(id: string, data: Partial<Inventory>) {
   const supabase = await createClient()
-  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.' }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.' }
+  const orgId = profile.organization_id
+
   try {
-    const { 
+    const {
       client,
       is_active,
       is_replacement_before,
       is_replacement_after,
       is_withdrawal,
       final_counts,
-      created_at,      
-      organization_id, 
-      ...dbData 
+      created_at,
+      organization_id,
+      ...dbData
     } = data;
 
     if (dbData.model_name != null) {
@@ -86,7 +92,8 @@ export async function updateInventoryAction(id: string, data: Partial<Inventory>
       dbData.model_name = modelName
     }
 
-    const { error } = await supabase.from('inventory').update(dbData).eq('id', id)
+    // H7: ID만으로 처리하던 것을 org ID까지 함께 검사
+    const { error } = await supabase.from('inventory').update(dbData).eq('id', id).eq('organization_id', orgId)
     if (error) throw error
 
     revalidatePath('/inventory')
@@ -99,17 +106,194 @@ export async function updateInventoryAction(id: string, data: Partial<Inventory>
 // ----------------------------------------------------------------------
 // 3. 자산 삭제 액션
 // ----------------------------------------------------------------------
+/**
+ * 자산(기기) 삭제 — 실제로 지우지 않고 휴지통으로 이동(소프트 삭제)한다.
+ * machine_history(설치/철수 이력)·settlement_details(정산)·service_logs(서비스 일지)는
+ * inventory 행이 실제로 남아있어야 연결이 끊기지 않으므로 그대로 보존된다.
+ * 완전 삭제는 설정 > 휴지통에서 purgeInventoryAction으로만 가능하다.
+ */
 export async function deleteInventoryAction(id: string) {
   const supabase = await createClient()
-  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.' }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.' }
+  const orgId = profile.organization_id
+
   try {
-    const { error } = await supabase.from('inventory').delete().eq('id', id)
+    const { data: row, error: rowErr } = await supabase
+      .from('inventory')
+      .select('id, client_id, is_deleted')
+      .eq('id', id)
+      .eq('organization_id', orgId)
+      .maybeSingle()
+
+    if (rowErr) throw rowErr
+    if (!row) return { success: false, message: '기기를 찾을 수 없습니다.' }
+    if (row.is_deleted) return { success: false, message: '이미 휴지통에 있는 기기입니다.' }
+
+    // 거래처에 설치된 상태면 삭제(휴지통 이동) 자체를 막음 — 먼저 철수부터 하도록 안내
+    if (row.client_id) {
+      return {
+        success: false,
+        message: '거래처에 설치된 기기는 삭제할 수 없습니다. 먼저 자산·재고 페이지에서 기기를 철수한 뒤 삭제해 주세요.',
+      }
+    }
+
+    const { error } = await supabase
+      .from('inventory')
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('organization_id', orgId)
     if (error) throw error
 
     revalidatePath('/inventory')
-    return { success: true, message: '삭제되었습니다.' }
+    revalidatePath('/settings')
+    return { success: true, message: '휴지통으로 이동되었습니다.' }
   } catch (e: any) {
     return { success: false, message: '삭제 실패: ' + e.message }
+  }
+}
+
+/** 휴지통에서 복구 — 다시 목록에 표시되도록 되돌림 */
+export async function restoreInventoryAction(id: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.' }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.' }
+  const orgId = profile.organization_id
+
+  try {
+    const { error } = await supabase
+      .from('inventory')
+      .update({ is_deleted: false, deleted_at: null })
+      .eq('id', id)
+      .eq('organization_id', orgId)
+      .eq('is_deleted', true)
+    if (error) throw error
+
+    revalidatePath('/inventory')
+    revalidatePath('/settings')
+    return { success: true, message: '복구되었습니다.' }
+  } catch (e: any) {
+    return { success: false, message: '복구 실패: ' + e.message }
+  }
+}
+
+/** 휴지통 목록 조회 — 기기 정보 + 연결된 서비스일지/정산/설치이력 건수 */
+export async function getTrashedInventoryAction() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.', data: [] as any[] }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.', data: [] as any[] }
+  const orgId = profile.organization_id
+
+  try {
+    const { data: trashed, error } = await supabase
+      .from('inventory')
+      .select('id, type, category, brand, model_name, serial_number, status, deleted_at')
+      .eq('organization_id', orgId)
+      .eq('is_deleted', true)
+      .order('deleted_at', { ascending: false })
+
+    if (error) throw error
+
+    const ids = (trashed || []).map((m) => m.id)
+    if (ids.length === 0) return { success: true, data: [] as any[] }
+
+    const [{ data: logRows }, { data: settleRows }, { data: histRows }] = await Promise.all([
+      supabase.from('service_logs').select('inventory_id').eq('organization_id', orgId).in('inventory_id', ids),
+      supabase.from('settlement_details').select('inventory_id').in('inventory_id', ids),
+      supabase.from('machine_history').select('inventory_id').eq('organization_id', orgId).in('inventory_id', ids),
+    ])
+
+    const countBy = (rows: { inventory_id: string | null }[] | null) => {
+      const map = new Map<string, number>()
+      for (const r of rows || []) {
+        if (!r.inventory_id) continue
+        map.set(r.inventory_id, (map.get(r.inventory_id) || 0) + 1)
+      }
+      return map
+    }
+
+    const logCounts = countBy(logRows)
+    const settleCounts = countBy(settleRows)
+    const histCounts = countBy(histRows)
+
+    const data = (trashed || []).map((m) => ({
+      ...m,
+      service_log_count: logCounts.get(m.id) || 0,
+      settlement_count: settleCounts.get(m.id) || 0,
+      history_count: histCounts.get(m.id) || 0,
+    }))
+
+    return { success: true, data }
+  } catch (e: any) {
+    return { success: false, message: e.message || '조회 실패', data: [] as any[] }
+  }
+}
+
+/** 휴지통에서 완전 삭제 — 되돌릴 수 없음. 연결된 서비스 일지가 남아있으면 거부 */
+export async function purgeInventoryAction(id: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.' }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.' }
+  const orgId = profile.organization_id
+
+  try {
+    const { data: row, error: rowErr } = await supabase
+      .from('inventory')
+      .select('id')
+      .eq('id', id)
+      .eq('organization_id', orgId)
+      .eq('is_deleted', true)
+      .maybeSingle()
+
+    if (rowErr) throw rowErr
+    if (!row) return { success: false, message: '휴지통에서 기기를 찾을 수 없습니다.' }
+
+    const [{ count: logCount, error: logErr }, { count: settleCount, error: settleErr }] = await Promise.all([
+      supabase
+        .from('service_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .eq('inventory_id', id),
+      supabase
+        .from('settlement_details')
+        .select('id', { count: 'exact', head: true })
+        .eq('inventory_id', id),
+    ])
+
+    if (logErr) throw logErr
+    if (settleErr) throw settleErr
+
+    if ((logCount || 0) > 0 || (settleCount || 0) > 0) {
+      const reasons: string[] = []
+      if (logCount) reasons.push(`서비스 일지 ${logCount}건`)
+      if (settleCount) reasons.push(`정산 내역 ${settleCount}건`)
+      return {
+        success: false,
+        message: `${reasons.join(', ')}이(가) 연결되어 있어 완전 삭제할 수 없습니다.`,
+      }
+    }
+
+    // 이 시점에서 machine_history는 DB 규칙(CASCADE)에 따라 함께 삭제됨(설치/철수 이력 소실 — 되돌릴 수 없음)
+    const { error } = await supabase.from('inventory').delete().eq('id', id).eq('organization_id', orgId)
+    if (error) throw error
+
+    revalidatePath('/inventory')
+    revalidatePath('/settings')
+    return { success: true, message: '완전히 삭제되었습니다.' }
+  } catch (e: any) {
+    return { success: false, message: '완전 삭제 실패: ' + e.message }
   }
 }
 

@@ -24,6 +24,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname()
   const [appName, setAppName] = useState('My Clean ERP')
+  const [serviceOpen, setServiceOpen] = useState(true)
 
   useEffect(() => {
     const sync = () => setAppName(loadAppSettings().general.appDisplayName || 'My Clean ERP')
@@ -32,10 +33,25 @@ export default function Sidebar({
     return () => window.removeEventListener('app-settings-changed', sync)
   }, [])
 
+  useEffect(() => {
+    try {
+      const v = sessionStorage.getItem('sidebar-service-open')
+      if (v !== null) setServiceOpen(v === '1')
+    } catch { /* ignore */ }
+  }, [])
+
+  const toggleServiceOpen = () => {
+    setServiceOpen((prev) => {
+      const next = !prev
+      try { sessionStorage.setItem('sidebar-service-open', next ? '1' : '0') } catch { /* ignore */ }
+      return next
+    })
+  }
+
   const navItems = [
     { name: '홈 (대시보드)', path: '/', icon: '🏠' },
-    { name: '거래처 관리', path: '/clients', icon: '👥' },
-    { name: '자산 및 재고', path: '/inventory', icon: '📦' },
+    { name: '거래처', path: '/clients', icon: '👥' },
+    { name: '재고', path: '/inventory', icon: '📦' },
     {
       name: '서비스',
       path: '/service',
@@ -115,48 +131,68 @@ export default function Sidebar({
           if (children && (!isCollapsed || isMobile)) {
             return (
               <div key={item.path} style={{ marginBottom: 4 }}>
-                <Link
-                  href={item.path}
-                  className={[styles.navLink, parentActive ? styles.navLinkActive : '']
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => onNavigate?.()}
-                >
-                  <span
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Link
+                    href={item.path}
+                    className={[styles.navLink, parentActive ? styles.navLinkActive : '']
+                      .filter(Boolean)
+                      .join(' ')}
+                    style={{ flex: 1, marginBottom: 0 }}
+                    onClick={() => onNavigate?.()}
+                  >
+                    <span
+                      style={{
+                        fontSize: '1.1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '24px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {item.icon}
+                    </span>
+                    <span style={{ marginLeft: '10px' }}>{item.name}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleServiceOpen() }}
+                    aria-label={serviceOpen ? '서비스 메뉴 접기' : '서비스 메뉴 펼치기'}
                     style={{
-                      fontSize: '1.1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '24px',
-                      flexShrink: 0,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px 8px',
+                      color: 'var(--notion-sub-text)',
+                      fontSize: '0.75rem',
                     }}
                   >
-                    {item.icon}
-                  </span>
-                  <span style={{ marginLeft: '10px' }}>{item.name}</span>
-                </Link>
-                <div style={{ marginLeft: 12, paddingLeft: 8, borderLeft: '2px solid var(--notion-border)' }}>
-                  {children.map((child) => {
-                    const childActive =
-                      child.path === '/service'
-                        ? pathname === '/service'
-                        : pathname === child.path || pathname.startsWith(`${child.path}/`)
-                    return (
-                      <Link
-                        key={child.path}
-                        href={child.path}
-                        className={[styles.navLink, childActive ? styles.navLinkActive : '']
-                          .filter(Boolean)
-                          .join(' ')}
-                        style={{ minHeight: 34, fontSize: '0.84rem', marginBottom: 2 }}
-                        onClick={() => onNavigate?.()}
-                      >
-                        <span style={{ marginLeft: 8 }}>{child.name}</span>
-                      </Link>
-                    )
-                  })}
+                    {serviceOpen ? '▼' : '▶'}
+                  </button>
                 </div>
+                {serviceOpen && (
+                  <div style={{ marginLeft: 12, paddingLeft: 8, borderLeft: '2px solid var(--notion-border)' }}>
+                    {children.map((child) => {
+                      const childActive =
+                        child.path === '/service'
+                          ? pathname === '/service'
+                          : pathname === child.path || pathname.startsWith(`${child.path}/`)
+                      return (
+                        <Link
+                          key={child.path}
+                          href={child.path}
+                          className={[styles.navLink, childActive ? styles.navLinkActive : '']
+                            .filter(Boolean)
+                            .join(' ')}
+                          style={{ minHeight: 34, fontSize: '0.84rem', marginBottom: 2 }}
+                          onClick={() => onNavigate?.()}
+                        >
+                          <span style={{ marginLeft: 8 }}>{child.name}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           }

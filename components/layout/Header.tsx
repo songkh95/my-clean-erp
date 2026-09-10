@@ -13,8 +13,8 @@ type HeaderProps = {
 
 function getPageTitle(path: string, compact: boolean) {
   if (path === '/') return compact ? '홈' : '홈 (대시보드)'
-  if (path.startsWith('/clients')) return compact ? '거래처' : '거래처 관리'
-  if (path.startsWith('/inventory')) return compact ? '재고' : '자산 및 재고 관리'
+  if (path.startsWith('/clients')) return '거래처'
+  if (path.startsWith('/inventory')) return '재고'
   if (path.startsWith('/service/sales-trip') || path.startsWith('/service/sales') || path.startsWith('/service/trip')) {
     return compact ? '판매출장' : '판매_출장 일지'
   }

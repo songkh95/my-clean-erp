@@ -26,6 +26,7 @@ export function useInventory() {
         .from('inventory')
         .select(`*, client:client_id (name)`)
         .eq('organization_id', profile.organization_id)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
 
       if (data) setItems(data as Inventory[])
@@ -46,18 +47,18 @@ export function useInventory() {
   }
 
   const deleteInventory = async (id: string) => {
-    if (!confirm('정말 삭제하시겠습니까? (주의: 관련 데이터가 있으면 삭제되지 않을 수 있습니다)')) return
+    if (!confirm('삭제하면 휴지통으로 이동합니다. 계속할까요? (거래처에 설치된 기기는 삭제할 수 없습니다 — 먼저 철수해 주세요)')) return
 
     try {
       const result = await deleteInventoryAction(id)
       if (result.success) {
-        alert(result.message)
+        alert(result.message) // "휴지통으로 이동되었습니다." — 설정 > 휴지통에서 복구·완전삭제 가능
         fetchInventory()
       } else {
         throw new Error(result.message)
       }
     } catch (e: any) {
-      alert('삭제 실패: ' + e.message + '\n(이미 사용 이력이 있는 기계는 삭제 대신 상태를 변경하세요)')
+      alert('삭제 실패: ' + e.message)
     }
   }
 

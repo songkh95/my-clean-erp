@@ -102,6 +102,7 @@ export async function importClientsMachinesFromExcelAction(
   let clientSkipped = 0
   let clientUpdated = 0
   let clientDeleted = 0
+  let clientRestored = 0
   let machineCreated = 0
   let machineUpdated = 0
   let machineDeleted = 0
@@ -114,9 +115,20 @@ export async function importClientsMachinesFromExcelAction(
       .eq('organization_id', orgId)
       .eq('is_deleted', false)
 
+    // H3: 소프트 삭제된 동명 거래처를 찾기 위한 목록 (재등록 시 신규 생성 대신 복구)
+    const { data: deletedClients } = await supabase
+      .from('clients')
+      .select('id, name')
+      .eq('organization_id', orgId)
+      .eq('is_deleted', true)
+
     const clientIdByName = new Map<string, string>()
     for (const c of existingClients || []) {
       if (c.name) clientIdByName.set(c.name.trim().toLowerCase(), c.id)
+    }
+    const deletedClientIdByName = new Map<string, string>()
+    for (const c of deletedClients || []) {
+      if (c.name) deletedClientIdByName.set(c.name.trim().toLowerCase(), c.id)
     }
 
     const pendingParent: { name: string; parentName: string }[] = []
@@ -182,6 +194,30 @@ export async function importClientsMachinesFromExcelAction(
         continue
       }
 
+      // H3: 삭제(숨김)된 동명 거래처가 있으면 새로 만들지 않고 복구
+      const restoreId = deletedClientIdByName.get(key)
+      if (restoreId) {
+        const payload = clientPayloadFromExcel(row, orgId)
+        const { error } = await supabase
+          .from('clients')
+          .update(payload)
+          .eq('id', restoreId)
+          .eq('organization_id', orgId)
+
+        if (error) {
+          errors.push(`거래처 "${name}" 복구 실패: ${error.message}`)
+          continue
+        }
+
+        clientIdByName.set(key, restoreId)
+        deletedClientIdByName.delete(key)
+        clientRestored += 1
+
+        const parentName = row.소속본사?.trim()
+        if (parentName) pendingParent.push({ name, parentName })
+        continue
+      }
+
       const payload = {
         ...clientPayloadFromExcel(row, orgId),
         parent_id: null,
@@ -235,6 +271,7 @@ export async function importClientsMachinesFromExcelAction(
       .from('inventory')
       .select('id, serial_number, client_id, status')
       .eq('organization_id', orgId)
+      .eq('is_deleted', false)
 
     const machineIdBySerial = new Map<string, string>()
     for (const m of existingMachines || []) {
@@ -371,12 +408,53 @@ export async function importClientsMachinesFromExcelAction(
       machineCreated += 1
     }
 
+    let machineRecalled = 0
+
     if (syncDelete) {
       // 엑셀에 거래처/기기 행이 하나도 없으면 전체 삭제를 막음 (실수 방지)
       if (excelClientKeys.size > 0) {
         for (const c of existingClients || []) {
           const key = String(c.name || '').trim().toLowerCase()
           if (!key || excelClientKeys.has(key)) continue
+
+          // H2: 거래처를 숨기기 전에 연결된 기기를 먼저 창고로 회수
+          // (숨겨진 거래처에 기기가 그대로 매달려 있는 문제 방지)
+          const { data: attachedMachines, error: attErr } = await supabase
+            .from('inventory')
+            .select('id')
+            .eq('organization_id', orgId)
+            .eq('client_id', c.id)
+
+          if (!attErr && attachedMachines && attachedMachines.length > 0) {
+            const ids = attachedMachines.map((m) => m.id)
+            const { error: recallErr } = await supabase
+              .from('inventory')
+              .update({ status: '창고', client_id: null })
+              .in('id', ids)
+              .eq('organization_id', orgId)
+
+            if (recallErr) {
+              errors.push(`거래처 "${c.name}" 연결 기기 회수 실패: ${recallErr.message}`)
+            } else {
+              await supabase.from('machine_history').insert(
+                ids.map((invId) => ({
+                  inventory_id: invId,
+                  client_id: c.id,
+                  organization_id: orgId,
+                  action_type: 'WITHDRAW',
+                  bw_count: 0,
+                  col_count: 0,
+                  bw_a3_count: 0,
+                  col_a3_count: 0,
+                  memo: '엑셀 삭제 동기화로 자동 회수',
+                  is_replacement: false,
+                  recorded_at: new Date().toISOString(),
+                }))
+              )
+              machineRecalled += ids.length
+            }
+          }
+
           const { error } = await supabase
             .from('clients')
             .update({ is_deleted: true })
@@ -435,9 +513,11 @@ export async function importClientsMachinesFromExcelAction(
     revalidatePath('/')
 
     const parts = [`거래처 신규 ${clientCreated}건`]
+    if (clientRestored) parts.push(`거래처 복구 ${clientRestored}건`)
     if (clientUpdated) parts.push(`거래처 덮어쓰기 ${clientUpdated}건`)
     if (clientSkipped) parts.push(`거래처 유지 ${clientSkipped}건`)
     if (clientDeleted) parts.push(`거래처 삭제 ${clientDeleted}건`)
+    if (machineRecalled) parts.push(`연결 기기 회수 ${machineRecalled}건`)
     parts.push(`기기 등록 ${machineCreated}건`)
     if (machineUpdated) parts.push(`기기 덮어쓰기 ${machineUpdated}건`)
     if (machineDeleted) parts.push(`기기 삭제 ${machineDeleted}건`)
@@ -448,9 +528,11 @@ export async function importClientsMachinesFromExcelAction(
       message: parts.join(' · '),
       errors,
       clientCreated,
+      clientRestored,
       clientUpdated,
       clientSkipped,
       clientDeleted,
+      machineRecalled,
       machineCreated,
       machineUpdated,
       machineDeleted,

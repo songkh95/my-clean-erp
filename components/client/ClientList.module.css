@@ -106,6 +106,7 @@
 
 .searchInput {
   width: 100%;
+  box-sizing: border-box;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--notion-border);
@@ -124,7 +125,7 @@
 /* 리스트 헤더 (컬럼명): 청구일 제외 4개 컬럼으로 조정 */
 .listHeader {
   display: grid;
-  grid-template-columns: 1.6fr 1.6fr 2fr 1.2fr;
+  grid-template-columns: 0.4fr 1.6fr 1.6fr 2fr 1.2fr;
   padding: 10px 20px;
   background-color: var(--notion-bg);
   border-bottom: 1px solid var(--notion-border);
@@ -141,7 +142,7 @@
 /* 요약 영역: 청구일 제외 4개 컬럼으로 조정 */
 .clientSummary {
   display: grid;
-  grid-template-columns: 1.6fr 1.6fr 2fr 1.2fr;
+  grid-template-columns: 0.4fr 1.6fr 1.6fr 2fr 1.2fr;
   padding: 14px 20px;
   cursor: pointer;
   align-items: center;
@@ -334,7 +335,11 @@
     padding: 12px 14px;
   }
 
-  .clientSummary > *:nth-child(n + 2) {
+  .noColumn {
+    display: none;
+  }
+
+  .clientSummary > *:nth-child(n + 3) {
     font-size: 0.82rem;
     color: var(--notion-sub-text);
   }
