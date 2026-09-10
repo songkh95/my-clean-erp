@@ -11,10 +11,15 @@ import ProductGroupManager from './ProductGroupManager'
 import PanelRefreshButton from '@/components/ui/PanelRefreshButton'
 import styles from './InventoryList.module.css'
 import { useAppSettings } from '@/hooks/useAppSettings'
+import { useSortableData } from '@/utils/tableSort'
 
 interface Props {
   tab: 'consumables' | 'parts' | 'others'
 }
+
+type SortKey =
+  | 'model_name' | 'category' | 'color' | 'code' | 'product_group'
+  | 'compatible_models' | 'current_stock' | 'unit_price' | 'stock_value'
 
 export default function ConsumableList({ tab }: Props) {
   const { settings, ready } = useAppSettings()
@@ -114,6 +119,34 @@ export default function ConsumableList({ tab }: Props) {
     parts: { title: '수리 부품', defaultCategory: categoriesForTab[0] || '부품' },
     others: { title: '기타 자재', defaultCategory: categoriesForTab[0] || '기타' },
   }
+
+  // 표 헤더 클릭 정렬
+  const { sortedItems, requestSort, sortIndicator } = useSortableData<any, SortKey>(
+    filteredItems,
+    (item, key) => {
+      if (key === 'compatible_models') {
+        return Array.isArray(item.compatible_models) ? item.compatible_models.join(', ') : ''
+      }
+      if (key === 'stock_value') {
+        return Number(item.current_stock || 0) * Number(item.unit_price || 0)
+      }
+      if (key === 'current_stock' || key === 'unit_price') {
+        return Number(item[key] ?? 0)
+      }
+      return item[key] ?? ''
+    }
+  )
+
+  const sortableTh = (key: SortKey, label: string, extraStyle?: React.CSSProperties) => (
+    <th
+      className={styles.th}
+      style={{ cursor: 'pointer', userSelect: 'none', ...extraStyle }}
+      onClick={() => requestSort(key)}
+      title="클릭하여 정렬"
+    >
+      {label}{sortIndicator(key)}
+    </th>
+  )
 
   return (
     <div className={styles.container}>
@@ -234,15 +267,15 @@ export default function ConsumableList({ tab }: Props) {
           <thead>
             <tr className={styles.theadTr}>
               <th className={styles.th} style={{ width: '50px', textAlign: 'center' }}>No.</th>
-              <th className={styles.th}>모델명</th>
-              <th className={styles.th} style={{ width: '80px' }}>종류</th>
-              <th className={styles.th} style={{ width: '56px', textAlign: 'center' }}>색상</th>
-              <th className={styles.th} style={{ width: '100px' }}>관리코드</th>
-              <th className={styles.th} style={{ minWidth: '110px' }}>제품군</th>
-              <th className={styles.th} style={{ minWidth: '140px' }}>호환기기</th>
-              <th className={styles.th} style={{ width: '100px', textAlign: 'right', backgroundColor: '#f0f8ff' }}>현재 재고</th>
-              <th className={styles.th} style={{ width: '120px', textAlign: 'right' }}>단가</th>
-              <th className={styles.th} style={{ width: '120px', textAlign: 'right' }}>재고금액</th>
+              {sortableTh('model_name', '모델명')}
+              {sortableTh('category', '종류', { width: '80px' })}
+              {sortableTh('color', '색상', { width: '56px', textAlign: 'center' })}
+              {sortableTh('code', '관리코드', { width: '100px' })}
+              {sortableTh('product_group', '제품군', { minWidth: '110px' })}
+              {sortableTh('compatible_models', '호환기기', { minWidth: '140px' })}
+              {sortableTh('current_stock', '현재 재고', { width: '100px', textAlign: 'right', backgroundColor: '#f0f8ff' })}
+              {sortableTh('unit_price', '단가', { width: '120px', textAlign: 'right' })}
+              {sortableTh('stock_value', '재고금액', { width: '120px', textAlign: 'right' })}
               <th className={styles.th} style={{ width: '120px', textAlign: 'center' }}>관리</th>
             </tr>
           </thead>
@@ -252,7 +285,7 @@ export default function ConsumableList({ tab }: Props) {
             ) : filteredItems.length === 0 ? (
               <tr><td colSpan={11} className={styles.noDataRow}>등록된 자재가 없습니다.</td></tr>
             ) : (
-              filteredItems.map((item, index) => (
+              sortedItems.map((item, index) => (
                 <tr
                   key={item.id}
                   className={styles.dataRow}

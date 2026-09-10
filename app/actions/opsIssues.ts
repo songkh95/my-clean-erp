@@ -85,7 +85,8 @@ export async function getOpsIssuesSummaryAction(lowStockThreshold = 5): Promise<
       supabase
         .from('inventory')
         .select('id, model_name, serial_number, status, client_id, plan_basic_fee')
-        .eq('organization_id', orgId),
+        .eq('organization_id', orgId)
+        .eq('is_deleted', false),
       supabase
         .from('quotes')
         .select('id, client_name, quote_no, status')

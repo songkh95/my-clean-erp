@@ -28,6 +28,7 @@ export default function InventoryPage() {
   const [excelModalOpen, setExcelModalOpen] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [pendingRefresh, setPendingRefresh] = useState(0)
+  const [machineCount, setMachineCount] = useState(0)
 
   useEffect(() => {
     setActiveTab(loadTab())
@@ -82,7 +83,9 @@ export default function InventoryPage() {
       {activeTab === 'machines' && (
         <div>
           <div className={styles.headerSection}>
-            <h2 className={styles.title}>전체 자산 목록</h2>
+            <h2 className={styles.title}>
+              전체 자산 목록 <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--notion-sub-text)' }}>({machineCount})</span>
+            </h2>
             <div style={{ display: 'flex', gap: 8 }}>
               <PanelRefreshButton
                 onRefresh={async () => {
@@ -106,7 +109,7 @@ export default function InventoryPage() {
               </button>
             </div>
           </div>
-          <InventoryList type="all" refreshTrigger={refreshTrigger} />
+          <InventoryList type="all" refreshTrigger={refreshTrigger} onCountChange={setMachineCount} />
 
           <InventoryForm
             isOpen={isMachineModalOpen}

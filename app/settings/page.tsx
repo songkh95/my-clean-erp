@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Button from '@/components/ui/Button'
 import AccountSettings from '@/components/settings/AccountSettings'
 import QuoteBrandingSettings from '@/components/settings/QuoteBrandingSettings'
+import InventoryTrashSettings from '@/components/settings/InventoryTrashSettings'
 import styles from './settings.module.css'
 import {
   AppSettings,
@@ -20,11 +21,11 @@ import {
   parseLeaseInfo,
 } from '@/utils/quoteDefaults'
 
-type TabId = 'account' | 'general' | 'clients' | 'inventory' | 'stock' | 'service' | 'accounting' | 'quotes'
+type TabId = 'account' | 'general' | 'clients' | 'inventory' | 'stock' | 'service' | 'accounting' | 'quotes' | 'trash'
 
 const TAB_KEY = 'settings-active-tab'
 const TAB_IDS: TabId[] = [
-  'account', 'general', 'clients', 'inventory', 'stock', 'service', 'accounting', 'quotes',
+  'account', 'general', 'clients', 'inventory', 'stock', 'service', 'accounting', 'quotes', 'trash',
 ]
 
 const TABS: { id: TabId; label: string }[] = [
@@ -36,6 +37,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'service', label: '서비스 일지' },
   { id: 'accounting', label: '정산' },
   { id: 'quotes', label: '견적서' },
+  { id: 'trash', label: '휴지통' },
 ]
 
 function loadSettingsTab(): TabId {
@@ -151,6 +153,8 @@ export default function SettingsPage() {
 
       <div className={styles.section}>
         {tab === 'account' && <AccountSettings />}
+
+        {tab === 'trash' && <InventoryTrashSettings />}
 
         {tab === 'general' && (
           <div className={styles.card}>
@@ -662,7 +666,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {tab !== 'account' && (
+      {tab !== 'account' && tab !== 'trash' && (
         <div className={styles.footer}>
           {savedFlash && <span className={styles.saved}>저장되었습니다</span>}
           <Button variant="outline" type="button" onClick={handleReset}>기본값으로</Button>

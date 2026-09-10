@@ -175,6 +175,7 @@ export async function getMachineModelOptionsAction() {
     .from('inventory')
     .select('model_name')
     .eq('organization_id', orgId)
+    .eq('is_deleted', false)
     .not('model_name', 'is', null)
 
   for (const m of machines || []) {

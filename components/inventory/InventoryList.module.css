@@ -41,6 +41,7 @@
 
 .searchInput {
   width: 100%;
+  box-sizing: border-box;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--notion-border);
@@ -134,6 +135,11 @@
 .statusInstalled {
   background-color: #d3e5ef; /* 노션 Light Blue */
   color: #18445a;
+}
+
+.statusTrash {
+  background-color: #fbe4e2; /* 노션 Light Red */
+  color: #9a3412;
 }
 
 /* 상세 정보 영역 (펼쳐진 곳) */

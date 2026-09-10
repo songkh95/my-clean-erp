@@ -270,4 +270,32 @@
   background: #fff;
 }
 
+.tableWrap {
+  overflow-x: auto;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.dataTable th,
+.dataTable td {
+  border: 1px solid var(--notion-border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.dataTable thead th {
+  background: var(--notion-soft-bg);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dataTable tbody tr:hover {
+  background: var(--notion-soft-bg);
+}
+
 

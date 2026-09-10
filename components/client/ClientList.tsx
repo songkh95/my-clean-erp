@@ -20,6 +20,39 @@ import {
   groupClientIssues,
   clientIssueKindTitle,
 } from '@/utils/clientIssues'
+import { useSortableData } from '@/utils/tableSort'
+
+type ClientSortKey = 'name' | 'contact' | 'assets'
+
+/** YYYY-MM-DD → YY.MM.DD */
+function formatYyMmDd(dateStr: string): string {
+  const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime())) return '-'
+  const yy = String(d.getFullYear()).slice(-2)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yy}.${mm}.${dd}`
+}
+
+/** D-day 표기: 남은 날이면 음수(-1 = 내일 만료), 지났으면 양수(+1 = 어제 만료) */
+function getDday(dateStr: string): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const end = new Date(dateStr)
+  end.setHours(0, 0, 0, 0)
+  const diff = Math.round((today.getTime() - end.getTime()) / 86400000)
+  if (diff === 0) return '0'
+  return diff > 0 ? `+${diff}` : `${diff}`
+}
+
+/** 거래처에 설치된 기기 중 가장 임박한 계약 종료일 */
+function earliestContractEnd(assets: Inventory[]): string | null {
+  const dates = assets
+    .map((a) => a.contract_end_date)
+    .filter((d): d is string => Boolean(d))
+    .sort()
+  return dates[0] || null
+}
 
 export default function ClientList() {
   const supabase = createClient()
@@ -29,6 +62,7 @@ export default function ClientList() {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [issuesOpen, setIssuesOpen] = useState(true)
   
   // 모달 상태
   const [isRegModalOpen, setIsRegModalOpen] = useState(false)
@@ -197,13 +231,35 @@ export default function ClientList() {
     return sortClientsByHierarchy(clients.filter((c) => matched.has(c.id)))
   })()
 
+  // 표 헤더 클릭 정렬 — 정렬 안 한 기본 상태는 위의 본사/자사 계층 순서를 그대로 씀
+  const { sortedItems: sortedClients, requestSort, sortIndicator } = useSortableData<Client, ClientSortKey>(
+    filteredClients,
+    (client, key) => {
+      if (key === 'name') return client.name || ''
+      if (key === 'contact') return client.phone || client.contact_person || ''
+      if (key === 'assets') return (assetsMap[client.id] || []).length
+      return ''
+    }
+  )
+
   const clientIssues = useMemo(() => detectClientIssues(clients), [clients])
   const clientIssueGroups = useMemo(() => groupClientIssues(clientIssues), [clientIssues])
+
+  const totalClients = clients.length
+  const totalMachines = useMemo(
+    () => Object.values(assetsMap).reduce((sum, arr) => sum + arr.length, 0),
+    [assetsMap]
+  )
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <span>거래처</span>
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          거래처
+          <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--notion-sub-text)' }}>
+            총 거래처 {totalClients} · 총 기기 {totalMachines}대
+          </span>
+        </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <PanelRefreshButton onRefresh={fetchClients} />
           <Button variant="outline" size="sm" onClick={() => setExcelModalOpen(true)}>
@@ -217,13 +273,20 @@ export default function ClientList() {
 
       {clientIssueGroups.length > 0 && (
         <div className={styles.issueBanner}>
-          <div className={styles.issueTitle}>
+          <div
+            className={styles.issueTitle}
+            style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+            onClick={() => setIssuesOpen((v) => !v)}
+          >
+            <span>{issuesOpen ? '▼' : '▶'}</span>
             문제 해결이 필요한 내용 {clientIssues.length}건
           </div>
-          <p className={styles.issueDesc}>
-            중복·오류·부족한 정보가 있습니다. 항목을 누르면 수정 화면이 열립니다.
-          </p>
-          {clientIssueGroups.map((group) => (
+          {issuesOpen && (
+            <>
+              <p className={styles.issueDesc}>
+                중복·오류·부족한 정보가 있습니다. 항목을 누르면 수정 화면이 열립니다.
+              </p>
+              {clientIssueGroups.map((group) => (
             <div key={group.kind} className={styles.issueGroup}>
               <div className={styles.issueGroupTitle}>
                 {clientIssueKindTitle(group.kind)} {group.items.length}건
@@ -249,7 +312,9 @@ export default function ClientList() {
                 {group.items.length > 8 ? <span className={styles.issueMore}>…</span> : null}
               </div>
             </div>
-          ))}
+              ))}
+            </>
+          )}
         </div>
       )}
 
@@ -263,28 +328,39 @@ export default function ClientList() {
       </div>
 
       <div className={styles.listHeader}>
-        <div>거래처명</div>
-        <div>연락처/주소</div>
-        <div>기기(대수)</div>
+        <div className={styles.noColumn}>No.</div>
+        <div onClick={() => requestSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }} title="클릭하여 정렬">
+          거래처명{sortIndicator('name')}
+        </div>
+        <div onClick={() => requestSort('contact')} style={{ cursor: 'pointer', userSelect: 'none' }} title="클릭하여 정렬">
+          연락처/주소{sortIndicator('contact')}
+        </div>
+        <div onClick={() => requestSort('assets')} style={{ cursor: 'pointer', userSelect: 'none' }} title="클릭하여 정렬">
+          기기(대수){sortIndicator('assets')}
+        </div>
         <div style={{ textAlign: 'right' }}>관리</div>
       </div>
 
       {loading ? (
         <div className={styles.noResult}>로딩 중...</div>
-      ) : filteredClients.map((client) => {
+      ) : sortedClients.map((client, index) => {
         const isExpanded = expandedRows.has(client.id)
         const assets = assetsMap[client.id] || []
         const machineNames = assets
           .map((a) => String(a.model_name || '').trim())
           .filter(Boolean)
           .join(', ')
+        const contractEnd = earliestContractEnd(assets)
 
         return (
           <div key={client.id} className={styles.clientRow}>
-            <div 
+            <div
               className={`${styles.clientSummary} ${isExpanded ? styles.clientSummarySelected : ''}`}
               onClick={() => toggleExpand(client.id)}
             >
+              <div className={styles.noColumn} style={{ color: 'var(--notion-sub-text)', fontSize: '0.85rem' }}>
+                {index + 1}
+              </div>
               <div
                 style={{
                   display: 'flex',
@@ -304,7 +380,12 @@ export default function ClientList() {
                 {client.phone || client.contact_person || '-'}
               </div>
               <div className={styles.machineCell}>
-                <div className={styles.machineCount}>{assets.length}대</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div className={styles.machineCount}>{assets.length}대</div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--notion-sub-text)' }}>
+                    {contractEnd ? `${formatYyMmDd(contractEnd)} (${getDday(contractEnd)})` : '-'}
+                  </span>
+                </div>
                 {machineNames ? (
                   <div className={styles.machineNames} title={machineNames}>
                     {machineNames}

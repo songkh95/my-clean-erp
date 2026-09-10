@@ -899,21 +899,36 @@ export async function patchServiceLogAction(
         const plan = await planPartsAllocation(supabase, orgId, normalized.parts, true, {})
         if (!plan.ok) return { success: false, message: plan.message }
 
-        await supabase.from('service_parts_usage').delete().eq('service_log_id', logId)
-        await insertPartsRows(supabase, logId, plan.rows)
+        // H5: 재고가 실제로 차감 가능한지부터 확정한 뒤 부품 사용 내역을 갱신
+        // (차감이 실패하면 부품 사용 내역은 아직 손대지 않았으므로 그대로 되돌아갈 수 있음)
         if (plan.toDeduct.length > 0) {
           await applyStockChange(supabase, plan.toDeduct, 'out')
         }
+        await supabase.from('service_parts_usage').delete().eq('service_log_id', logId)
+        await insertPartsRows(supabase, logId, plan.rows)
         stockTouched = true
       } else if (wasDone && !willBeDone && oldRows.length > 0) {
         const toRestore = deductedPartsFromRows(oldRows, true)
+        // H5: 재고 복구가 실제로 성공한 뒤에만 부품 사용 내역을 'none'으로 갱신
+        // (복구 실패 시 부품 사용 내역은 그대로 유지되어 재고와 어긋나지 않음)
         if (toRestore.length > 0) {
           await applyStockChange(supabase, toRestore, 'in')
         }
-        await supabase
+        const { error: statusUpdErr } = await supabase
           .from('service_parts_usage')
           .update({ stock_status: 'none' } as any)
           .eq('service_log_id', logId)
+        if (statusUpdErr) {
+          // 부품 상태 갱신 실패 — 방금 복구한 재고를 다시 차감해 원상태로 되돌림
+          if (toRestore.length > 0) {
+            try {
+              await applyStockChange(supabase, toRestore, 'out')
+            } catch {
+              // 되돌리기마저 실패 — 아래 에러 메시지로 수동 확인을 요청
+            }
+          }
+          return { success: false, message: '부품 상태 갱신 실패로 상태 변경을 취소했습니다: ' + statusUpdErr.message }
+        }
         stockTouched = true
       }
     }
@@ -969,18 +984,41 @@ export async function updateServiceLogAction(logId: string, formData: any, parts
     )
     if (!plan.ok) return { success: false, message: plan.message }
 
-    if (oldDeducted.length > 0) {
-      await applyStockChange(supabase, oldDeducted, 'in')
-    }
-
+    // H5: 실패 가능성이 높은 기본 필드 저장(스키마 폴백 재시도 등)을 재고 반영보다 먼저 처리.
+    // 여기서 실패하면 재고·부품은 아직 손대지 않았으므로 그대로 되돌아갈 수 있음(기존엔 재고부터 복구해서 어긋났음).
     const updateError = await updateServiceLogRow(supabase, logId, orgId, resolvedForm)
     if (updateError) throw updateError
 
-    await supabase.from('service_parts_usage').delete().eq('service_log_id', logId)
-    await insertPartsRows(supabase, logId, plan.rows)
+    // 이제부터 재고·부품 반영. 실패 시 최대한 이전 상태로 되돌리고, 그래도 안 맞을 수 있으면 명확히 알림.
+    try {
+      if (oldDeducted.length > 0) {
+        await applyStockChange(supabase, oldDeducted, 'in')
+      }
 
-    if (plan.toDeduct.length > 0) {
-      await applyStockChange(supabase, plan.toDeduct, 'out')
+      await supabase.from('service_parts_usage').delete().eq('service_log_id', logId)
+      await insertPartsRows(supabase, logId, plan.rows)
+
+      if (plan.toDeduct.length > 0) {
+        await applyStockChange(supabase, plan.toDeduct, 'out')
+      }
+    } catch (stockErr: any) {
+      // 되돌리기 시도: 방금 복구했던 만큼 다시 차감해 재고를 원래대로 맞춤
+      if (oldDeducted.length > 0) {
+        try {
+          await applyStockChange(supabase, oldDeducted, 'out')
+        } catch {
+          // 되돌리기마저 실패 — 아래 메시지로 수동 확인을 명확히 요청
+        }
+      }
+      revalidateServiceAndInventory()
+      return {
+        success: false,
+        id: logId,
+        message:
+          '일지 내용은 저장되었지만 부품/재고 반영에 실패했습니다: ' +
+          (stockErr?.message || '알 수 없는 오류') +
+          ' — 재고 현황을 확인 후 부품을 다시 저장해 주세요.',
+      }
     }
 
     const deductedQty = plan.toDeduct.reduce((s, p) => s + p.quantity, 0)
@@ -1199,6 +1237,7 @@ export async function getOfficeMachinesAction() {
     .select('id, model_name, serial_number, department, status')
     .eq('organization_id', profile.organization_id)
     .eq('status', '창고')
+    .eq('is_deleted', false)
     .order('model_name', { ascending: true })
 
   return data || []
@@ -1689,7 +1728,7 @@ export async function importServiceLogsFromExcelAction(
 
   const [{ data: clients }, { data: machines }, { data: employees }] = await Promise.all([
     supabase.from('clients').select('id, name').eq('organization_id', orgId).eq('is_deleted', false),
-    supabase.from('inventory').select('id, model_name, serial_number, client_id').eq('organization_id', orgId),
+    supabase.from('inventory').select('id, model_name, serial_number, client_id').eq('organization_id', orgId).eq('is_deleted', false),
     supabase.from('profiles').select('id, name').eq('organization_id', orgId),
   ])
 
@@ -1753,11 +1792,22 @@ export async function importServiceLogsFromExcelAction(
       const statusRaw = row.상태.trim() || '접수'
       const status = allowedStatus.has(statusRaw) ? statusRaw : '접수'
       if (status === '미방문') {
+        // H6: 미방문 행은 생성/수정하지 않되, 일지ID가 있으면(기존 실일지) 삭제 동기화 대상에서 제외(보호)
+        const existingId = row.일지ID.trim()
+        if (existingId && /^[0-9a-f-]{36}$/i.test(existingId)) {
+          keptLogIds.add(existingId)
+        }
         skipped += 1
         continue
       }
 
-      const visitDate = row.방문일자 || new Date().toISOString().slice(0, 10)
+      if (!row.방문일자?.trim()) {
+        // H6: 방문일자가 없는 행을 오늘 날짜로 채우면 기간 밖 데이터가 생길 수 있어 거절
+        errors.push(`${line}행: 방문일자가 없어 건너뜁니다.`)
+        skipped += 1
+        continue
+      }
+      const visitDate = row.방문일자.trim()
       const payload = {
         client_id: clientId,
         inventory_id: inventoryId,
