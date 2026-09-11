@@ -19,12 +19,7 @@ interface Props {
   
   viewMode: 'all' | 'machine'
   setViewMode: (mode: 'all' | 'machine') => void
-  
-  isEditMode: boolean
-  onToggleEditMode: () => void
-  hasChanges: boolean
-  onSave: () => void
-  
+
   totalCount: number
 }
 
@@ -44,7 +39,7 @@ export default function HistoryFilter({
   searchTerm, setSearchTerm, showSuggestions, setShowSuggestions, filteredClients, onSelectClient, onSearchTrigger,
   startMonth, setStartMonth, endMonth, setEndMonth,
   viewMode, setViewMode,
-  isEditMode, onToggleEditMode, hasChanges, onSave, totalCount
+  totalCount
 }: Props) {
   const searchRef = useRef<HTMLDivElement>(null)
 
@@ -269,45 +264,6 @@ export default function HistoryFilter({
              건수: <b>{totalCount}</b>
              {!start.year && !end.year ? <span style={{ marginLeft: 6, color: '#999' }}>(전체 기간)</span> : null}
            </span>
-        )}
-        
-        <button 
-            onClick={onToggleEditMode}
-            style={{ 
-                padding: '0 12px', 
-                height: '32px',
-                backgroundColor: isEditMode ? '#666' : '#fff', 
-                color: isEditMode ? '#fff' : '#0070f3',
-                border: `1px solid ${isEditMode ? '#666' : '#0070f3'}`,
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                whiteSpace: 'nowrap'
-            }}
-        >
-            {isEditMode ? '수정 취소' : '✏️ 수정'}
-        </button>
-
-        {hasChanges && (
-            <button 
-              onClick={onSave} 
-              style={{ 
-                padding: '0 16px', 
-                height: '32px',
-                backgroundColor: '#d93025', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '6px', 
-                fontWeight: '600', 
-                fontSize: '0.8rem',
-                cursor: 'pointer', 
-                boxShadow: '0 2px 4px rgba(217,48,37,0.2)',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              💾 저장
-            </button>
         )}
       </div>
     </div>

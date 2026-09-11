@@ -476,6 +476,39 @@ export function useAccounting() {
   const handlePreSave = () => {
     if (selectedInventories.size === 0) return alert('선택된 기계가 없습니다.')
 
+    // 합산청구 그룹 잠금: 그룹 내 기기 중 1대라도 이번 달 지침이 없으면 그룹 전체 청구를 막는다.
+    // (day 필터로 인해 그룹원이 화면에서 빠져 selectedInventories에 안 들어온 경우까지 잡기 위해
+    //  전체 inventoryMap 기준으로 그룹원을 다시 모아 확인한다.)
+    {
+      const settledIds = getSettledInventoryIds()
+      const allAssets = Object.values(inventoryMap).flat()
+      const selectedGroupIds = new Set(
+        Array.from(selectedInventories)
+          .map((id) => allAssets.find((a) => a.id === id)?.billing_group_id)
+          .filter((gid): gid is string => Boolean(gid))
+      )
+
+      const groupBlocked: string[] = []
+      selectedGroupIds.forEach((gid) => {
+        const members = allAssets.filter((a) => a.billing_group_id === gid && !settledIds.has(a.id))
+        const notReady = members.filter((m) => {
+          const isAutoFilled = m.is_replacement_before || m.is_withdrawal
+          return !touchedInputs.has(m.id) && !isAutoFilled
+        })
+        if (notReady.length > 0) {
+          groupBlocked.push(
+            `합산그룹(${members.find((m) => !notReady.includes(m))?.model_name || members[0]?.model_name}) — 지침 대기 중: ${notReady.map((m) => m.model_name).join(', ')}`
+          )
+        }
+      })
+
+      if (groupBlocked.length > 0) {
+        return alert(
+          `합산청구 그룹은 그룹 내 모든 기기의 당월 지침이 입력되어야 청구할 수 있습니다.\n\n${groupBlocked.join('\n')}`
+        )
+      }
+    }
+
     const missingInput: string[] = []
     const zeroCurr: string[] = []
 

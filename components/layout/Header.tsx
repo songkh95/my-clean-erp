@@ -23,7 +23,8 @@ function getPageTitle(path: string, compact: boolean) {
   }
   if (path.startsWith('/service')) return compact ? '일지' : '서비스 일지'
   if (path.startsWith('/accounting/registration')) return compact ? '정산' : '월 정산 등록'
-  if (path.startsWith('/accounting/history')) return compact ? '청구' : '청구 이력/수정'
+  if (path.startsWith('/accounting/history')) return compact ? '청구' : '청구 이력'
+  if (path.startsWith('/accounting/dashboard')) return compact ? '수금' : '수금 현황'
   if (path.startsWith('/accounting')) return compact ? '정산' : '정산 및 회계 관리'
   if (path.startsWith('/settings')) return '설정'
   return 'My Clean ERP'
