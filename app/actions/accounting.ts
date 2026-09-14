@@ -513,3 +513,315 @@ export async function fetchClientTimelineAction(clientId: string, startYear: num
     return { success: false, message: '타임라인 조회 실패: ' + e.message, data: [] }
   }
 }
+
+/**
+ * 거래명세서 발송 완료 처리.
+ * 지금은 "PDF 내려받아 수동 발송 후 체크"용이며, SMTP 자동발송이 붙으면
+ * 발송 성공 콜백에서 이 액션을 그대로 재사용한다 (sent_at 기록 로직은 동일).
+ */
+export async function markStatementSentAction(settlementId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.' }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.' }
+  const orgId = profile.organization_id
+
+  const { error } = await supabase
+    .from('settlements')
+    .update({ sent_at: new Date().toISOString() })
+    .eq('id', settlementId)
+    .eq('organization_id', orgId)
+
+  if (error) return { success: false, message: '처리 실패: ' + error.message }
+
+  revalidatePath('/accounting/history')
+  return { success: true, message: '발송완료로 표시했습니다.' }
+}
+
+export type BillingDashboardRow = {
+  settlement_id: string
+  client_id: string
+  client_name: string
+  billing_year: number
+  billing_month: number
+  created_at: string | null
+  total_amount: number
+  is_paid: boolean
+  sent_at: string | null
+  memo: string | null
+  tax_invoice_status: '미발행' | '정상' | '취소' | '수정발행됨'
+}
+
+export type HometaxUploadRow = {
+  settlementId: string
+  writtenDate: string // YYYY-MM-DD
+  buyerBizNo: string
+  buyerName: string
+  buyerRepName: string
+  buyerAddress: string
+  buyerEmail: string
+  supplyAmount: number
+  taxAmount: number
+  itemName: string
+}
+
+/**
+ * 아직 세금계산서(정상)가 기록되지 않은 정산 건들을 홈택스 일괄등록 엑셀용 데이터로 반환.
+ * 실제 엑셀 파일 생성은 클라이언트(utils/hometaxBulkExcel.ts)에서 한다.
+ */
+export async function getPendingTaxInvoiceBillingDataAction(year: number, month: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.', rows: [] as HometaxUploadRow[] }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.', rows: [] as HometaxUploadRow[] }
+  const orgId = profile.organization_id
+
+  try {
+    const { data: settlements, error } = await supabase
+      .from('settlements')
+      .select('id, billing_year, billing_month, client_id, client:clients(name, business_number, representative_name, address, email)')
+      .eq('organization_id', orgId)
+      .eq('billing_year', year)
+      .eq('billing_month', month)
+
+    if (error) throw error
+    if (!settlements || settlements.length === 0) return { success: true, rows: [] as HometaxUploadRow[] }
+
+    const ids = settlements.map((s) => s.id)
+
+    const { data: alreadyInvoiced } = await supabase
+      .from('tax_invoices')
+      .select('settlement_id')
+      .eq('organization_id', orgId)
+      .eq('status', '정상')
+      .in('settlement_id', ids)
+    const invoicedSet = new Set((alreadyInvoiced || []).map((i) => i.settlement_id))
+
+    const { data: details } = await supabase
+      .from('settlement_details')
+      .select('settlement_id, calculated_amount')
+      .in('settlement_id', ids)
+
+    const supplyBySettlement = new Map<string, number>()
+    for (const d of details || []) {
+      if (!d.settlement_id) continue
+      supplyBySettlement.set(d.settlement_id, (supplyBySettlement.get(d.settlement_id) || 0) + (d.calculated_amount || 0))
+    }
+
+    const lastDay = new Date(year, month, 0).getDate()
+    const writtenDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+    const rows: HometaxUploadRow[] = []
+    for (const s of settlements) {
+      if (invoicedSet.has(s.id)) continue
+      const supply = supplyBySettlement.get(s.id) || 0
+      if (supply <= 0) continue
+      const tax = Math.floor(supply * 0.1)
+      const client = s.client as any
+
+      rows.push({
+        settlementId: s.id,
+        writtenDate,
+        buyerBizNo: (client?.business_number || '').replace(/-/g, ''),
+        buyerName: client?.name || '',
+        buyerRepName: client?.representative_name || '',
+        buyerAddress: client?.address || '',
+        buyerEmail: client?.email || '',
+        supplyAmount: supply,
+        taxAmount: tax,
+        itemName: `복합기 렌탈료(${year}년 ${month}월)`,
+      })
+    }
+
+    return { success: true, rows }
+  } catch (e: any) {
+    return { success: false, message: '조회 실패: ' + e.message, rows: [] as HometaxUploadRow[] }
+  }
+}
+
+/**
+ * 청구 이력의 특정 정산 건 하나만 홈택스 일괄등록 엑셀용 데이터로 반환.
+ * (이미 세금계산서가 기록된 건이라도 재발급/재다운로드를 위해 제외하지 않는다.)
+ */
+export async function getHometaxUploadDataForSettlementAction(settlementId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.', row: null as HometaxUploadRow | null }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.', row: null as HometaxUploadRow | null }
+  const orgId = profile.organization_id
+
+  try {
+    const { data: s, error } = await supabase
+      .from('settlements')
+      .select('id, billing_year, billing_month, client:clients(name, business_number, representative_name, address, email)')
+      .eq('organization_id', orgId)
+      .eq('id', settlementId)
+      .single()
+    if (error) throw error
+    if (!s) return { success: false, message: '정산 건을 찾을 수 없습니다.', row: null as HometaxUploadRow | null }
+
+    const { data: details } = await supabase
+      .from('settlement_details')
+      .select('calculated_amount')
+      .eq('settlement_id', settlementId)
+
+    const supply = (details || []).reduce((sum, d) => sum + (d.calculated_amount || 0), 0)
+    if (supply <= 0) return { success: false, message: '이 정산 건은 청구액이 0원이라 엑셀을 생성할 수 없습니다.', row: null as HometaxUploadRow | null }
+    const tax = Math.floor(supply * 0.1)
+
+    const year = s.billing_year
+    const month = s.billing_month
+    const lastDay = new Date(year, month, 0).getDate()
+    const writtenDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    const client = s.client as any
+
+    const row: HometaxUploadRow = {
+      settlementId: s.id,
+      writtenDate,
+      buyerBizNo: (client?.business_number || '').replace(/-/g, ''),
+      buyerName: client?.name || '',
+      buyerRepName: client?.representative_name || '',
+      buyerAddress: client?.address || '',
+      buyerEmail: client?.email || '',
+      supplyAmount: supply,
+      taxAmount: tax,
+      itemName: `복합기 렌탈료(${year}년 ${month}월)`,
+    }
+
+    return { success: true, row }
+  } catch (e: any) {
+    return { success: false, message: '조회 실패: ' + e.message, row: null as HometaxUploadRow | null }
+  }
+}
+
+/**
+ * 청구 이력에서 체크박스로 여러 정산 건을 선택해 한 번에 홈택스 일괄등록 엑셀용
+ * 데이터로 반환한다. (이미 세금계산서가 기록된 건도 재발급/재다운로드를 위해 제외하지 않음)
+ */
+export async function getHometaxUploadDataForSettlementsAction(settlementIds: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.', rows: [] as HometaxUploadRow[] }
+  if (settlementIds.length === 0) return { success: true, rows: [] as HometaxUploadRow[] }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.', rows: [] as HometaxUploadRow[] }
+  const orgId = profile.organization_id
+
+  try {
+    const { data: settlements, error } = await supabase
+      .from('settlements')
+      .select('id, billing_year, billing_month, client:clients(name, business_number, representative_name, address, email)')
+      .eq('organization_id', orgId)
+      .in('id', settlementIds)
+    if (error) throw error
+    if (!settlements || settlements.length === 0) return { success: true, rows: [] as HometaxUploadRow[] }
+
+    const { data: details } = await supabase
+      .from('settlement_details')
+      .select('settlement_id, calculated_amount')
+      .in('settlement_id', settlementIds)
+
+    const supplyBySettlement = new Map<string, number>()
+    for (const d of details || []) {
+      if (!d.settlement_id) continue
+      supplyBySettlement.set(d.settlement_id, (supplyBySettlement.get(d.settlement_id) || 0) + (d.calculated_amount || 0))
+    }
+
+    const rows: HometaxUploadRow[] = []
+    for (const s of settlements) {
+      const supply = supplyBySettlement.get(s.id) || 0
+      if (supply <= 0) continue
+      const tax = Math.floor(supply * 0.1)
+      const year = s.billing_year
+      const month = s.billing_month
+      const lastDay = new Date(year, month, 0).getDate()
+      const writtenDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+      const client = s.client as any
+
+      rows.push({
+        settlementId: s.id,
+        writtenDate,
+        buyerBizNo: (client?.business_number || '').replace(/-/g, ''),
+        buyerName: client?.name || '',
+        buyerRepName: client?.representative_name || '',
+        buyerAddress: client?.address || '',
+        buyerEmail: client?.email || '',
+        supplyAmount: supply,
+        taxAmount: tax,
+        itemName: `복합기 렌탈료(${year}년 ${month}월)`,
+      })
+    }
+
+    return { success: true, rows }
+  } catch (e: any) {
+    return { success: false, message: '조회 실패: ' + e.message, rows: [] as HometaxUploadRow[] }
+  }
+}
+
+/**
+ * 미수금/초과입금(현재는 완납 여부만) + 명세서 발송여부 + 세금계산서 발행상태를
+ * 한 화면에서 보기 위한 대시보드 데이터.
+ */
+export async function getBillingDashboardAction(year: number, month: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.', data: [] as BillingDashboardRow[] }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.', data: [] as BillingDashboardRow[] }
+  const orgId = profile.organization_id
+
+  try {
+    const { data: settlements, error } = await supabase
+      .from('settlements')
+      .select('id, client_id, billing_year, billing_month, created_at, total_amount, is_paid, sent_at, memo, client:clients(name)')
+      .eq('organization_id', orgId)
+      .eq('billing_year', year)
+      .eq('billing_month', month)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    const ids = (settlements || []).map((s) => s.id)
+    const invoiceStatusBySettlement = new Map<string, BillingDashboardRow['tax_invoice_status']>()
+
+    if (ids.length > 0) {
+      const { data: invoices } = await supabase
+        .from('tax_invoices')
+        .select('settlement_id, status, created_at')
+        .eq('organization_id', orgId)
+        .in('settlement_id', ids)
+        .order('created_at', { ascending: true })
+
+      // 같은 정산 건에 발행 이력이 여러 개(원본→취소/수정)면 가장 최근 상태를 대표로 사용
+      for (const inv of invoices || []) {
+        invoiceStatusBySettlement.set(inv.settlement_id, inv.status as BillingDashboardRow['tax_invoice_status'])
+      }
+    }
+
+    const rows: BillingDashboardRow[] = (settlements || []).map((s: any) => ({
+      settlement_id: s.id,
+      client_id: s.client_id,
+      client_name: s.client?.name || '(알 수 없음)',
+      billing_year: s.billing_year,
+      billing_month: s.billing_month,
+      created_at: s.created_at,
+      total_amount: s.total_amount || 0,
+      is_paid: !!s.is_paid,
+      sent_at: s.sent_at,
+      memo: s.memo,
+      tax_invoice_status: invoiceStatusBySettlement.get(s.id) || '미발행',
+    }))
+
+    return { success: true, data: rows }
+  } catch (e: any) {
+    return { success: false, message: '대시보드 조회 실패: ' + e.message, data: [] as BillingDashboardRow[] }
+  }
+}

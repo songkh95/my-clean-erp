@@ -440,27 +440,45 @@ export type Database = {
       }
       organizations: {
         Row: {
+          address: string | null
+          business_item: string | null
+          business_number: string | null
+          business_type: string | null
           created_at: string | null
+          email: string | null
           id: string
           is_deleted: boolean | null
           name: string
           plan_type: string | null
+          representative_name: string | null
           updated_at: string | null
         }
         Insert: {
+          address?: string | null
+          business_item?: string | null
+          business_number?: string | null
+          business_type?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
           is_deleted?: boolean | null
           name: string
           plan_type?: string | null
+          representative_name?: string | null
           updated_at?: string | null
         }
         Update: {
+          address?: string | null
+          business_item?: string | null
+          business_number?: string | null
+          business_type?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
           is_deleted?: boolean | null
           name?: string
           plan_type?: string | null
+          representative_name?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -1047,6 +1065,7 @@ export type Database = {
           is_paid: boolean | null
           memo: string | null
           organization_id: string | null
+          sent_at: string | null
           total_amount: number | null
           total_usage_bw: number | null
           total_usage_col: number | null
@@ -1063,6 +1082,7 @@ export type Database = {
           is_paid?: boolean | null
           memo?: string | null
           organization_id?: string | null
+          sent_at?: string | null
           total_amount?: number | null
           total_usage_bw?: number | null
           total_usage_col?: number | null
@@ -1079,6 +1099,7 @@ export type Database = {
           is_paid?: boolean | null
           memo?: string | null
           organization_id?: string | null
+          sent_at?: string | null
           total_amount?: number | null
           total_usage_bw?: number | null
           total_usage_col?: number | null
@@ -1096,6 +1117,77 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_invoices: {
+        Row: {
+          amount: number | null
+          approval_no: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          issued_at: string | null
+          memo: string | null
+          organization_id: string
+          original_invoice_id: string | null
+          settlement_id: string
+          status: string
+        }
+        Insert: {
+          amount?: number | null
+          approval_no?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          issued_at?: string | null
+          memo?: string | null
+          organization_id: string
+          original_invoice_id?: string | null
+          settlement_id: string
+          status?: string
+        }
+        Update: {
+          amount?: number | null
+          approval_no?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          issued_at?: string | null
+          memo?: string | null
+          organization_id?: string
+          original_invoice_id?: string | null
+          settlement_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_invoices_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_invoices_original_invoice_id_fkey"
+            columns: ["original_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "tax_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_invoices_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
             referencedColumns: ["id"]
           },
         ]

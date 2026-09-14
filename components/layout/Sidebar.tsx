@@ -64,7 +64,8 @@ export default function Sidebar({
     },
     { name: '견적서', path: '/quotes', icon: '📄' },
     { name: '월 정산 등록', path: '/accounting/registration', icon: '📝' },
-    { name: '청구 이력/수정', path: '/accounting/history', icon: '🕒' },
+    { name: '청구 이력', path: '/accounting/history', icon: '🕒' },
+    { name: '수금 현황', path: '/accounting/dashboard', icon: '📊' },
     { name: '설정', path: '/settings', icon: '⚙️' },
   ]
 
