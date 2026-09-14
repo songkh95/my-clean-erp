@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { HistoryItem } from '@/app/types'
+import styles from '@/app/accounting/accounting.module.css'
 
 interface Props {
   loading: boolean
@@ -45,42 +46,42 @@ export default function HistoryTable({
   }, [items, viewMode]);
 
   return (
-    <div style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #ddd', overflow: 'hidden', minHeight: '600px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-        <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                <thead style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ccc', color: '#444' }}>
+    <div className={styles.section}>
+        <div className={styles.tableContainer} style={{ overflowX: 'auto' }}>
+            <table className={styles.table} style={{ tableLayout: 'auto' }}>
+                <thead>
                     <tr>
-                        <th style={{ padding: '10px', width: '32px', borderRight: '1px solid #ddd' }}></th>
-                        <th style={{ padding: '10px', width: '40px', borderRight: '1px solid #ddd' }}>No.</th>
-                        <th style={{ padding: '10px', width: '180px', borderRight: '1px solid #ddd', textAlign: 'left' }}>기계명 (S/N)</th>
+                        <th className={styles.th} style={{ width: '32px' }}></th>
+                        <th className={styles.th} style={{ width: '40px' }}>No.</th>
+                        <th className={styles.th} style={{ width: '180px', textAlign: 'left' }}>기계명 (S/N)</th>
 
-                        <th style={{ padding: '10px', width: '50px', borderRight: '1px solid #ddd', whiteSpace: 'nowrap' }} rowSpan={2}>
+                        <th className={styles.th} style={{ width: '50px' }} rowSpan={2}>
                             청구월
                         </th>
 
-                        <th style={{ padding: '8px', width: '160px', borderRight: '1px solid #ddd', backgroundColor: '#f0f0f0', verticalAlign:'middle' }}>
+                        <th className={styles.th} style={{ width: '160px', backgroundColor: '#f0f0f0' }}>
                             전월 지침<br/>
                             <span style={{fontSize:'0.75rem', fontWeight:'normal', color:'#666'}}>(A4/A3 흑·칼)</span>
                         </th>
 
-                        <th style={{ padding: '8px', width: '160px', borderRight: '1px solid #ddd', backgroundColor: '#e3f2fd', verticalAlign:'middle' }}>
+                        <th className={styles.th} style={{ width: '160px', backgroundColor: '#e3f2fd' }}>
                             당월 지침<br/>
                             <span style={{fontSize:'0.75rem', fontWeight:'normal', color:'#666'}}>(A4/A3 흑·칼)</span>
                         </th>
 
-                        <th style={{ padding: '8px', borderRight: '1px solid #ddd', width: '120px', verticalAlign:'middle' }}>
+                        <th className={styles.th} style={{ width: '120px' }}>
                             실사용 / 추가 매수
                         </th>
 
-                        <th style={{ padding: '10px', width: '90px', textAlign: 'right', borderRight: '1px solid #ddd' }}>청구금액<br />(VAT포함)</th>
-                        <th style={{ padding: '10px', width: '100px', textAlign: 'center' }}>발행</th>
+                        <th className={styles.th} style={{ width: '90px', textAlign: 'right' }}>청구금액<br />(VAT포함)</th>
+                        <th className={styles.th} style={{ width: '100px' }}>발행</th>
                     </tr>
                 </thead>
                 <tbody>
                     {loading ? (
-                        <tr><td colSpan={9} style={{ padding: '60px', textAlign: 'center' }}>데이터를 불러오는 중입니다...</td></tr>
+                        <tr><td colSpan={9} className={styles.td} style={{ padding: '60px' }}>데이터를 불러오는 중입니다...</td></tr>
                     ) : items.length === 0 ? (
-                        <tr><td colSpan={9} style={{ padding: '60px', textAlign: 'center', color: '#888' }}>조회된 청구 이력이 없습니다.</td></tr>
+                        <tr><td colSpan={9} className={styles.td} style={{ padding: '60px', color: 'var(--notion-sub-text)' }}>조회된 청구 이력이 없습니다.</td></tr>
                     ) : (
                         sortedItems.map((item, idx) => {
                             const isLocked = item.settlement.is_paid
@@ -106,10 +107,10 @@ export default function HistoryTable({
                             return (
                                 <React.Fragment key={item.id}>
                                     {isNewGroup && (
-                                        <tr><td colSpan={9} style={{ height: '30px', backgroundColor: '#f4f4f4', borderTop: '2px solid #ccc', borderBottom: '1px solid #ccc' }}></td></tr>
+                                        <tr><td colSpan={9} style={{ height: '30px', backgroundColor: 'var(--notion-soft-bg)', borderTop: '2px solid var(--notion-border)', borderBottom: '1px solid var(--notion-border)' }}></td></tr>
                                     )}
-                                    <tr style={{ backgroundColor: item.is_modified ? '#fffbe6' : '#fff', borderBottom: '1px solid #eee', opacity: isLocked ? 0.7 : 1 }}>
-                                        <td style={{ textAlign: 'center' }}>
+                                    <tr style={{ backgroundColor: item.is_modified ? '#fffbe6' : undefined, opacity: isLocked ? 0.7 : 1 }}>
+                                        <td className={styles.td}>
                                             <input
                                                 type="checkbox"
                                                 checked={checkedIds.has(item.id)}
@@ -118,20 +119,20 @@ export default function HistoryTable({
                                                 title={isLocked ? '이미 처리된 건은 선택할 수 없습니다' : undefined}
                                             />
                                         </td>
-                                        <td style={{ textAlign: 'center', color: '#888' }}>{idx + 1}</td>
-                                        <td style={{ padding: '12px' }}>
+                                        <td className={styles.td} style={{ color: 'var(--notion-sub-text)' }}>{idx + 1}</td>
+                                        <td className={styles.td} style={{ textAlign: 'left', padding: '12px' }}>
                                             <div style={{ fontWeight: 'bold', color: '#333', fontSize: '0.9rem' }}>{inventory?.model_name || '-'}</div>
                                             <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '2px' }}>{inventory?.serial_number || '-'}</div>
                                         </td>
 
-                                        <td style={{ textAlign: 'center' }}>
+                                        <td className={styles.td}>
                                             <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>
                                                 {String(item.settlement.billing_month).padStart(2, '0')}월
                                             </div>
                                         </td>
 
                                         {/* ✅ 전월 지침 (에러여도 수정 가능하도록 조건 변경) */}
-                                        <td style={{ padding: '8px', backgroundColor: '#fafafa', borderRight: '1px solid #ddd' }}>
+                                        <td className={styles.td} style={{ padding: '8px', backgroundColor: '#fafafa' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#666', width: '20px' }}>A4</span>
@@ -174,7 +175,7 @@ export default function HistoryTable({
                                         </td>
 
                                         {/* 당월 지침 */}
-                                        <td style={{ padding: '8px', backgroundColor: '#f0f8ff', borderRight: '1px solid #ddd' }}>
+                                        <td className={styles.td} style={{ padding: '8px', backgroundColor: '#f0f8ff' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#666', width: '20px' }}>A4</span>
@@ -190,7 +191,7 @@ export default function HistoryTable({
                                         </td>
 
                                         {/* 실사용 / 추가 */}
-                                        <td style={{ padding: '8px', borderRight: '1px solid #ddd', verticalAlign:'middle' }}>
+                                        <td className={styles.td} style={{ padding: '8px', textAlign: 'left' }}>
                                             <div style={{ display:'flex', flexDirection:'column', gap:'8px', fontSize:'0.8rem' }}>
                                                 <div style={{ display:'flex', flexDirection:'column', gap:'2px' }}>
                                                     <span style={{ color:'#555', fontWeight:'bold', fontSize:'0.75rem' }}>기본</span>
@@ -213,22 +214,24 @@ export default function HistoryTable({
                                             </div>
                                         </td>
 
-                                        <td style={{ textAlign: 'right', padding: '12px', fontWeight: 'bold', color: '#171717', fontSize: '0.9rem', borderRight: '1px solid #ddd' }}>
+                                        <td className={styles.td} style={{ textAlign: 'right', padding: '12px', fontWeight: 'bold', color: '#171717', fontSize: '0.9rem' }}>
                                             {Math.floor(item.calculated_amount * 1.1).toLocaleString()}원
                                         </td>
 
-                                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                                        <td className={styles.td} style={{ padding: '8px' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                                                 <button
                                                     onClick={() => onStatement(item)}
-                                                    style={{ fontSize: '0.75rem', padding: '3px 8px', border: '1px solid #0070f3', color: '#0070f3', backgroundColor: 'white', borderRadius: '4px', cursor: 'pointer', width: '100%' }}
+                                                    className={styles.btnOutline}
+                                                    style={{ padding: '3px 8px', fontSize: '0.75rem', color: 'var(--notion-blue)', borderColor: 'var(--notion-blue)', width: '100%' }}
                                                 >
                                                     🧾 명세서
                                                 </button>
 
                                                 <button
                                                     onClick={() => onTaxInvoice(item)}
-                                                    style={{ fontSize: '0.75rem', padding: '3px 8px', border: '1px solid #7c3aed', color: '#7c3aed', backgroundColor: 'white', borderRadius: '4px', cursor: 'pointer', width: '100%' }}
+                                                    className={styles.btnOutline}
+                                                    style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#7c3aed', borderColor: '#7c3aed', width: '100%' }}
                                                 >
                                                     🧾 세금계산서
                                                 </button>
@@ -260,8 +263,8 @@ function InputCell({
             disabled={disabled}
             style={{
                 width: '60px',
-                border: isError ? '1px solid #ff4d4f' : '1px solid #d1d1d1',
-                borderRadius: '4px',
+                border: isError ? '1px solid #ff4d4f' : '1px solid var(--notion-border)',
+                borderRadius: 'var(--radius-sm)',
                 padding: '4px',
                 textAlign: 'right',
                 fontSize: '0.85rem',
@@ -283,7 +286,7 @@ function InputCell({
             }}
             onBlur={(e) => {
                 if (!isError) {
-                    e.target.style.border = '1px solid #d1d1d1';
+                    e.target.style.border = '1px solid var(--notion-border)';
                     e.target.style.boxShadow = '0 1px 1px rgba(0,0,0,0.05)';
                 }
             }}

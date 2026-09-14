@@ -255,6 +255,37 @@
 
 .saveBtn:hover { opacity: 0.9; }
 .saveBtn:disabled { background-color: #e5e5e5; color: #a0a0a0; cursor: not-allowed; }
+
+/* 보조(아웃라인) 버튼 — 정산 등록·청구 이력·수금 현황 전체에서 통일해 쓰는 보조 액션 버튼 */
+.btnOutline {
+  padding: 6px 12px;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--notion-main-text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.btnOutline:hover:not(:disabled) { background-color: var(--notion-soft-bg); }
+.btnOutline:disabled { color: #aaa; border-color: #ddd; cursor: not-allowed; }
+
+/* 카드/리스트 상단 타이틀 바 — .header와 같은 톤이되 콘텐츠가 많은 목록 헤더에 사용 */
+.cardTitle {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--notion-main-text);
+}
+
+@media (max-width: 768px) {
+  .btnOutline {
+    min-height: 32px;
+    padding: 0 12px;
+  }
+}
 /* 리사이저 핸들 (드래그 가능한 세로선) */
 .resizer {
   position: absolute;

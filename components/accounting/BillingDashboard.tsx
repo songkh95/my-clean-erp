@@ -63,21 +63,8 @@ export default function BillingDashboard() {
   const totalUnpaid = rows.filter((r) => !r.is_paid).reduce((s, r) => s + r.total_amount, 0)
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header} style={{ cursor: 'default' }}>
-        <span>수금 · 발송 · 발행 현황</span>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button
-            type="button"
-            onClick={() => setExcelModalOpen(true)}
-            style={{ fontSize: '0.78rem', padding: '5px 10px', border: '1px solid var(--notion-border)', borderRadius: 4, background: '#fff', cursor: 'pointer' }}
-          >
-            세금계산서 엑셀로 가져오기
-          </button>
-        </div>
-      </div>
-
-      <p style={{ margin: '10px 20px 0', fontSize: '0.8rem', color: 'var(--notion-sub-text)' }}>
+    <div className={`${styles.section} ${styles.container}`}>
+      <p style={{ margin: '12px 12px 0', fontSize: '0.8rem', color: 'var(--notion-sub-text)' }}>
         홈택스에서 발급이 완료돼 세금계산서가 등록된 건만 표시됩니다. 발행 전 건은{' '}
         <Link href="/accounting/history" style={{ color: 'var(--notion-blue)' }}>청구 이력</Link> 페이지에서 홈택스 업로드용 엑셀을 먼저 받아 발급해 주세요.
       </p>
@@ -85,26 +72,36 @@ export default function BillingDashboard() {
       <div className={styles.content}>
         <div className={styles.controls}>
           <div className={styles.controlItem}>
-            <label>년도</label>
             <select className={styles.input} value={year} onChange={(e) => setYear(Number(e.target.value))}>
               {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
+            <span>년도</span>
           </div>
           <div className={styles.controlItem}>
-            <label>월</label>
             <select className={styles.input} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-              {MONTHS.map((m) => <option key={m} value={m}>{m}월</option>)}
+              {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
+            <span>월</span>
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: 'var(--notion-sub-text)' }}>
             <input type="checkbox" checked={onlyUnpaid} onChange={(e) => setOnlyUnpaid(e.target.checked)} />
             미수금만 보기
           </label>
+          <button type="button" onClick={load} className={styles.saveBtn}>조회</button>
+
+          <button
+            type="button"
+            onClick={() => setExcelModalOpen(true)}
+            className={styles.btnOutline}
+            style={{ marginLeft: 'auto' }}
+          >
+            세금계산서 엑셀로 가져오기
+          </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 16, margin: '4px 0 14px', fontSize: '0.85rem' }}>
+        <div style={{ display: 'flex', gap: 16, margin: '4px 12px 14px', fontSize: '0.85rem' }}>
           <span>총 청구액: <strong>{totalBilled.toLocaleString()}원</strong></span>
           <span style={{ color: totalUnpaid > 0 ? '#b91c1c' : 'inherit' }}>
             미수금 합계: <strong>{totalUnpaid.toLocaleString()}원</strong>
@@ -112,7 +109,7 @@ export default function BillingDashboard() {
         </div>
 
         {loading ? (
-          <div>불러오는 중...</div>
+          <div style={{ margin: '4px 12px 14px' }}>불러오는 중...</div>
         ) : (
           <div className={styles.tableContainer}>
             <table className={styles.table}>
@@ -155,7 +152,8 @@ export default function BillingDashboard() {
                             type="button"
                             onClick={() => handleMarkSent(r.settlement_id)}
                             disabled={busyId === r.settlement_id}
-                            style={{ fontSize: '0.75rem', padding: '3px 8px', border: '1px solid var(--notion-border)', borderRadius: 4, background: '#fff', cursor: 'pointer' }}
+                            className={styles.btnOutline}
+                            style={{ fontSize: '0.75rem', padding: '3px 8px' }}
                           >
                             발송완료 처리
                           </button>

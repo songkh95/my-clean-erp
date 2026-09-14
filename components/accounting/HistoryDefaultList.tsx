@@ -2,6 +2,7 @@
 
 import React, { ReactNode } from 'react'
 import { BillingDashboardRow } from '@/app/actions/accounting'
+import styles from '@/app/accounting/accounting.module.css'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
 
@@ -47,16 +48,16 @@ export default function HistoryDefaultList({
   const allChecked = rows.length > 0 && rows.every((r) => checkedIds.has(r.settlement_id))
 
   return (
-    <div style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #ddd', overflow: 'hidden', minHeight: '400px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid #eee', backgroundColor: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+    <div className={styles.section}>
+      <div className={styles.header} style={{ cursor: 'default', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#171717' }}>월 정산 등록 현황</span>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} style={{ padding: '5px 8px', border: '1px solid #ddd', borderRadius: 4, fontSize: '0.85rem' }}>
+          <span className={styles.cardTitle}>월 정산 등록 현황</span>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={styles.input}>
             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
               <option key={y} value={y}>{y}년</option>
             ))}
           </select>
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} style={{ padding: '5px 8px', border: '1px solid #ddd', borderRadius: 4, fontSize: '0.85rem' }}>
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={styles.input}>
             {MONTHS.map((m) => <option key={m} value={m}>{m}월</option>)}
           </select>
         </div>
@@ -65,62 +66,65 @@ export default function HistoryDefaultList({
           type="button"
           onClick={onBulkDownload}
           disabled={checkedIds.size === 0 || bulkDownloading}
-          style={{
-            fontSize: '0.8rem', padding: '6px 12px', borderRadius: 4,
-            border: '1px solid #0070f3', color: checkedIds.size === 0 ? '#9ca3af' : '#0070f3',
-            borderColor: checkedIds.size === 0 ? '#ddd' : '#0070f3',
-            background: '#fff', cursor: checkedIds.size === 0 ? 'not-allowed' : 'pointer',
-          }}
+          className={styles.btnOutline}
+          style={{ color: checkedIds.size === 0 ? undefined : 'var(--notion-blue)', borderColor: checkedIds.size === 0 ? undefined : 'var(--notion-blue)' }}
         >
           {bulkDownloading ? '생성 중...' : `📥 선택한 ${checkedIds.size}건 홈택스 엑셀 일괄 다운로드`}
         </button>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-          <thead style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ccc', color: '#444' }}>
+      <div className={styles.tableContainer} style={{ overflowX: 'auto' }}>
+        <table className={styles.table} style={{ tableLayout: 'auto' }}>
+          <thead>
             <tr>
-              <th style={{ padding: '10px', width: '36px', borderRight: '1px solid #ddd' }}>
+              <th className={styles.th} style={{ width: '36px' }}>
                 <input type="checkbox" checked={allChecked} onChange={onToggleAll} />
               </th>
-              <th style={{ padding: '10px', width: '40px', borderRight: '1px solid #ddd' }}>No.</th>
-              <th style={{ padding: '10px', textAlign: 'left', borderRight: '1px solid #ddd' }}>거래처</th>
-              <th style={{ padding: '10px', textAlign: 'right', borderRight: '1px solid #ddd', width: '110px' }}>청구액</th>
-              <th style={{ padding: '10px', width: '90px', borderRight: '1px solid #ddd' }}>명세서 발송</th>
-              <th style={{ padding: '10px', width: '90px', borderRight: '1px solid #ddd' }}>세금계산서</th>
-              <th style={{ padding: '10px', width: '90px' }}>상세</th>
+              <th className={styles.th} style={{ width: '40px' }}>No.</th>
+              <th className={styles.th} style={{ textAlign: 'left' }}>거래처</th>
+              <th className={styles.th} style={{ textAlign: 'right', width: '110px' }}>청구액</th>
+              <th className={styles.th} style={{ width: '90px' }}>명세서 발송</th>
+              <th className={styles.th} style={{ width: '90px' }}>세금계산서</th>
+              <th className={styles.th} style={{ width: '90px' }}>상세</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} style={{ padding: '60px', textAlign: 'center' }}>불러오는 중...</td></tr>
+              <tr><td colSpan={7} className={styles.td} style={{ padding: '60px' }}>불러오는 중...</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={7} style={{ padding: '60px', textAlign: 'center', color: '#888' }}>이 달에 등록된 월 정산 건이 없습니다.</td></tr>
+              <tr><td colSpan={7} className={styles.td} style={{ padding: '60px', color: 'var(--notion-sub-text)' }}>이 달에 등록된 월 정산 건이 없습니다.</td></tr>
             ) : (
               rows.map((r, idx) => {
                 const isOpen = r.settlement_id === openSettlementId
                 return (
                   <React.Fragment key={r.settlement_id}>
-                    <tr style={{ borderBottom: '1px solid #eee', backgroundColor: isOpen ? '#f0f7ff' : undefined }}>
-                      <td style={{ textAlign: 'center', borderRight: '1px solid #eee' }}>
+                    <tr style={{ backgroundColor: isOpen ? 'var(--notion-blue-light)' : undefined }}>
+                      <td className={styles.td}>
                         <input type="checkbox" checked={checkedIds.has(r.settlement_id)} onChange={() => onToggleOne(r.settlement_id)} />
                       </td>
-                      <td style={{ textAlign: 'center', color: '#888', borderRight: '1px solid #eee' }}>{idx + 1}</td>
-                      <td style={{ padding: '10px', borderRight: '1px solid #eee' }}>{r.client_name}</td>
-                      <td style={{ textAlign: 'right', padding: '10px', borderRight: '1px solid #eee' }}>{r.total_amount.toLocaleString()}원</td>
-                      <td style={{ textAlign: 'center', fontSize: '0.78rem', color: '#666', borderRight: '1px solid #eee' }}>
+                      <td className={styles.td} style={{ color: 'var(--notion-sub-text)' }}>{idx + 1}</td>
+                      <td className={styles.td} style={{ textAlign: 'left', padding: '8px 10px' }}>{r.client_name}</td>
+                      <td className={styles.td} style={{ textAlign: 'right', padding: '8px 10px' }}>{r.total_amount.toLocaleString()}원</td>
+                      <td className={styles.td} style={{ fontSize: '0.78rem', color: 'var(--notion-sub-text)' }}>
                         {formatDate(r.sent_at) || '미발송'}
                       </td>
-                      <td style={{ textAlign: 'center', borderRight: '1px solid #eee' }}>
-                        <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 10, background: '#f5f5f5', color: INVOICE_BADGE_COLOR[r.tax_invoice_status] }}>
+                      <td className={styles.td}>
+                        <span className={styles.badge} style={{ backgroundColor: 'var(--notion-soft-bg)', color: INVOICE_BADGE_COLOR[r.tax_invoice_status] }}>
                           {r.tax_invoice_status}
                         </span>
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td className={styles.td}>
                         <button
                           type="button"
                           onClick={() => onRowOpen(r)}
-                          style={{ fontSize: '0.75rem', padding: '3px 8px', border: `1px solid ${isOpen ? '#0070f3' : 'var(--notion-border, #ddd)'}`, borderRadius: 4, background: isOpen ? '#0070f3' : '#fff', color: isOpen ? '#fff' : '#333', cursor: 'pointer' }}
+                          className={styles.btnOutline}
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: '0.75rem',
+                            backgroundColor: isOpen ? 'var(--notion-blue)' : undefined,
+                            borderColor: isOpen ? 'var(--notion-blue)' : undefined,
+                            color: isOpen ? '#fff' : undefined,
+                          }}
                         >
                           {isOpen ? '▲ 닫기' : '▼ 열기'}
                         </button>
@@ -128,7 +132,7 @@ export default function HistoryDefaultList({
                     </tr>
                     {isOpen && (
                       <tr>
-                        <td colSpan={7} style={{ padding: 0, background: '#fafbfc', borderBottom: '2px solid #0070f3' }}>
+                        <td colSpan={7} style={{ padding: 0, background: 'var(--notion-soft-bg)', borderBottom: '2px solid var(--notion-blue)' }}>
                           {renderDetail(r)}
                         </td>
                       </tr>

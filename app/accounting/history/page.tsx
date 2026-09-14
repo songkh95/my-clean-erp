@@ -21,6 +21,7 @@ import HistoryTable from '@/components/accounting/HistoryTable'
 import HistoryDefaultList from '@/components/accounting/HistoryDefaultList'
 import { calculateSingleDetailAmount } from '@/utils/billingCalculator'
 import { calcGrandTotal, nextYearMonth } from '@/utils/billingAmounts'
+import styles from '@/app/accounting/accounting.module.css'
 
 function AccountingHistoryContent() {
     const supabase = createClient()
@@ -634,23 +635,25 @@ function AccountingHistoryContent() {
     // 목록 밑에 표시한다. 별도 컴포넌트로 빼지 않고 이 안에서 재사용한다.
     const detailPanel = selectedClient && (
         <>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', backgroundColor: '#fafafa', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 'bold', color: '#111' }}>{selectedClient.name}</span>
-                <span style={{ color: '#666', fontSize: '0.9rem' }}>| {selectedClient.representative_name} ({selectedClient.phone})</span>
+            <div className={styles.header} style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span className={styles.cardTitle} style={{ fontSize: '1rem' }}>{selectedClient.name}</span>
+                    <span style={{ color: 'var(--notion-sub-text)', fontSize: '0.85rem', fontWeight: 400 }}>| {selectedClient.representative_name} ({selectedClient.phone})</span>
+                </span>
 
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: '0.8rem', color: '#666' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--notion-sub-text)' }}>
                         선택 {selectedItemIds.size}건
                     </span>
                     {editingItemId ? (
                         <>
                             <span style={{ fontSize: '0.8rem', color: '#b45309' }}>수정 중 — 당월을 바꾸면 다음 달 전월이 자동 반영됩니다</span>
                             {hasChanges && (
-                                <button type="button" onClick={handleSave} style={{ padding: '6px 14px', backgroundColor: '#d93025', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>
-                                    💾 저장
+                                <button type="button" onClick={handleSave} className={styles.saveBtn} style={{ padding: '6px 14px', backgroundColor: '#d93025', fontSize: '0.8rem' }}>
+                                    저장
                                 </button>
                             )}
-                            <button type="button" onClick={handleCancelEdit} style={{ padding: '6px 14px', backgroundColor: '#666', color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.8rem', cursor: 'pointer' }}>
+                            <button type="button" onClick={handleCancelEdit} className={styles.btnOutline} style={{ padding: '6px 14px', backgroundColor: '#666', color: '#fff', border: 'none' }}>
                                 수정 취소
                             </button>
                         </>
@@ -660,32 +663,32 @@ function AccountingHistoryContent() {
                                 type="button"
                                 onClick={handleStartEdit}
                                 disabled={selectedItemIds.size !== 1}
-                                style={{ padding: '6px 12px', backgroundColor: '#fff', color: selectedItemIds.size === 1 ? '#0070f3' : '#aaa', border: `1px solid ${selectedItemIds.size === 1 ? '#0070f3' : '#ddd'}`, borderRadius: 6, fontSize: '0.8rem', fontWeight: 600, cursor: selectedItemIds.size === 1 ? 'pointer' : 'not-allowed' }}
+                                className={styles.btnOutline}
+                                style={selectedItemIds.size === 1 ? { color: 'var(--notion-blue)', borderColor: 'var(--notion-blue)' } : undefined}
                                 title="체크박스에서 1건만 선택해야 수정할 수 있습니다"
                             >
-                                ✏️ 수정
+                                수정
                             </button>
                             <button
                                 type="button"
                                 onClick={handleBulkRebill}
                                 disabled={selectedItemIds.size === 0}
-                                style={{ padding: '6px 12px', backgroundColor: '#fff', color: selectedItemIds.size > 0 ? '#ffa500' : '#aaa', border: `1px solid ${selectedItemIds.size > 0 ? '#ffa500' : '#ddd'}`, borderRadius: 6, fontSize: '0.8rem', fontWeight: 600, cursor: selectedItemIds.size > 0 ? 'pointer' : 'not-allowed' }}
+                                className={styles.btnOutline}
+                                style={selectedItemIds.size > 0 ? { color: '#b45309', borderColor: '#ffa500' } : undefined}
                             >
-                                🔄 재청구
+                                재청구
                             </button>
                             <button
                                 type="button"
                                 onClick={handleBulkDelete}
                                 disabled={selectedItemIds.size === 0}
-                                style={{ padding: '6px 12px', backgroundColor: '#fff', color: selectedItemIds.size > 0 ? '#d93025' : '#aaa', border: `1px solid ${selectedItemIds.size > 0 ? '#d93025' : '#ddd'}`, borderRadius: 6, fontSize: '0.8rem', fontWeight: 600, cursor: selectedItemIds.size > 0 ? 'pointer' : 'not-allowed' }}
+                                className={styles.btnOutline}
+                                style={selectedItemIds.size > 0 ? { color: '#d93025', borderColor: '#d93025' } : undefined}
                             >
-                                🗑️ 삭제
+                                삭제
                             </button>
                         </>
                     )}
-                    <button type="button" onClick={handleCloseDetail} style={{ padding: '6px 12px', background: 'none', border: '1px solid #ccc', borderRadius: 6, fontSize: '0.8rem', cursor: 'pointer', color: '#666' }}>
-                        ✕ 닫기
-                    </button>
                 </div>
             </div>
 
@@ -706,8 +709,6 @@ function AccountingHistoryContent() {
 
     return (
         <div className="pageShell" style={{ fontFamily: 'sans-serif' }}>
-            <h1 className="pageTitle">청구 이력</h1>
-            
             <HistoryFilter
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
@@ -757,7 +758,7 @@ function AccountingHistoryContent() {
 
             {/* 검색으로 들어온 거래처가 이번 달 목록(아코디언)에 없을 때의 대체 표시 */}
             {selectedClient && !openSettlementId && (
-                <div style={{ marginTop: 16, backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #ddd', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+                <div className={styles.section} style={{ marginTop: 16 }}>
                     {detailPanel}
                 </div>
             )}

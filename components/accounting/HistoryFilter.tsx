@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useMemo } from 'react'
 import { Client } from '@/app/types'
+import styles from '@/app/accounting/accounting.module.css'
 
 interface Props {
   searchTerm: string
@@ -70,8 +71,8 @@ export default function HistoryFilter({
     }
   }
 
-  const labelStyle = { display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#666', marginBottom: '2px' }
-  const inputStyle = { padding: '6px 8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '0.85rem', height: '32px', boxSizing: 'border-box' as const }
+  const labelStyle = { display: 'block', fontSize: '0.75rem', fontWeight: '600', color: 'var(--notion-sub-text)', marginBottom: '2px' }
+  const inputStyle = { padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--notion-border)', fontSize: '0.85rem', height: '32px', boxSizing: 'border-box' as const, backgroundColor: 'var(--notion-soft-bg)', color: 'var(--notion-main-text)' }
   const selectStyle = { ...inputStyle, backgroundColor: '#fff', cursor: 'pointer' as const }
 
   const MonthPicker = ({
@@ -137,19 +138,19 @@ export default function HistoryFilter({
   return (
     <div
       className="historyFilterBar"
-      style={{ 
-      backgroundColor: '#fff', 
-      padding: '8px 10px', 
-      borderRadius: '8px', 
-      border: '1px solid #e5e5e5', 
-      marginBottom: '12px', 
-      display: 'flex', 
-      gap: '8px', 
-      alignItems: 'flex-end', 
+      style={{
+      backgroundColor: 'var(--notion-bg)',
+      padding: '10px 12px',
+      borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--notion-border)',
+      marginBottom: '12px',
+      display: 'flex',
+      gap: '8px',
+      alignItems: 'flex-end',
       flexWrap: 'nowrap',
       overflowX: 'auto',
       WebkitOverflowScrolling: 'touch',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.02)' 
+      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
     }}
     lang="ko"
     >
@@ -165,28 +166,18 @@ export default function HistoryFilter({
             onKeyDown={handleKeyDown}
             onChange={(e) => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
             onFocus={() => setShowSuggestions(true)}
-            style={{ ...inputStyle, width: '100%' }}
+            style={{ ...inputStyle, width: '100%', minWidth: 0 }}
           />
-          <button 
+          <button
             onClick={onSearchTrigger}
-            style={{ 
-              padding: '0 10px', 
-              backgroundColor: '#0070f3', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '6px', 
-              fontWeight: '600', 
-              fontSize: '0.8rem',
-              cursor: 'pointer', 
-              whiteSpace: 'nowrap',
-              height: '32px'
-            }}
+            className={styles.saveBtn}
+            style={{ padding: '0 14px', height: '32px', fontSize: '0.8rem', flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             조회
           </button>
         </div>
         {showSuggestions && filteredClients.length > 0 && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #ccc', borderRadius: '6px', maxHeight: '200px', overflowY: 'auto', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', marginTop: '2px' }}>
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'var(--notion-bg)', border: '1px solid var(--notion-border)', borderRadius: 'var(--radius-md)', maxHeight: '200px', overflowY: 'auto', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', marginTop: '2px' }}>
             {filteredClients.map(client => (
               <div
                 key={client.id}
@@ -211,17 +202,8 @@ export default function HistoryFilter({
           <button
             type="button"
             onClick={() => { setStartMonth(''); setEndMonth('') }}
-            style={{
-              height: 32,
-              padding: '0 10px',
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              background: '#fff',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              color: '#666',
-              whiteSpace: 'nowrap',
-            }}
+            className={styles.btnOutline}
+            style={{ height: 32, padding: '0 10px' }}
             title="기간 필터 해제 — 전체 이력"
           >
             기간 초기화
@@ -232,25 +214,25 @@ export default function HistoryFilter({
       {/* 3. 보기 방식 */}
       <div>
         <label style={labelStyle}>보기 방식</label>
-        <div style={{ display: 'flex', border: '1px solid #ccc', borderRadius: '6px', overflow: 'hidden', height: '32px' }}>
-          <button 
-            onClick={() => setViewMode('all')} 
-            style={{ 
-              padding: '0 12px', 
-              backgroundColor: viewMode === 'all' ? '#0070f3' : '#fff', 
-              color: viewMode === 'all' ? '#fff' : '#333', 
-              border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '500' 
+        <div style={{ display: 'flex', border: '1px solid var(--notion-border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', height: '32px' }}>
+          <button
+            onClick={() => setViewMode('all')}
+            style={{
+              padding: '0 12px',
+              backgroundColor: viewMode === 'all' ? 'var(--notion-blue)' : 'var(--notion-bg)',
+              color: viewMode === 'all' ? '#fff' : 'var(--notion-main-text)',
+              border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600'
             }}
           >
             전체
           </button>
-          <button 
-            onClick={() => setViewMode('machine')} 
-            style={{ 
-              padding: '0 12px', 
-              backgroundColor: viewMode === 'machine' ? '#0070f3' : '#fff', 
-              color: viewMode === 'machine' ? '#fff' : '#333', 
-              border: 'none', cursor: 'pointer', borderLeft: '1px solid #ccc', fontSize: '0.8rem', fontWeight: '500' 
+          <button
+            onClick={() => setViewMode('machine')}
+            style={{
+              padding: '0 12px',
+              backgroundColor: viewMode === 'machine' ? 'var(--notion-blue)' : 'var(--notion-bg)',
+              color: viewMode === 'machine' ? '#fff' : 'var(--notion-main-text)',
+              border: 'none', cursor: 'pointer', borderLeft: '1px solid var(--notion-border)', fontSize: '0.8rem', fontWeight: '600'
             }}
           >
             기계별
