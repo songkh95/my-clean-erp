@@ -89,7 +89,7 @@ export default function QuoteBrandingSettings() {
             <Button
               type="button"
               size="sm"
-              variant="ghost"
+              variant="danger"
               disabled={busy === 'stamp'}
               onClick={() => onDelete('stamp')}
               style={{ marginTop: 6 }}
@@ -124,7 +124,7 @@ export default function QuoteBrandingSettings() {
             <Button
               type="button"
               size="sm"
-              variant="ghost"
+              variant="danger"
               disabled={busy === 'hqLogo'}
               onClick={() => onDelete('hqLogo')}
               style={{ marginTop: 6 }}

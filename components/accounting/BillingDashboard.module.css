@@ -1,0 +1,108 @@
+/* 수금 현황 + 세금계산서 엑셀 가져오기 모달 */
+
+.link {
+  color: var(--c-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.amount {
+  color: var(--c-ink);
+  font-weight: var(--fw-bold);
+}
+
+.danger {
+  color: var(--c-danger);
+}
+
+.unit {
+  color: var(--c-ink-3);
+}
+
+.sep {
+  margin: 0 var(--sp-2);
+  color: var(--c-ink-3);
+}
+
+/* 필터 바의 체크박스: 입력창과 같은 높이로 아래 정렬 */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 2.125rem;
+  font-size: var(--fs-sm);
+  color: var(--c-ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.check input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--c-ink);
+}
+
+.date {
+  color: var(--c-ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.memo {
+  max-width: 16rem;
+  white-space: pre-wrap;
+  color: var(--c-ink-2);
+}
+
+/* ---------- 엑셀 가져오기 모달 ---------- */
+.guide {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--c-ink-2);
+}
+
+.guide strong {
+  color: var(--c-ink);
+  font-weight: var(--fw-medium);
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.fileInput {
+  display: none;
+}
+
+.fileName {
+  font-size: var(--fs-sm);
+  color: var(--c-ink-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.error {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--c-danger);
+}
+
+.results {
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.approvalNo {
+  font-size: var(--fs-xs);
+  color: var(--c-ink-2);
+  font-variant-numeric: tabular-nums;
+}

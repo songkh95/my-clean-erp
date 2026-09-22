@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import React, { useRef, useEffect, useMemo } from 'react'
 import { Client } from '@/app/types'
 import styles from '@/app/accounting/accounting.module.css'
@@ -141,16 +142,13 @@ export default function HistoryFilter({
       style={{
       backgroundColor: 'var(--notion-bg)',
       padding: '10px 12px',
-      borderRadius: 'var(--radius-md)',
-      border: '1px solid var(--notion-border)',
       marginBottom: '12px',
       display: 'flex',
       gap: '8px',
       alignItems: 'flex-end',
       flexWrap: 'nowrap',
       overflowX: 'auto',
-      WebkitOverflowScrolling: 'touch',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+      WebkitOverflowScrolling: 'touch'
     }}
     lang="ko"
     >
@@ -168,13 +166,10 @@ export default function HistoryFilter({
             onFocus={() => setShowSuggestions(true)}
             style={{ ...inputStyle, width: '100%', minWidth: 0 }}
           />
-          <button
-            onClick={onSearchTrigger}
-            className={styles.saveBtn}
-            style={{ padding: '0 14px', height: '32px', fontSize: '0.8rem', flexShrink: 0, whiteSpace: 'nowrap' }}
-          >
+          <Button variant="primary"
+            onClick={onSearchTrigger}>
             조회
-          </button>
+          </Button>
         </div>
         {showSuggestions && filteredClients.length > 0 && (
           <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'var(--notion-bg)', border: '1px solid var(--notion-border)', borderRadius: 'var(--radius-md)', maxHeight: '200px', overflowY: 'auto', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', marginTop: '2px' }}>
@@ -199,15 +194,14 @@ export default function HistoryFilter({
         <span style={{ paddingBottom: 6, color: '#999', fontSize: '0.8rem' }}>~</span>
         <MonthPicker label="종료월" value={endMonth} onChange={setEndMonth} />
         {(startMonth || endMonth) && (
-          <button
+          <Button variant="secondary"
             type="button"
             onClick={() => { setStartMonth(''); setEndMonth('') }}
-            className={styles.btnOutline}
-            style={{ height: 32, padding: '0 10px' }}
-            title="기간 필터 해제 — 전체 이력"
-          >
+           
+           
+            title="기간 필터 해제 — 전체 이력">
             기간 초기화
-          </button>
+          </Button>
         )}
       </div>
 

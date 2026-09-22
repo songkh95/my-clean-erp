@@ -1,5 +1,7 @@
 'use client'
 
+import { Cog, Droplets, Printer, Shapes } from 'lucide-react'
+import Button from '@/components/ui/Button'
 import React, { useEffect, useState } from 'react'
 import InventoryList from '@/components/inventory/InventoryList'
 import ConsumableList from '@/components/inventory/ConsumableList'
@@ -58,25 +60,29 @@ export default function InventoryPage() {
           className={`${styles.tab} ${activeTab === 'machines' ? styles.tabActive : ''}`}
           onClick={() => selectTab('machines')}
         >
-          🖨️ 기기
+          <Printer size="1em" strokeWidth={1.5} aria-hidden />
+          기기
         </div>
         <div
           className={`${styles.tab} ${activeTab === 'consumables' ? styles.tabActive : ''}`}
           onClick={() => selectTab('consumables')}
         >
-          🧴 소모품
+          <Droplets size="1em" strokeWidth={1.5} aria-hidden />
+          소모품
         </div>
         <div
           className={`${styles.tab} ${activeTab === 'parts' ? styles.tabActive : ''}`}
           onClick={() => selectTab('parts')}
         >
-          ⚙️ 부품
+          <Cog size="1em" strokeWidth={1.5} aria-hidden />
+          부품
         </div>
         <div
           className={`${styles.tab} ${activeTab === 'others' ? styles.tabActive : ''}`}
           onClick={() => selectTab('others')}
         >
-          🔧 기타
+          <Shapes size="1em" strokeWidth={1.5} aria-hidden />
+          기타
         </div>
       </div>
 
@@ -93,20 +99,16 @@ export default function InventoryPage() {
                   setPendingRefresh((prev) => prev + 1)
                 }}
               />
-              <button
+              <Button variant="secondary"
                 type="button"
-                onClick={() => setExcelModalOpen(true)}
-                className={styles.secondaryBtn}
-              >
+                onClick={() => setExcelModalOpen(true)}>
                 엑셀
-              </button>
-              <button
+              </Button>
+              <Button variant="primary"
                 type="button"
-                onClick={() => setIsMachineModalOpen(true)}
-                className={styles.primaryBtn}
-              >
+                onClick={() => setIsMachineModalOpen(true)}>
                 + 기기 추가
-              </button>
+              </Button>
             </div>
           </div>
           <InventoryList type="all" refreshTrigger={refreshTrigger} onCountChange={setMachineCount} />

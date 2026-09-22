@@ -20,6 +20,18 @@ import {
   formatLeaseInfo,
   parseLeaseInfo,
 } from '@/utils/quoteDefaults'
+import {
+  BODY_FALLBACK,
+  BODY_FONTS,
+  DEFAULT_DISPLAY,
+  FONT_SIZES,
+  HEADING_FALLBACK,
+  HEADING_FONTS,
+  ensureFontLoaded,
+  findBodyFont,
+  findHeadingFont,
+  type FontSizeId,
+} from '@/utils/displaySettings'
 
 type TabId = 'account' | 'general' | 'clients' | 'inventory' | 'stock' | 'service' | 'accounting' | 'quotes' | 'trash'
 
@@ -157,6 +169,72 @@ export default function SettingsPage() {
         {tab === 'trash' && <InventoryTrashSettings />}
 
         {tab === 'general' && (
+          <>
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>화면</h2>
+            <p className={styles.cardDesc}>제목과 본문 글꼴, 글자 크기입니다. 이 브라우저에만 적용되며 저장하면 전체 화면에 반영됩니다.</p>
+            <div className={styles.row}>
+              <div className={styles.field}>
+                <label className={styles.label}>제목 글꼴</label>
+                <select
+                  className={styles.select}
+                  value={draft.general.fontHeading}
+                  onChange={(e) => {
+                    ensureFontLoaded(findHeadingFont(e.target.value))
+                    patch('general', { fontHeading: e.target.value })
+                  }}
+                >
+                  {HEADING_FONTS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label}>본문 글꼴</label>
+                <select
+                  className={styles.select}
+                  value={draft.general.fontBody}
+                  onChange={(e) => {
+                    ensureFontLoaded(findBodyFont(e.target.value))
+                    patch('general', { fontBody: e.target.value })
+                  }}
+                >
+                  {BODY_FONTS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>글자 크기</label>
+              <select
+                className={styles.select}
+                value={draft.general.fontSize}
+                onChange={(e) => patch('general', { fontSize: e.target.value as FontSizeId })}
+              >
+                {FONT_SIZES.map((s) => <option key={s.id} value={s.id}>{s.label} ({s.px}px)</option>)}
+              </select>
+            </div>
+            <div
+              className={styles.displayPreview}
+              style={{
+                fontSize: `${FONT_SIZES.find((s) => s.id === draft.general.fontSize)?.px ?? 14}px`,
+                fontFamily: `${findBodyFont(draft.general.fontBody).family}, ${BODY_FALLBACK}`,
+              }}
+            >
+              <span className={styles.displayPreviewLabel}>미리보기</span>
+              <span
+                className={styles.displayPreviewTitle}
+                style={{ fontFamily: `${findHeadingFont(draft.general.fontHeading).family}, ${HEADING_FALLBACK}` }}
+              >
+                월 정산 등록
+              </span>
+              <span className={styles.displayPreviewBody}>
+                거래처 12곳 · 합계 <span className="num">1,234,000</span>원 · 2026.09.22
+              </span>
+            </div>
+            <div className={styles.displayActions}>
+              <Button type="button" variant="ghost" size="sm" onClick={() => patch('general', { ...DEFAULT_DISPLAY })}>
+                기본값으로
+              </Button>
+            </div>
+          </div>
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>일반</h2>
             <p className={styles.cardDesc}>앱 표시 이름과 홈 화면 안내입니다.</p>
@@ -180,6 +258,7 @@ export default function SettingsPage() {
               <span className={styles.hint}>홈 화면에 안내로 표시됩니다. 비워 두면 숨깁니다.</span>
             </div>
           </div>
+          </>
         )}
 
         {tab === 'clients' && (

@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import React, { useState, useEffect, useMemo } from 'react'
 import {
   getConsumablesAction,
@@ -214,42 +215,14 @@ export default function ConsumableList({ tab }: Props) {
         </span>
         <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
         <PanelRefreshButton onRefresh={fetchItems} />
-        <button
-          onClick={() => setGroupManagerOpen(true)}
-          style={{
-            padding: '0 10px',
-            height: 30,
-            backgroundColor: '#fff',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '0.78rem',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
-        >
+        <Button variant="secondary" size="sm"
+          onClick={() => setGroupManagerOpen(true)}>
           제품군 정리
-        </button>
-        <button
-          onClick={() => { setSelectedItem(null); setIsModalOpen(true); }}
-          style={{
-            padding: '0 10px',
-            height: 30,
-            backgroundColor: '#0070f3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '0.78rem',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
-        >
+        </Button>
+        <Button variant="primary" size="sm"
+          onClick={() => { setSelectedItem(null); setIsModalOpen(true); }}>
           + 등록
-        </button>
+        </Button>
         </span>
       </div>
 
@@ -336,35 +309,20 @@ export default function ConsumableList({ tab }: Props) {
                   <td className={styles.td} style={{ textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                       {item.is_active === false ? (
-                        <button
-                          onClick={() => handleRestore(item.id)}
-                          style={{
-                            background: 'white', border: '1px solid #ddd', color: '#059669',
-                            cursor: 'pointer', borderRadius: '4px', fontSize: '0.7rem', padding: '2px 6px'
-                          }}
-                        >
+                        <Button variant="secondary" size="sm"
+                          onClick={() => handleRestore(item.id)}>
                           복구
-                        </button>
+                        </Button>
                       ) : (
                         <>
-                          <button
-                            onClick={() => { setSelectedItem(item); setIsModalOpen(true); }}
-                            style={{
-                              background: 'white', border: '1px solid #ddd', color: '#0070f3',
-                              cursor: 'pointer', borderRadius: '4px', fontSize: '0.7rem', padding: '2px 6px'
-                            }}
-                          >
+                          <Button variant="secondary" size="sm"
+                            onClick={() => { setSelectedItem(item); setIsModalOpen(true); }}>
                             수정
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            style={{
-                              background: 'white', border: '1px solid #ddd', color: '#d93025',
-                              cursor: 'pointer', borderRadius: '4px', fontSize: '0.7rem', padding: '2px 6px'
-                            }}
-                          >
+                          </Button>
+                          <Button variant="danger" size="sm"
+                            onClick={() => handleDelete(item.id)}>
                             삭제
-                          </button>
+                          </Button>
                         </>
                       )}
                     </div>

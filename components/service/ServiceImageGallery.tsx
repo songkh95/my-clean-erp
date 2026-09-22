@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
 import {
@@ -97,7 +98,7 @@ export default function ServiceImageGallery({
               {images.length > 0 ? ` · ${images.length}장` : ''}
             </p>
           </div>
-          <button type="button" className={styles.close} onClick={onClose}>닫기</button>
+          <Button variant="secondary" type="button" onClick={onClose}>닫기</Button>
         </div>
 
         {loading ? (
@@ -109,9 +110,9 @@ export default function ServiceImageGallery({
             <p>등록된 사진이 없습니다.</p>
             <p className={styles.hint}>거래처명 또는 No를 더블클릭해 일지 수정에서 사진을 추가하세요.</p>
             {onEditLog && !locked && (
-              <button type="button" className={styles.editBtn} onClick={onEditLog}>
+              <Button variant="primary" type="button" onClick={onEditLog}>
                 일지에서 사진 추가
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -150,18 +151,16 @@ export default function ServiceImageGallery({
               </span>
               <div className={styles.footerActions}>
                 {onEditLog && !locked && (
-                  <button type="button" className={styles.editBtn} onClick={onEditLog}>
+                  <Button variant="primary" type="button" onClick={onEditLog}>
                     사진 추가
-                  </button>
+                  </Button>
                 )}
                 {!locked && (
-                  <button
+                  <Button variant="danger"
                     type="button"
-                    className={styles.deleteBtn}
-                    onClick={() => images[active] && remove(images[active])}
-                  >
+                    onClick={() => images[active] && remove(images[active])}>
                     이 사진 삭제
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>

@@ -137,9 +137,9 @@ export default function ProductGroupManager({ isOpen, onClose, onChanged }: Prop
                           : '기기 없음'}
                       </div>
                     </button>
-                    <button type="button" className={local.delBtn} onClick={() => void handleDelete(row)}>
+                    <Button variant="danger" size="sm" type="button" onClick={() => void handleDelete(row)}>
                       삭제
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -186,9 +186,9 @@ export default function ProductGroupManager({ isOpen, onClose, onChanged }: Prop
                     }}
                   />
                 </div>
-                <button type="button" className={local.addBtn} onClick={() => addModel()}>
+                <Button variant="primary" type="button" onClick={() => addModel()}>
                   추가
-                </button>
+                </Button>
               </div>
             </div>
 

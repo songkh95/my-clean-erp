@@ -197,11 +197,6 @@
     flex-wrap: wrap;
   }
 
-  .footer > button,
-  .footer > * {
-    min-height: 40px;
-  }
-
   .saved {
     width: 100%;
     margin: 0 0 4px;
@@ -299,3 +294,39 @@
 }
 
 
+
+/* 설정 > 일반 > 화면 미리보기 (DESIGN_SYSTEM 3.5) */
+.displayPreview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  padding: var(--sp-4) 0;
+  border-top: 1px solid var(--c-line);
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-ink);
+}
+
+.displayPreviewLabel {
+  font-size: 0.8125em;
+  font-weight: var(--fw-medium);
+  color: var(--c-ink-3);
+}
+
+.displayPreviewTitle {
+  font-size: 1.5em;
+  font-weight: var(--fw-bold);
+  line-height: 1.25;
+  font-synthesis-weight: none;
+}
+
+.displayPreviewBody {
+  font-size: 1em;
+  color: var(--c-ink-2);
+}
+
+.displayActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--sp-2);
+}

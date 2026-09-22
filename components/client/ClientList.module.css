@@ -307,14 +307,6 @@
     min-width: 0;
   }
 
-  .header button {
-    flex-shrink: 0;
-    min-height: 30px !important;
-    height: 30px !important;
-    padding: 0 10px !important;
-    font-size: 0.75rem !important;
-  }
-
   .searchContainer {
     padding: 8px 12px;
   }
@@ -348,11 +340,6 @@
     justify-content: flex-start !important;
     margin-top: 4px;
     gap: 8px !important;
-  }
-
-  .clientSummary > *:last-child button {
-    min-height: 36px;
-    padding: 0 12px;
   }
 
   .detailsContainer {

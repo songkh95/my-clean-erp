@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import React, { ReactNode } from 'react'
 import { BillingDashboardRow } from '@/app/actions/accounting'
 import styles from '@/app/accounting/accounting.module.css'
@@ -62,15 +63,10 @@ export default function HistoryDefaultList({
           </select>
         </div>
 
-        <button
+        <Button variant="secondary"
           type="button"
           onClick={onBulkDownload}
-          disabled={checkedIds.size === 0 || bulkDownloading}
-          className={styles.btnOutline}
-          style={{ color: checkedIds.size === 0 ? undefined : 'var(--notion-blue)', borderColor: checkedIds.size === 0 ? undefined : 'var(--notion-blue)' }}
-        >
-          {bulkDownloading ? '생성 중...' : `📥 선택한 ${checkedIds.size}건 홈택스 엑셀 일괄 다운로드`}
-        </button>
+          disabled={checkedIds.size === 0 || bulkDownloading}>{bulkDownloading ? '생성 중...' : `선택한 ${checkedIds.size}건 홈택스 엑셀 일괄 다운로드`}</Button>
       </div>
 
       <div className={styles.tableContainer} style={{ overflowX: 'auto' }}>
@@ -114,20 +110,9 @@ export default function HistoryDefaultList({
                         </span>
                       </td>
                       <td className={styles.td}>
-                        <button
+                        <Button variant="secondary" size="sm"
                           type="button"
-                          onClick={() => onRowOpen(r)}
-                          className={styles.btnOutline}
-                          style={{
-                            padding: '3px 8px',
-                            fontSize: '0.75rem',
-                            backgroundColor: isOpen ? 'var(--notion-blue)' : undefined,
-                            borderColor: isOpen ? 'var(--notion-blue)' : undefined,
-                            color: isOpen ? '#fff' : undefined,
-                          }}
-                        >
-                          {isOpen ? '▲ 닫기' : '▼ 열기'}
-                        </button>
+                          onClick={() => onRowOpen(r)}>{isOpen ? '닫기' : '열기'}</Button>
                       </td>
                     </tr>
                     {isOpen && (

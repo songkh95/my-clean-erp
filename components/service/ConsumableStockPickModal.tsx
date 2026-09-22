@@ -192,7 +192,7 @@ export default function ConsumableStockPickModal({
             {selectedIds.length}개 선택
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button variant="ghost" type="button" onClick={onClose} disabled={busy}>
+            <Button variant="danger" type="button" onClick={onClose} disabled={busy}>
               취소
             </Button>
             <Button variant="primary" type="button" onClick={handleConfirm} disabled={busy}>

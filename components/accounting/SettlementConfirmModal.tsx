@@ -1,6 +1,7 @@
 // components/accounting/SettlementConfirmModal.tsx
 'use client'
 
+import Button from '@/components/ui/Button'
 import React from 'react'
 import styles from '@/app/accounting/accounting.module.css'
 import { Client, Inventory, CalculatedAsset, BillCalculationResult } from '@/app/types'
@@ -162,15 +163,12 @@ export default function SettlementConfirmModal({
                     </div>
                 </div>
                 <div className={styles.modalActions}>
-                    <button onClick={onClose} className={styles.btnCancel} disabled={loading}>취소</button>
-                    <button 
+                    <Button variant="danger" onClick={onClose} disabled={loading}>취소</Button>
+                    <Button variant="primary"
                         onClick={onSave} 
-                        className={styles.btnConfirm} 
-                        disabled={loading}
-                        style={{ opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
-                    >
+                        disabled={loading}>
                         {loading ? '저장 중...' : '확인 및 저장'}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

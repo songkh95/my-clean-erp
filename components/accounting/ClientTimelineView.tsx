@@ -300,17 +300,10 @@ export default function ClientTimelineView({ client, onBack }: Props) {
                             
                             {/* 다음 달로 복사 버튼 */}
                             {!isPaid && idx < group.length - 1 && item.inventory_id && (
-                              <button 
+                              <Button variant="secondary" size="sm" style={{ position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}
                                 onClick={() => handleCopyNext(item.inventory_id, idx)}
-                                style={{
-                                  position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', zIndex: 10,
-                                  backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '12px', 
-                                  fontSize: '0.7rem', padding: '2px 8px', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                }}
-                                title="현재 당월 지침을 다음 달 전월 지침으로 복사"
-                              >
-                                ▼ 다음달 반영
-                              </button>
+                               
+                                title="현재 당월 지침을 다음 달 전월 지침으로 복사">다음달 반영</Button>
                             )}
                           </td>
 

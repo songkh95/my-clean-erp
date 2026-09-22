@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import { useEffect, useState } from 'react'
 import styles from '@/app/accounting/accounting.module.css'
 import {
@@ -157,14 +158,10 @@ export default function TaxInvoiceModal({ isOpen, onClose, settlementId, clientN
         </p>
 
         <div style={{ marginBottom: 14 }}>
-          <button
+          <Button variant="secondary" size="sm"
             type="button"
             onClick={handleDownloadExcel}
-            disabled={downloading}
-            style={{ fontSize: '0.78rem', padding: '6px 10px', border: '1px solid #0070f3', color: '#0070f3', borderRadius: 4, background: '#fff', cursor: 'pointer' }}
-          >
-            {downloading ? '생성 중...' : '📥 홈택스 일괄등록 엑셀 다운로드'}
-          </button>
+            disabled={downloading}>{downloading ? '생성 중...' : '홈택스 일괄등록 엑셀 다운로드'}</Button>
           <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--notion-sub-text)', marginTop: 4 }}>
             이 정산 건 1건만 담은 홈택스 업로드용 엑셀을 받습니다. 홈택스에서 이 파일을 업로드해 발급하세요.
           </span>
@@ -191,13 +188,11 @@ export default function TaxInvoiceModal({ isOpen, onClose, settlementId, clientN
                   <td style={{ fontSize: '0.72rem' }}>{r.approval_no || '-'}</td>
                   <td>{r.amount != null ? r.amount.toLocaleString() + '원' : '-'}</td>
                   <td>
-                    <button
+                    <Button variant="danger" size="sm"
                       type="button"
-                      onClick={() => handleDelete(r.id)}
-                      style={{ fontSize: '0.72rem', color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer' }}
-                    >
+                      onClick={() => handleDelete(r.id)}>
                       삭제
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -289,10 +284,10 @@ export default function TaxInvoiceModal({ isOpen, onClose, settlementId, clientN
         </div>
 
         <div className={styles.modalActions}>
-          <button type="button" className={styles.btnCancel} onClick={onClose}>닫기</button>
-          <button type="button" className={styles.btnConfirm} onClick={handleSave} disabled={saving}>
+          <Button variant="secondary" type="button" onClick={onClose}>닫기</Button>
+          <Button variant="primary" type="button" onClick={handleSave} disabled={saving}>
             {saving ? '저장 중...' : '기록 저장'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

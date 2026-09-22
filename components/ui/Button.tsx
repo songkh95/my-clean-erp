@@ -1,47 +1,46 @@
 'use client'
 
+import styles from './ui.module.css'
+import { cx } from './cx'
+
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'
+
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'outline' | 'ghost' | 'danger'
+  /** primary = 일반, danger = 취소·삭제, secondary = 보조. outline 은 secondary 의 이전 이름, ghost 는 아이콘 전용 */
+  variant?: ButtonVariant
+  /** sm 은 iconOnly 버튼에만 적용됨. 글자 버튼은 항상 기본 크기 */
   size?: 'sm' | 'md'
+  /** 아이콘만 있는 버튼 (정사각형). aria-label 필수 */
+  iconOnly?: boolean
 }
 
-export default function Button({ 
-  children, 
-  variant = 'primary', 
-  size = 'md', 
-  style, 
-  ...props 
+const VARIANT_CLASS: Record<ButtonVariant, string> = {
+  primary: styles.btnPrimary,
+  secondary: styles.btnSecondary,
+  outline: styles.btnSecondary,
+  ghost: styles.btnGhost,
+  danger: styles.btnDanger,
+}
+
+export default function Button({
+  children,
+  variant = 'primary',
+  size = 'md',
+  iconOnly = false,
+  className,
+  ...props
 }: ButtonProps) {
-  const baseStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 'var(--radius-md)',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'background 0.2s, border 0.2s',
-    border: '1px solid transparent',
-    fontSize: size === 'sm' ? '0.85rem' : '0.9rem',
-    padding: size === 'sm' ? '4px 8px' : '8px 14px',
-    gap: '6px'
-  }
-
-  const variants = {
-    primary: { backgroundColor: 'var(--notion-blue)', color: '#fff' },
-    outline: { backgroundColor: 'transparent', color: 'var(--notion-main-text)', border: '1px solid var(--notion-border)' },
-    ghost: { backgroundColor: 'transparent', color: 'var(--notion-sub-text)' },
-    danger: { backgroundColor: 'transparent', color: '#d93025', border: '1px solid var(--notion-border)' }
-  }
-
   return (
-    <button 
-      style={{ ...baseStyle, ...variants[variant], ...style }} 
-      onMouseOver={(e) => {
-        if (variant === 'ghost' || variant === 'outline') e.currentTarget.style.backgroundColor = 'var(--notion-soft-bg)'
-      }}
-      onMouseOut={(e) => {
-        if (variant === 'ghost' || variant === 'outline') e.currentTarget.style.backgroundColor = 'transparent'
-      }}
+    <button
+      className={cx(
+        styles.btn,
+        // 글자 버튼은 크기 한 가지 (DESIGN_SYSTEM.md 7.1). sm 은 아이콘만 있는 버튼에만 적용
+        size === 'sm' && iconOnly ? styles.btnSm : styles.btnMd,
+        // 버튼 색은 세 가지만: 글자가 있는 ghost 는 secondary 로 그림 (DESIGN_SYSTEM.md 7.1)
+        variant === 'ghost' && !iconOnly ? styles.btnSecondary : VARIANT_CLASS[variant],
+        iconOnly && styles.btnIconOnly,
+        className,
+      )}
       {...props}
     >
       {children}

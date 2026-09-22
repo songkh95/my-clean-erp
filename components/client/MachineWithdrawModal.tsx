@@ -102,7 +102,7 @@ export default function MachineWithdrawModal({ asset, clientId, onClose, onSucce
         />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px', borderTop: '1px solid var(--notion-border)', paddingTop: '20px' }}>
-          <Button variant="ghost" onClick={onClose}>취소</Button>
+          <Button variant="danger" onClick={onClose}>취소</Button>
           <Button variant="danger" onClick={handleWithdraw} disabled={loading}>
             {loading ? '처리 중...' : '철수 확정'}
           </Button>

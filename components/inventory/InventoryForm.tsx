@@ -515,7 +515,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
           </div>
           <InputField label="비고" as="textarea" value={formData.memo} onChange={e => setFormData({ ...formData, memo: e.target.value })} style={{ height: '80px' }} />
           <div className={styles.footer}>
-            <Button variant="ghost" onClick={onClose}>취소</Button>
+            <Button variant="danger" onClick={onClose}>취소</Button>
             <Button variant="primary" type="submit" disabled={loading}>저장하기</Button>
           </div>
         </form>

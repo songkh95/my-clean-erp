@@ -127,8 +127,4 @@
     margin-top: 20px;
   }
 
-  .footer > * {
-    flex: 1;
-    min-height: 44px;
-  }
 }

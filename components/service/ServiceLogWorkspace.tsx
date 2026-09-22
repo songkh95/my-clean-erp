@@ -1,5 +1,6 @@
 'use client'
 
+import { Info } from 'lucide-react'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Button from '@/components/ui/Button'
 import ServiceForm from '@/components/service/ServiceForm'
@@ -1092,32 +1093,9 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
         <div className={styles.headerLeft}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 className={styles.title} style={{ margin: 0 }}>{meta.title}</h2>
-            <button
-              type="button"
-              aria-label="사용 안내"
-              title="사용 안내"
-              onClick={() => setGuideOpen(true)}
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                border: '1px solid #93c5fd',
-                background: '#eff6ff',
-                color: '#1d4ed8',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                fontStyle: 'italic',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                lineHeight: 1,
-                flexShrink: 0,
-              }}
-            >
-              i
-            </button>
+            <Button variant="ghost" size="sm" iconOnly aria-label="사용 안내" title="사용 안내" onClick={() => setGuideOpen(true)}>
+              <Info size="1em" strokeWidth={1.5} aria-hidden />
+            </Button>
           </div>
           <p className={styles.hint}>
             {orgLabel ? <>현재 회사: <strong>{orgLabel}</strong> · </> : null}
@@ -1141,14 +1119,11 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
             {query && (
               <span className={styles.hint}>
                 {sortedLogs.length}건 표시
-                <button
+                <Button variant="secondary" size="sm"
                   type="button"
-                  className={styles.actionBtn}
-                  style={{ marginLeft: 6 }}
-                  onClick={() => setQuery('')}
-                >
+                  onClick={() => setQuery('')}>
                   초기화
-                </button>
+                </Button>
               </span>
             )}
             {dirtyCount > 0 && !locked && (
@@ -1161,8 +1136,6 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           <Button
             variant="outline"
             size="sm"
-            className={locked ? styles.lockOn : undefined}
-            style={locked ? { backgroundColor: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' } : undefined}
             onClick={toggleLock}
           >
             {locked ? '잠금 해제' : '잠금'}
@@ -1185,9 +1158,8 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           </Button>
           ) : null}
           <Button
-            variant="outline"
+            variant="danger"
             size="sm"
-            className={deleteMode ? styles.deleteModeOn : undefined}
             onClick={() => {
               if (locked) return alert('잠금 상태입니다.')
               setDeleteMode((v) => !v)
@@ -1199,7 +1171,6 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           <Button
             variant="primary"
             size="sm"
-            className={styles.saveBtn}
             onClick={handleSaveAll}
             disabled={locked || saving || dirtyCount === 0}
           >

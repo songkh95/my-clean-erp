@@ -716,7 +716,7 @@ export default function ClientExcelModal({
               }}
             >
               <Button
-                variant="outline"
+                variant="danger"
                 onClick={() => {
                   resetImportState()
                   clearMsg()
@@ -778,7 +778,7 @@ export default function ClientExcelModal({
                 <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: 12, lineHeight: 1.5 }}>
                   등록된 거래처·기기를 <strong>한 시트</strong>로 내려받습니다. (기계 1대 = 1행)
                 </p>
-                <Button variant="primary" onClick={handleExport} disabled={busy} style={{ width: '100%' }}>
+                <Button variant="primary" onClick={handleExport} disabled={busy}>
                   {busy ? '내보내는 중...' : '엑셀로 저장'}
                 </Button>
               </div>
@@ -793,7 +793,7 @@ export default function ClientExcelModal({
                   <br />
                   <strong>계약시작일 + 계약년수</strong> → 종료일 자동 계산
                 </p>
-                <Button variant="primary" onClick={handleTemplate} style={{ width: '100%' }}>
+                <Button variant="primary" onClick={handleTemplate}>
                   양식 다운로드
                 </Button>
               </div>

@@ -1,6 +1,8 @@
 'use client'
 
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useId, useMemo, useRef, useState } from 'react'
+import styles from './ui.module.css'
+import { cx } from './cx'
 
 export interface ComboOption {
   id: string
@@ -30,6 +32,7 @@ export default function ComboBoxSelect({
   emptyOptionLabel = '(선택 안 함)',
   style,
 }: ComboBoxSelectProps) {
+  const inputId = useId()
   const selected = useMemo(() => options.find((o) => o.id === value) || null, [options, value])
   // null = 편집 중이 아님 → 선택된 항목의 이름을 그대로 보여줌
   // string = 사용자가 입력 중인 검색어
@@ -52,23 +55,18 @@ export default function ComboBoxSelect({
   }
 
   return (
-    <div style={{ marginBottom: '16px', position: 'relative', ...style }}>
-      <label style={{
-        display: 'block', marginBottom: '4px', fontSize: '0.75rem',
-        fontWeight: 500, color: 'var(--notion-sub-text)',
-      }}>
-        {label}
-      </label>
+    <div className={styles.field} style={style}>
+      <label className={styles.label} htmlFor={inputId}>{label}</label>
       <input
+        id={inputId}
+        className={cx(styles.control, styles.controlBox)}
         value={displayValue}
         onChange={(e) => { setDraft(e.target.value); setOpen(true) }}
-        onFocus={(e) => {
+        onFocus={() => {
           if (blurTimer.current) clearTimeout(blurTimer.current)
           setOpen(true)
-          e.currentTarget.style.boxShadow = '0 0 0 2px var(--notion-blue-light)'
         }}
-        onBlur={(e) => {
-          e.currentTarget.style.boxShadow = 'none'
+        onBlur={() => {
           // 클릭으로 선택하려면 blur를 잠깐 늦춤. 선택 없이 벗어나면 원래 값으로 복귀.
           blurTimer.current = setTimeout(() => {
             setDraft(null)
@@ -77,77 +75,33 @@ export default function ComboBoxSelect({
         }}
         placeholder={placeholder}
         autoComplete="off"
-        style={{
-          width: '100%',
-          padding: '8px 10px',
-          border: '1px solid var(--notion-border)',
-          borderRadius: 'var(--radius-sm)',
-          fontSize: '0.9rem',
-          outline: 'none',
-          backgroundColor: 'var(--notion-bg)',
-          color: 'var(--notion-main-text)',
-          boxSizing: 'border-box',
-        }}
       />
 
       {open && (
         <div
-          style={{
-            marginTop: 6,
-            border: '1px solid var(--notion-border)',
-            borderRadius: 'var(--radius-sm)',
-            background: '#fff',
-            overflow: 'hidden',
-            maxHeight: 220,
-            overflowY: 'auto',
-            position: 'absolute',
-            width: '100%',
-            zIndex: 20,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          }}
+          className={cx(styles.dropdown, styles.dropdownFloat)}
           // mousedown으로 blur보다 먼저 선택 처리
           onMouseDown={(e) => e.preventDefault()}
         >
           <button
             type="button"
             onClick={() => commit(null)}
-            style={{
-              display: 'block', width: '100%', textAlign: 'left',
-              padding: '8px 10px', border: 'none', borderBottom: '1px solid #f0f0f0',
-              background: value === '' ? 'var(--notion-blue-light)' : 'transparent',
-              cursor: 'pointer', fontSize: '0.85rem', color: 'var(--notion-sub-text)',
-            }}
+            className={cx(styles.option, styles.optionMuted, value === '' && styles.optionSelected)}
           >
             {emptyOptionLabel}
           </button>
           {filtered.length === 0 ? (
-            <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: 'var(--notion-sub-text)' }}>
-              일치하는 항목이 없습니다.
-            </div>
+            <div className={styles.optionEmpty}>일치하는 항목이 없습니다.</div>
           ) : (
             filtered.map((opt) => (
               <button
                 key={opt.id}
                 type="button"
                 onClick={() => commit(opt)}
-                style={{
-                  display: 'flex', width: '100%', textAlign: 'left',
-                  justifyContent: 'space-between', gap: 8,
-                  padding: '8px 10px', border: 'none', borderBottom: '1px solid #f0f0f0',
-                  background: opt.id === value ? 'var(--notion-blue-light)' : 'transparent',
-                  cursor: 'pointer', fontSize: '0.85rem', color: 'var(--notion-main-text)',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--notion-blue-light)' }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = opt.id === value ? 'var(--notion-blue-light)' : 'transparent'
-                }}
+                className={cx(styles.option, opt.id === value && styles.optionSelected)}
               >
-                <span style={{ fontWeight: 600 }}>{opt.label}</span>
-                {opt.hint ? (
-                  <span style={{ color: 'var(--notion-sub-text)', fontSize: '0.75rem', flexShrink: 0 }}>
-                    {opt.hint}
-                  </span>
-                ) : null}
+                <span>{opt.label}</span>
+                {opt.hint ? <span className={styles.optionHint}>{opt.hint}</span> : null}
               </button>
             ))
           )}

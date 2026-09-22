@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import React, { useMemo } from 'react'
 import styles from '@/app/accounting/accounting.module.css'
 import { 
@@ -113,7 +114,7 @@ export default function AccountingRegistration({
   const grandTotal = calcGrandTotal(totalSupplyValue); 
 
   return (
-    <div className={styles.section}>
+    <div className={styles.section} style={{ borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderRadius: 0, boxShadow: 'none' }}>
       <style dangerouslySetInnerHTML={{ __html: `
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button {
@@ -126,7 +127,7 @@ export default function AccountingRegistration({
       `}} />
 
       {/* ✅ [수정] 아코디언 기능 삭제 (onClick 제거, 화살표 제거, cursor: default 적용) */}
-      <div className={styles.header} style={{ cursor: 'default' }}>
+      <div className={styles.header} style={{ cursor: 'default', borderBottom: 'none' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             사용매수·청구 ({regYear}.{regMonth})
@@ -158,7 +159,7 @@ export default function AccountingRegistration({
             <input type="checkbox" id="unreg" checked={showUnregistered} onChange={e => setShowUnregistered(e.target.checked)} />
             <label htmlFor="unreg" style={{ fontSize: '0.85rem', cursor: 'pointer', color: 'var(--notion-sub-text)' }} title="해당 월에 한 대도 정산되지 않은 거래처만">미등록만 보기</label>
           </div>
-          <button onClick={onSearch} className={styles.saveBtn}>조회</button>
+          <Button variant="primary" onClick={onSearch}>조회</Button>
         </div>
 
         <div className={styles.tableContainer}>
@@ -344,7 +345,7 @@ export default function AccountingRegistration({
             공급가: <b>{totalSupplyValue.toLocaleString()}</b>원 (+VAT {totalVat.toLocaleString()}) = 
             <span className={styles.totalAmount}>{grandTotal.toLocaleString()} 원</span>
           </div>
-          <button onClick={handlePreSave} disabled={selectedInventories.size === 0} className={styles.saveBtn}>🚀 청구서 확정 및 저장</button>
+          <Button variant="primary" onClick={handlePreSave} disabled={selectedInventories.size === 0}>청구서 확정 및 저장</Button>
         </div>
       </div>
     </div>

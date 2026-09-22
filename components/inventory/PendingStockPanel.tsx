@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   confirmPendingPartsAction,
@@ -141,12 +142,12 @@ export default function PendingStockPanel({ onGoConsumables, refreshKey = 0 }: P
             </p>
           </div>
           <div className={styles.groupActions}>
-            <button type="button" className={styles.refresh} onClick={() => void load()}>
+            <Button variant="secondary" size="sm" type="button" onClick={() => void load()}>
               새로고침
-            </button>
-            <button type="button" className={styles.goBtn} style={{ marginBottom: 0 }} onClick={() => setModalOpen(true)}>
+            </Button>
+            <Button variant="primary" size="sm" type="button" onClick={() => setModalOpen(true)}>
               표로 전체 보기
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -156,9 +157,9 @@ export default function PendingStockPanel({ onGoConsumables, refreshKey = 0 }: P
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHead}>
               <h3 className={styles.modalTitle}>미입고 전체 목록</h3>
-              <button type="button" className={styles.refresh} onClick={() => setModalOpen(false)}>
+              <Button variant="secondary" size="sm" type="button" onClick={() => setModalOpen(false)}>
                 닫기
-              </button>
+              </Button>
             </div>
             <p className={styles.desc}>
               서비스 일지에서 재고가 없는데 소모품을 등록한 건입니다. 거래처·소모품을 확인한 뒤 입고하고 확정하세요.
@@ -225,26 +226,22 @@ export default function PendingStockPanel({ onGoConsumables, refreshKey = 0 }: P
                                 }))
                               }
                             />
-                            <button
+                            <Button variant="primary" size="sm"
                               type="button"
-                              className={styles.stockBtn}
                               disabled={busyId === `stock-${row.consumable_id}`}
-                              onClick={() => void addStock(row.consumable_id)}
-                            >
+                              onClick={() => void addStock(row.consumable_id)}>
                               입고
-                            </button>
+                            </Button>
                           </div>
                         </td>
                         <td>
                           <div className={styles.rowActions}>
-                            <button
+                            <Button variant="primary" size="sm"
                               type="button"
-                              className={styles.smallBtn}
                               disabled={!canConfirm || busyId === row.id}
-                              onClick={() => void confirmOne(row.id)}
-                            >
+                              onClick={() => void confirmOne(row.id)}>
                               확정
-                            </button>
+                            </Button>
                             <button
                               type="button"
                               className={styles.linkBtn}

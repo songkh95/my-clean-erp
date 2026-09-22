@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import React, { useMemo } from 'react'
 import { HistoryItem } from '@/app/types'
 import styles from '@/app/accounting/accounting.module.css'
@@ -220,21 +221,11 @@ export default function HistoryTable({
 
                                         <td className={styles.td} style={{ padding: '8px' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                                <button
-                                                    onClick={() => onStatement(item)}
-                                                    className={styles.btnOutline}
-                                                    style={{ padding: '3px 8px', fontSize: '0.75rem', color: 'var(--notion-blue)', borderColor: 'var(--notion-blue)', width: '100%' }}
-                                                >
-                                                    🧾 명세서
-                                                </button>
+                                                <Button variant="secondary" size="sm"
+                                                    onClick={() => onStatement(item)}> 명세서 </Button>
 
-                                                <button
-                                                    onClick={() => onTaxInvoice(item)}
-                                                    className={styles.btnOutline}
-                                                    style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#7c3aed', borderColor: '#7c3aed', width: '100%' }}
-                                                >
-                                                    🧾 세금계산서
-                                                </button>
+                                                <Button variant="secondary" size="sm"
+                                                    onClick={() => onTaxInvoice(item)}> 세금계산서 </Button>
                                             </div>
                                         </td>
                                     </tr>

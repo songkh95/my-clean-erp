@@ -7,6 +7,7 @@ import {
   parseLeaseInfo,
   type QuoteNotePreset,
 } from '@/utils/quoteDefaults'
+import { DEFAULT_DISPLAY, normalizeDisplay, type FontSizeId } from '@/utils/displaySettings'
 
 /** 앱 전역 설정 (로컬 저장, 조직/브라우저 단위) */
 
@@ -16,6 +17,12 @@ export type AppSettings = {
     appDisplayName: string
     /** 홈 대시보드 안내 문구 */
     dashboardNote: string
+    /** 화면: 제목 글꼴 id (utils/displaySettings HEADING_FONTS) */
+    fontHeading: string
+    /** 화면: 본문 글꼴 id (utils/displaySettings BODY_FONTS) */
+    fontBody: string
+    /** 화면: 글자 크기 */
+    fontSize: FontSizeId
   }
   clients: {
     defaultStatus: 'active' | 'inactive'
@@ -69,6 +76,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   general: {
     appDisplayName: 'My Clean ERP',
     dashboardNote: '',
+    ...DEFAULT_DISPLAY,
   },
   clients: {
     defaultStatus: 'active',
@@ -118,6 +126,8 @@ function mergeSettings(base: AppSettings, patch: unknown): AppSettings {
     if (!isPlainObject(incoming)) continue
     ;(out as any)[section] = { ...(base as any)[section], ...incoming }
   }
+  // 화면 설정: 모르는 값은 기본값으로
+  Object.assign(out.general, normalizeDisplay(out.general))
   // 배열 필드는 통째로 교체
   if (isPlainObject(patch.stock)) {
     const s = patch.stock

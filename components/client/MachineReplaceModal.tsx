@@ -260,7 +260,7 @@ export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuc
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
-          <Button variant="ghost" onClick={onClose}>취소</Button>
+          <Button variant="danger" onClick={onClose}>취소</Button>
           <Button variant="primary" onClick={handleReplace} disabled={loading}>
             {loading ? '처리 중...' : '교체 및 계약 확정'}
           </Button>

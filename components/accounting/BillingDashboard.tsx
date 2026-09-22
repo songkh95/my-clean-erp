@@ -2,31 +2,40 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import styles from '@/app/accounting/accounting.module.css'
 import {
   getBillingDashboardAction,
   markStatementSentAction,
   type BillingDashboardRow,
 } from '@/app/actions/accounting'
+import PageHeader from '@/components/ui/PageHeader'
+import FilterBar from '@/components/ui/FilterBar'
+import Select from '@/components/ui/Select'
+import Button from '@/components/ui/Button'
+import Table from '@/components/ui/Table'
+import Badge, { type BadgeTone } from '@/components/ui/Badge'
+import EmptyState from '@/components/ui/EmptyState'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { toast } from '@/components/ui/Toast'
 import TaxInvoiceExcelModal from './TaxInvoiceExcelModal'
+import styles from './BillingDashboard.module.css'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
 
 function formatDate(iso: string | null) {
   if (!iso) return null
   const d = new Date(iso)
-  const yy = String(d.getFullYear()).slice(-2)
-  return `${yy}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
 }
 
-const INVOICE_BADGE_COLOR: Record<BillingDashboardRow['tax_invoice_status'], string> = {
-  '미발행': '#9ca3af',
-  '정상': '#0f7b3a',
-  '취소': '#b91c1c',
-  '수정발행됨': '#b45309',
+const INVOICE_TONE: Record<BillingDashboardRow['tax_invoice_status'], BadgeTone> = {
+  '미발행': 'neutral',
+  '정상': 'success',
+  '취소': 'danger',
+  '수정발행됨': 'warning',
 }
 
 export default function BillingDashboard() {
+  const confirm = useConfirm()
   const [year, setYear] = useState(new Date().getFullYear())
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [rows, setRows] = useState<BillingDashboardRow[]>([])
@@ -50,12 +59,21 @@ export default function BillingDashboard() {
   }, [year, month])
 
   const handleMarkSent = async (settlementId: string) => {
-    if (!confirm('거래명세서를 발송하셨나요? 발송일로 오늘 날짜가 기록됩니다.')) return
+    const ok = await confirm({
+      title: '거래명세서를 발송하셨나요?',
+      description: '발송일로 오늘 날짜가 기록됩니다.',
+      confirmLabel: '발송완료 처리',
+    })
+    if (!ok) return
     setBusyId(settlementId)
     const res = await markStatementSentAction(settlementId)
     setBusyId(null)
-    if (!res.success) alert(res.message)
-    else load()
+    if (!res.success) {
+      await confirm({ title: '발송일을 기록하지 못했습니다', description: res.message, alertOnly: true })
+      return
+    }
+    toast('발송일을 기록했습니다.')
+    load()
   }
 
   const visibleRows = onlyUnpaid ? rows.filter((r) => !r.is_paid) : rows
@@ -63,123 +81,109 @@ export default function BillingDashboard() {
   const totalUnpaid = rows.filter((r) => !r.is_paid).reduce((s, r) => s + r.total_amount, 0)
 
   return (
-    <div className={`${styles.section} ${styles.container}`}>
-      <p style={{ margin: '12px 12px 0', fontSize: '0.8rem', color: 'var(--notion-sub-text)' }}>
-        홈택스에서 발급이 완료돼 세금계산서가 등록된 건만 표시됩니다. 발행 전 건은{' '}
-        <Link href="/accounting/history" style={{ color: 'var(--notion-blue)' }}>청구 이력</Link> 페이지에서 홈택스 업로드용 엑셀을 먼저 받아 발급해 주세요.
-      </p>
-
-      <div className={styles.content}>
-        <div className={styles.controls}>
-          <div className={styles.controlItem}>
-            <select className={styles.input} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-            <span>년도</span>
-          </div>
-          <div className={styles.controlItem}>
-            <select className={styles.input} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-              {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <span>월</span>
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: 'var(--notion-sub-text)' }}>
-            <input type="checkbox" checked={onlyUnpaid} onChange={(e) => setOnlyUnpaid(e.target.checked)} />
-            미수금만 보기
-          </label>
-          <button type="button" onClick={load} className={styles.saveBtn}>조회</button>
-
-          <button
-            type="button"
-            onClick={() => setExcelModalOpen(true)}
-            className={styles.btnOutline}
-            style={{ marginLeft: 'auto' }}
-          >
+    <div>
+      <PageHeader
+        title="수금 현황"
+        description={
+          <>
+            홈택스에서 발급이 완료돼 세금계산서가 등록된 건만 표시됩니다. 발행 전 건은{' '}
+            <Link href="/accounting/history" className={styles.link}>청구 이력</Link>
+            {' '}페이지에서 홈택스 업로드용 엑셀을 먼저 받아 발급해 주세요.
+          </>
+        }
+        actions={
+          <Button variant="secondary" onClick={() => setExcelModalOpen(true)}>
             세금계산서 엑셀로 가져오기
-          </button>
-        </div>
+          </Button>
+        }
+      />
 
-        <div style={{ display: 'flex', gap: 16, margin: '4px 12px 14px', fontSize: '0.85rem' }}>
-          <span>총 청구액: <strong>{totalBilled.toLocaleString()}원</strong></span>
-          <span style={{ color: totalUnpaid > 0 ? '#b91c1c' : 'inherit' }}>
-            미수금 합계: <strong>{totalUnpaid.toLocaleString()}원</strong>
-          </span>
-        </div>
+      <FilterBar
+        summary={
+          <>
+            총 청구액 <span className={styles.amount}>{totalBilled.toLocaleString()}</span><span className={styles.unit}>원</span>
+            <span className={styles.sep}>·</span>
+            미수금 합계{' '}
+            <span className={totalUnpaid > 0 ? `${styles.amount} ${styles.danger}` : styles.amount}>
+              {totalUnpaid.toLocaleString()}
+            </span>
+            <span className={styles.unit}>원</span>
+          </>
+        }
+      >
+        <Select label="연도" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+          {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+            <option key={y} value={y}>{y}년</option>
+          ))}
+        </Select>
+        <Select label="월" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+          {MONTHS.map((m) => <option key={m} value={m}>{m}월</option>)}
+        </Select>
+        <label className={styles.check}>
+          <input type="checkbox" checked={onlyUnpaid} onChange={(e) => setOnlyUnpaid(e.target.checked)} />
+          미수금만 보기
+        </label>
+        <Button variant="primary" onClick={load}>조회</Button>
+      </FilterBar>
 
-        {loading ? (
-          <div style={{ margin: '4px 12px 14px' }}>불러오는 중...</div>
-        ) : (
-          <div className={styles.tableContainer}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.th}>등록일</th>
-                  <th className={styles.th}>거래처</th>
-                  <th className={styles.th} style={{ textAlign: 'right' }}>청구액</th>
-                  <th className={styles.th}>입금</th>
-                  <th className={styles.th}>메모</th>
-                  <th className={styles.th}>명세서 발송</th>
-                  <th className={styles.th}>세금계산서</th>
-                  <th className={styles.th}>작업</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleRows.length === 0 ? (
-                  <tr><td className={styles.td} colSpan={8}>표시할 정산 건이 없습니다.</td></tr>
-                ) : (
-                  visibleRows.map((r) => (
-                    <tr key={r.settlement_id}>
-                      <td className={styles.td} style={{ fontSize: '0.8rem', color: 'var(--notion-sub-text)', whiteSpace: 'nowrap' }}>
-                        {formatDate(r.created_at) || '-'}
-                      </td>
-                      <td className={styles.td}>{r.client_name}</td>
-                      <td className={styles.td} style={{ textAlign: 'right' }}>{r.total_amount.toLocaleString()}원</td>
-                      <td className={styles.td}>
-                        <span className={styles.badge} style={{ background: r.is_paid ? '#e6f4ea' : '#fdecea', color: r.is_paid ? '#0f7b3a' : '#b91c1c' }}>
-                          {r.is_paid ? '완납' : '미수금'}
-                        </span>
-                      </td>
-                      <td className={styles.td} style={{ maxWidth: 180, whiteSpace: 'pre-wrap', fontSize: '0.8rem', color: 'var(--notion-sub-text)' }}>
-                        {r.memo || '-'}
-                      </td>
-                      <td className={styles.td}>
-                        {r.sent_at ? (
-                          formatDate(r.sent_at)
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleMarkSent(r.settlement_id)}
-                            disabled={busyId === r.settlement_id}
-                            className={styles.btnOutline}
-                            style={{ fontSize: '0.75rem', padding: '3px 8px' }}
-                          >
-                            발송완료 처리
-                          </button>
-                        )}
-                      </td>
-                      <td className={styles.td}>
-                        <span className={styles.badge} style={{ background: '#f5f5f5', color: INVOICE_BADGE_COLOR[r.tax_invoice_status] }}>
-                          {r.tax_invoice_status}
-                        </span>
-                      </td>
-                      <td className={styles.td}>
-                        <Link
-                          href={`/accounting/history?client_id=${r.client_id}&focus_year=${r.billing_year}&focus_month=${r.billing_month}`}
-                          style={{ fontSize: '0.78rem', color: 'var(--notion-blue)' }}
-                        >
-                          상세로 이동
-                        </Link>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {loading ? (
+        <EmptyState>불러오는 중…</EmptyState>
+      ) : visibleRows.length === 0 ? (
+        <EmptyState>표시할 정산 건이 없습니다.</EmptyState>
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <th className="center">등록일</th>
+              <th>거래처</th>
+              <th className="num">청구액</th>
+              <th className="center">입금</th>
+              <th>메모</th>
+              <th className="center">명세서 발송</th>
+              <th className="center">세금계산서</th>
+              <th className="num">작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.map((r) => (
+              <tr key={r.settlement_id}>
+                <td className={`center ${styles.date}`}>{formatDate(r.created_at) || '-'}</td>
+                <td>{r.client_name}</td>
+                <td className="num">{r.total_amount.toLocaleString()}<span className="unit">원</span></td>
+                <td className="center">
+                  <Badge tone={r.is_paid ? 'success' : 'danger'}>{r.is_paid ? '완납' : '미수금'}</Badge>
+                </td>
+                <td className={styles.memo}>{r.memo || '-'}</td>
+                <td className={`center ${styles.date}`}>
+                  {r.sent_at ? (
+                    formatDate(r.sent_at)
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleMarkSent(r.settlement_id)}
+                      disabled={busyId === r.settlement_id}
+                    >
+                      발송완료 처리
+                    </Button>
+                  )}
+                </td>
+                <td className="center">
+                  <Badge tone={INVOICE_TONE[r.tax_invoice_status]}>{r.tax_invoice_status}</Badge>
+                </td>
+                <td className="num">
+                  <Link
+                    href={`/accounting/history?client_id=${r.client_id}&focus_year=${r.billing_year}&focus_month=${r.billing_month}`}
+                    className={styles.link}
+                  >
+                    상세로 이동
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
 
       <TaxInvoiceExcelModal
         isOpen={excelModalOpen}

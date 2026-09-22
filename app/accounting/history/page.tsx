@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import React, { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase'
@@ -649,44 +650,35 @@ function AccountingHistoryContent() {
                         <>
                             <span style={{ fontSize: '0.8rem', color: '#b45309' }}>수정 중 — 당월을 바꾸면 다음 달 전월이 자동 반영됩니다</span>
                             {hasChanges && (
-                                <button type="button" onClick={handleSave} className={styles.saveBtn} style={{ padding: '6px 14px', backgroundColor: '#d93025', fontSize: '0.8rem' }}>
+                                <Button variant="primary" type="button" onClick={handleSave}>
                                     저장
-                                </button>
+                                </Button>
                             )}
-                            <button type="button" onClick={handleCancelEdit} className={styles.btnOutline} style={{ padding: '6px 14px', backgroundColor: '#666', color: '#fff', border: 'none' }}>
+                            <Button variant="danger" type="button" onClick={handleCancelEdit}>
                                 수정 취소
-                            </button>
+                            </Button>
                         </>
                     ) : (
                         <>
-                            <button
+                            <Button variant="secondary"
                                 type="button"
                                 onClick={handleStartEdit}
                                 disabled={selectedItemIds.size !== 1}
-                                className={styles.btnOutline}
-                                style={selectedItemIds.size === 1 ? { color: 'var(--notion-blue)', borderColor: 'var(--notion-blue)' } : undefined}
-                                title="체크박스에서 1건만 선택해야 수정할 수 있습니다"
-                            >
+                                title="체크박스에서 1건만 선택해야 수정할 수 있습니다">
                                 수정
-                            </button>
-                            <button
+                            </Button>
+                            <Button variant="secondary"
                                 type="button"
                                 onClick={handleBulkRebill}
-                                disabled={selectedItemIds.size === 0}
-                                className={styles.btnOutline}
-                                style={selectedItemIds.size > 0 ? { color: '#b45309', borderColor: '#ffa500' } : undefined}
-                            >
+                                disabled={selectedItemIds.size === 0}>
                                 재청구
-                            </button>
-                            <button
+                            </Button>
+                            <Button variant="danger"
                                 type="button"
                                 onClick={handleBulkDelete}
-                                disabled={selectedItemIds.size === 0}
-                                className={styles.btnOutline}
-                                style={selectedItemIds.size > 0 ? { color: '#d93025', borderColor: '#d93025' } : undefined}
-                            >
+                                disabled={selectedItemIds.size === 0}>
                                 삭제
-                            </button>
+                            </Button>
                         </>
                     )}
                 </div>
@@ -729,13 +721,11 @@ function AccountingHistoryContent() {
             {focusInventoryId && (
                 <div style={{ marginBottom: 10, fontSize: '0.85rem', color: '#666' }}>
                     특정 기기만 표시 중
-                    <button
+                    <Button variant="secondary" size="sm"
                         type="button"
-                        onClick={() => setFocusInventoryId(null)}
-                        style={{ marginLeft: 8, fontSize: '0.8rem', cursor: 'pointer' }}
-                    >
+                        onClick={() => setFocusInventoryId(null)}>
                         전체 보기
-                    </button>
+                    </Button>
                 </div>
             )}
 
