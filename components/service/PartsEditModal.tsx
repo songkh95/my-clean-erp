@@ -188,7 +188,7 @@ export default function PartsEditModal({ isOpen, log, locked = false, onClose, o
         />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-          <Button variant="ghost" type="button" onClick={handleCancel}>취소</Button>
+          <Button variant="danger" type="button" onClick={handleCancel}>취소</Button>
           <Button variant="primary" type="button" disabled={locked || loading} onClick={handleSave}>
             {loading ? '저장 중…' : '부품 저장'}
           </Button>

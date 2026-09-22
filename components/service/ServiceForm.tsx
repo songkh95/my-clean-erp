@@ -578,21 +578,11 @@ export default function ServiceForm({
                   }}
                 />
                 {!clientInputDisabled && (formData.client_id || clientQuery) ? (
-                  <button
+                  <Button variant="secondary"
                     type="button"
-                    onClick={clearClient}
-                    style={{
-                      border: '1px solid #e5e7eb',
-                      background: '#fff',
-                      borderRadius: 6,
-                      padding: '0 10px',
-                      cursor: 'pointer',
-                      fontSize: '0.78rem',
-                      color: '#6b7280',
-                    }}
-                  >
+                    onClick={clearClient}>
                     지우기
-                  </button>
+                  </Button>
                 ) : null}
               </div>
               {allowSkipClient && !editData ? (
@@ -733,21 +723,11 @@ export default function ServiceForm({
                     style={{ ...inputBoxStyle, flex: 1 }}
                   />
                   {formData.inventory_id || machineQuery ? (
-                    <button
+                    <Button variant="secondary"
                       type="button"
-                      onClick={clearMachine}
-                      style={{
-                        border: '1px solid #e5e7eb',
-                        background: '#fff',
-                        borderRadius: 6,
-                        padding: '0 10px',
-                        cursor: 'pointer',
-                        fontSize: '0.78rem',
-                        color: '#6b7280',
-                      }}
-                    >
+                      onClick={clearMachine}>
                       지우기
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
                 {formData.inventory_id && selectedMachine ? (
@@ -986,7 +966,7 @@ export default function ServiceForm({
           />
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
-            <Button variant="ghost" onClick={handleCancel} type="button">취소</Button>
+            <Button variant="danger" onClick={handleCancel} type="button">취소</Button>
             <Button variant="primary" type="submit" disabled={loading}>
               {loading ? '저장 중…' : editData ? '수정완료' : '저장하기'}
             </Button>

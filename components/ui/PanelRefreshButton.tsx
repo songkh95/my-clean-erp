@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, type CSSProperties, type MouseEvent } from 'react'
+import { RefreshCw } from 'lucide-react'
+import Button from './Button'
 
 type Props = {
   onRefresh: () => void | Promise<void>
@@ -33,36 +35,20 @@ export default function PanelRefreshButton({
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
+      size="sm"
       className={className}
+      style={style}
       title={title}
       aria-label={label}
+      aria-busy={busy}
       disabled={busy}
       onClick={handleClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '0 10px',
-        height: 30,
-        borderRadius: 4,
-        border: '1px solid #d1d5db',
-        background: '#fff',
-        color: '#374151',
-        fontSize: '0.78rem',
-        fontWeight: 600,
-        cursor: busy ? 'wait' : 'pointer',
-        opacity: busy ? 0.7 : 1,
-        whiteSpace: 'nowrap',
-        flexShrink: 0,
-        ...style,
-      }}
     >
-      <span aria-hidden style={{ fontSize: '0.9rem', lineHeight: 1 }}>
-        {busy ? '…' : '↻'}
-      </span>
-      {busy ? '불러오는 중' : label}
-    </button>
+      <RefreshCw size="1em" strokeWidth={1.5} aria-hidden />
+      {busy ? '불러오는 중…' : label}
+    </Button>
   )
 }

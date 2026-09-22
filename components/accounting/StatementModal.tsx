@@ -46,11 +46,7 @@ export default function StatementModal({ settlement, supplier, onClose }: Props)
         <Button
           onClick={onClose}
           variant="ghost"
-          style={{
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
-            color: '#333',
-          }}
+         
         >
           닫기
         </Button>

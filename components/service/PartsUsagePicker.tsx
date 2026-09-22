@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import { useMemo, useState } from 'react'
 import ConsumableForm, { type ConsumableFormPreset } from '@/components/inventory/ConsumableForm'
 import ConsumableStockPickModal, {
@@ -473,23 +474,18 @@ export default function PartsUsagePicker({
             disabled={disabled || !selectedMachine}
             onChange={(e) => setPartQty(Math.max(1, Number(e.target.value) || 1))}
           />
-          <button
+          <Button variant="primary"
             type="button"
-            className={styles.addBtn}
             disabled={disabled || !partId}
-            onClick={addPart}
-          >
+            onClick={addPart}>
             추가
-          </button>
-          <button
+          </Button>
+          <Button variant="secondary"
             type="button"
-            className={styles.addBtn}
             disabled={disabled || !selectedMachine}
-            onClick={registerPart}
-            style={{ background: '#fff', color: '#1d4ed8', border: '1px solid #93c5fd' }}
-          >
+            onClick={registerPart}>
             부품 선택·등록
-          </button>
+          </Button>
         </div>
         {selectedMachine && partOptions.length === 0 && (
           <p className={styles.hint}>
@@ -526,23 +522,18 @@ export default function PartsUsagePicker({
             disabled={disabled || !selectedMachine}
             onChange={(e) => setOtherQty(Math.max(1, Number(e.target.value) || 1))}
           />
-          <button
+          <Button variant="primary"
             type="button"
-            className={styles.addBtn}
             disabled={disabled || !otherId}
-            onClick={addOther}
-          >
+            onClick={addOther}>
             추가
-          </button>
-          <button
+          </Button>
+          <Button variant="secondary"
             type="button"
-            className={styles.addBtn}
             disabled={disabled || !selectedMachine}
-            onClick={registerOther}
-            style={{ background: '#fff', color: '#1d4ed8', border: '1px solid #93c5fd' }}
-          >
+            onClick={registerOther}>
             기존 재고·등록
-          </button>
+          </Button>
         </div>
         {selectedMachine && otherOptions.length === 0 && (
           <p className={styles.hint}>
@@ -573,14 +564,12 @@ export default function PartsUsagePicker({
                 <span className={styles.avail} style={{ color: over ? '#b45309' : undefined }}>
                   {over ? `가용 ${row.max_stock} · 초과분은 미입고` : `가용 ${row.max_stock}`}
                 </span>
-                <button
+                <Button variant="danger" size="sm"
                   type="button"
-                  className={styles.removeBtn}
                   disabled={disabled}
-                  onClick={() => removeRow(idx)}
-                >
+                  onClick={() => removeRow(idx)}>
                   삭제
-                </button>
+                </Button>
               </div>
             )
           })
@@ -601,27 +590,21 @@ export default function PartsUsagePicker({
               기기 <strong>{selectedMachine}</strong> · 기존 재고를 골라 호환을 추가하거나, 새로 등록하세요.
             </p>
             <div className={styles.choiceActions}>
-              <button
+              <Button variant="primary"
                 type="button"
-                className={styles.choicePrimary}
-                onClick={() => startPickFromStock(missingChoice)}
-              >
+                onClick={() => startPickFromStock(missingChoice)}>
                 기존 재고에서 선택
-              </button>
-              <button
+              </Button>
+              <Button variant="secondary"
                 type="button"
-                className={styles.choiceSecondary}
-                onClick={() => startNewRegister(missingChoice)}
-              >
+                onClick={() => startNewRegister(missingChoice)}>
                 새로 등록
-              </button>
-              <button
+              </Button>
+              <Button variant="danger"
                 type="button"
-                className={styles.choiceGhost}
-                onClick={() => setMissingChoice(null)}
-              >
+                onClick={() => setMissingChoice(null)}>
                 취소
-              </button>
+              </Button>
             </div>
           </div>
         </div>

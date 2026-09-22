@@ -600,20 +600,16 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                       <span style={{ color: '#666', fontSize: '0.75rem', marginLeft: 8 }}>{m.type}</span>
                     </span>
                     <span style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-                      <button
+                      <Button variant="secondary" size="sm"
                         type="button"
-                        onClick={() => startEditNewMachine(idx)}
-                        style={{ border: 'none', background: 'none', color: '#0070f3', cursor: 'pointer', fontSize: '0.8rem' }}
-                      >
+                        onClick={() => startEditNewMachine(idx)}>
                         수정
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="danger" size="sm"
                         type="button"
-                        onClick={() => removeNewMachine(idx)}
-                        style={{ border: 'none', background: 'none', color: '#d93025', cursor: 'pointer', fontSize: '0.8rem' }}
-                      >
+                        onClick={() => removeNewMachine(idx)}>
                         제거
-                      </button>
+                      </Button>
                     </span>
                   </div>
                 ))}
@@ -701,7 +697,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                   />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-                  <Button type="button" variant="ghost" size="sm" onClick={cancelMachineDraft}>취소</Button>
+                  <Button type="button" variant="danger" size="sm" onClick={cancelMachineDraft}>취소</Button>
                   <Button type="button" variant="primary" size="sm" onClick={addDraftMachine}>
                     {editingMachineIndex !== null ? '수정 반영' : '목록에 추가'}
                   </Button>
@@ -711,7 +707,7 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
-            <Button variant="ghost" type="button" onClick={onClose}>취소</Button>
+            <Button variant="danger" type="button" onClick={onClose}>취소</Button>
             <Button variant="primary" type="submit" disabled={loading}>
               {loading ? '저장 중…' : selectedCount > 0 ? `저장 (기계 ${selectedCount}대 포함)` : '저장하기'}
             </Button>

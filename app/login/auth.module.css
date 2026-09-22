@@ -106,24 +106,9 @@
 }
 
 .submit {
-  margin-top: 4px;
-  height: 42px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.submit:hover {
-  background: #1d4ed8;
-}
-
-.submit:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+  composes: btn btnMd btnPrimary from '../../components/ui/ui.module.css';
+  width: 100%;
+  margin-top: var(--sp-1);
 }
 
 .links {
@@ -193,13 +178,9 @@
   }
 
   .input,
-  .submit,
   .modeBtn {
     font-size: 16px;
   }
 
-  .submit {
-    min-height: 48px;
-  }
 }
 

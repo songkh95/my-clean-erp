@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
 import { useRouter, usePathname } from 'next/navigation'
-import Button from './../ui/Button'
+import { Menu } from 'lucide-react'
 import styles from './layout.module.css'
 
 type HeaderProps = {
@@ -23,7 +23,8 @@ function getPageTitle(path: string, compact: boolean) {
   }
   if (path.startsWith('/service')) return compact ? '일지' : '서비스 일지'
   if (path.startsWith('/accounting/registration')) return compact ? '정산' : '월 정산 등록'
-  if (path.startsWith('/accounting/history')) return compact ? '청구' : '청구 이력/수정'
+  if (path.startsWith('/accounting/history')) return compact ? '청구' : '청구 이력'
+  if (path.startsWith('/accounting/dashboard')) return compact ? '수금' : '수금 현황'
   if (path.startsWith('/accounting')) return compact ? '정산' : '정산 및 회계 관리'
   if (path.startsWith('/settings')) return '설정'
   return 'My Clean ERP'
@@ -74,36 +75,34 @@ export default function Header({ onMenuClick, showMenuButton = false }: HeaderPr
         {showMenuButton ? (
           <button
             type="button"
-            className={styles.menuBtn}
+            className={`${styles.iconBtn} ${styles.menuBtn}`}
             aria-label="메뉴 열기"
             onClick={onMenuClick}
           >
-            ☰
+            <Menu size="1em" strokeWidth={1.5} aria-hidden />
           </button>
         ) : null}
-        <h2 className={styles.pageTitle}>{getPageTitle(pathname, compact)}</h2>
+        <span className={styles.headerTitle}>{getPageTitle(pathname, compact)}</span>
       </div>
 
       <div className={styles.headerRight}>
         {userEmail ? (
           <>
             <div className={styles.userMeta} title={userEmail}>
-              <span className={styles.userAvatar} aria-hidden>👤</span>
               <span className={styles.userName}>{displayName}</span>
               {userName && userEmail ? (
-                <span className={styles.userEmail}>({userEmail})</span>
+                <span className={styles.userEmail}>{userEmail}</span>
               ) : null}
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
               onClick={handleLogout}
               className={styles.logoutBtn}
               aria-label="로그아웃"
             >
               {compact ? '나가기' : '로그아웃'}
-            </Button>
+            </button>
           </>
         ) : (
           <span className={styles.userLoading}>…</span>

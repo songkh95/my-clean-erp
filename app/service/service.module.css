@@ -82,16 +82,6 @@
   white-space: nowrap;
 }
 
-.lockOn {
-  background: #fef2f2 !important;
-  color: #b91c1c !important;
-  border-color: #fecaca !important;
-}
-
-.saveBtn {
-  min-width: 72px;
-}
-
 .periodBar {
   display: flex;
   align-items: center;
@@ -669,12 +659,6 @@
   background-color: #f5f5f5;
 }
 
-.deleteModeOn {
-  background: #fef2f2 !important;
-  color: #b91c1c !important;
-  border-color: #fecaca !important;
-}
-
 .noCell {
   display: inline-flex;
   align-items: center;
@@ -941,13 +925,6 @@
     flex: 0 0 auto;
   }
 
-  .headerActions button {
-    min-height: 30px !important;
-    height: 30px !important;
-    padding: 0 8px !important;
-    font-size: 0.72rem !important;
-    white-space: nowrap;
-  }
 
   .periodBar {
     width: 100%;

@@ -9,18 +9,17 @@ type SettlementRow = Database['public']['Tables']['settlements']['Row']
 type SettlementDetailRow = Database['public']['Tables']['settlement_details']['Row']
 type MachineHistoryRow = Database['public']['Tables']['machine_history']['Row']
 type OrganizationRow = Database['public']['Tables']['organizations']['Row']
+type TaxInvoiceRow = Database['public']['Tables']['tax_invoices']['Row']
 
 // 2. Client 타입 (DB Row 상속)
 export interface Client extends ClientRow {
   // DB 스키마에 이미 contract_start_date가 있으므로 별도 선언 불필요
 }
 
-// 3. Organization 타입 (명세서용)
+// 3. Organization 타입 (명세서·홈택스 업로드용)
+// business_number/representative_name/address/email/business_type/business_item은
+// OrganizationRow(DB)에 이미 있음. phone만 DB에 없어 화면 전용으로 추가.
 export interface Organization extends OrganizationRow {
-  business_number?: string;
-  representative_name?: string;
-  address?: string;
-  email?: string;
   phone?: string;
 }
 
@@ -128,6 +127,9 @@ export interface SettlementDetail extends SettlementDetailRow {
     groupStats: any;
   };
 }
+
+// 세금계산서 발행 기록 (홈택스 수동 발행 결과만 기록)
+export type TaxInvoice = TaxInvoiceRow
 
 export interface MachineHistory extends MachineHistoryRow {
   inventory?: Inventory | null;

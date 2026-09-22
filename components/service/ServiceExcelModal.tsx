@@ -258,9 +258,9 @@ export default function ServiceExcelModal({
           {mode === 'export' ? (
             <>
               <p className={styles.hint}>선택 기간의 등록된 일지 <strong>{exportCount}</strong>건을 저장합니다. (미방문 행 제외)</p>
-              <button className={styles.submit} type="button" onClick={handleExport} disabled={busy || exportCount === 0}>
+              <Button variant="primary" type="button" onClick={handleExport} disabled={busy || exportCount === 0}>
                 엑셀로 저장
-              </button>
+              </Button>
             </>
           ) : (
             <>

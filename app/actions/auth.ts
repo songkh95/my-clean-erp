@@ -227,6 +227,61 @@ export async function findLoginEmailsByNameAction(name: string) {
   }
 }
 
+/** 홈택스 일괄등록 엑셀 등에 쓰이는 우리 회사(공급자) 사업자 정보 */
+export async function getOrgBusinessInfoAction() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false as const, message: '로그인이 필요합니다.' }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false as const, message: '조직 정보를 찾을 수 없습니다.' }
+
+  const { data: org, error } = await supabase
+    .from('organizations')
+    .select('id, name, business_number, representative_name, address, email, business_type, business_item')
+    .eq('id', profile.organization_id)
+    .single()
+
+  if (error) return { success: false as const, message: error.message }
+  return { success: true as const, data: org }
+}
+
+export async function updateOrgBusinessInfoAction(input: {
+  businessNumber?: string
+  representativeName?: string
+  address?: string
+  email?: string
+  businessType?: string
+  businessItem?: string
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false as const, message: '로그인이 필요합니다.' }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false as const, message: '조직 정보를 찾을 수 없습니다.' }
+
+  const { data: updated, error } = await supabase
+    .from('organizations')
+    .update({
+      business_number: input.businessNumber?.trim() || null,
+      representative_name: input.representativeName?.trim() || null,
+      address: input.address?.trim() || null,
+      email: input.email?.trim() || null,
+      business_type: input.businessType?.trim() || null,
+      business_item: input.businessItem?.trim() || null,
+    })
+    .eq('id', profile.organization_id)
+    .select('id')
+
+  if (error) return { success: false as const, message: error.message }
+  // RLS 정책이 막으면 error 없이 0건만 적용될 수 있어 실제 적용 여부를 확인한다.
+  if (!updated || updated.length === 0) {
+    return { success: false as const, message: '저장 권한이 없어 반영되지 않았습니다. 관리자에게 문의해 주세요.' }
+  }
+  return { success: true as const, message: '사업자 정보가 저장되었습니다.' }
+}
+
 export async function requestPasswordResetAction(email: string, redirectTo: string) {
   const trimmed = email.trim()
   if (!trimmed) return { success: false as const, message: '이메일을 입력해 주세요.' }

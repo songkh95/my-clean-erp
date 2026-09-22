@@ -79,9 +79,7 @@ export default function RegistrationPage() {
 
   return (
     <div className="pageShell">
-      <h1 className="pageTitle">월 정산 등록</h1>
-      
-      <AccountingRegistration 
+      <AccountingRegistration
         isRegOpen={true}
         setIsRegOpen={setIsRegOpen}
         regYear={regYear} setRegYear={setRegYear}

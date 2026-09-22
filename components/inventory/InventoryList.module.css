@@ -282,11 +282,6 @@
     flex-wrap: wrap;
   }
 
-  .buttonArea > * {
-    flex: 1;
-    min-height: 40px;
-  }
-
   .dropdownItem {
     padding: 12px;
     min-height: 40px;

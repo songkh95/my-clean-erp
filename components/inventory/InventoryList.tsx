@@ -236,7 +236,7 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
                                     variant="outline"
                                     size="sm"
                                     onClick={(e) => { e.stopPropagation(); handleRestore(item.id); }}
-                                    style={{padding: '4px 8px', fontSize: '0.75rem'}}
+                                   
                                   >
                                     복구
                                   </Button>
@@ -246,7 +246,7 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
                                       variant="outline"
                                       size="sm"
                                       onClick={(e) => handleEditClick(e, item)}
-                                      style={{padding: '4px 8px', fontSize: '0.75rem'}}
+                                     
                                     >
                                       수정
                                     </Button>
@@ -254,7 +254,7 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
                                       variant="danger"
                                       size="sm"
                                       onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                                      style={{padding: '4px 8px', fontSize: '0.75rem'}}
+                                     
                                     >
                                       삭제
                                     </Button>

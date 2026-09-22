@@ -571,7 +571,7 @@ export default function PlanSettingModal({ inventoryId, clientId, onClose, onUpd
         </div>
 
         <div style={{display:'flex', justifyContent:'flex-end', gap:'8px', marginTop:'32px'}}>
-          <Button variant="ghost" onClick={onClose}>취소</Button>
+          <Button variant="danger" onClick={onClose}>취소</Button>
           <Button variant="primary" onClick={handleSave} disabled={loading}>
             {loading ? '저장 중...' : '설정 저장'}
           </Button>

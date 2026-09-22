@@ -6,6 +6,8 @@ import {
   changePasswordAction,
   getMyProfileAction,
   updateMyNameAction,
+  getOrgBusinessInfoAction,
+  updateOrgBusinessInfoAction,
 } from '@/app/actions/auth'
 import styles from '@/app/settings/settings.module.css'
 
@@ -26,6 +28,17 @@ export default function AccountSettings() {
   const [pwErr, setPwErr] = useState('')
   const [savingPw, setSavingPw] = useState(false)
 
+  // 홈택스 일괄등록 엑셀 등에 쓰이는 우리 회사(공급자) 사업자 정보
+  const [bizNumber, setBizNumber] = useState('')
+  const [bizRepName, setBizRepName] = useState('')
+  const [bizAddress, setBizAddress] = useState('')
+  const [bizEmail, setBizEmail] = useState('')
+  const [bizType, setBizType] = useState('')
+  const [bizItem, setBizItem] = useState('')
+  const [bizMsg, setBizMsg] = useState('')
+  const [bizErr, setBizErr] = useState('')
+  const [savingBiz, setSavingBiz] = useState(false)
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -40,11 +53,42 @@ export default function AccountSettings() {
       setName(res.profile?.name || '')
       setOrgName(res.profile?.organizationName || '')
       setOrgId(res.profile?.organizationId || null)
+
+      const bizRes = await getOrgBusinessInfoAction()
+      if (cancelled) return
+      if (bizRes.success && bizRes.data) {
+        setBizNumber(bizRes.data.business_number || '')
+        setBizRepName(bizRes.data.representative_name || '')
+        setBizAddress(bizRes.data.address || '')
+        setBizEmail(bizRes.data.email || '')
+        setBizType(bizRes.data.business_type || '')
+        setBizItem(bizRes.data.business_item || '')
+      }
     })()
     return () => {
       cancelled = true
     }
   }, [])
+
+  const saveBizInfo = async () => {
+    setBizMsg('')
+    setBizErr('')
+    setSavingBiz(true)
+    const res = await updateOrgBusinessInfoAction({
+      businessNumber: bizNumber,
+      representativeName: bizRepName,
+      address: bizAddress,
+      email: bizEmail,
+      businessType: bizType,
+      businessItem: bizItem,
+    })
+    setSavingBiz(false)
+    if (!res.success) {
+      setBizErr(res.message)
+      return
+    }
+    setBizMsg(res.message)
+  }
 
   const saveName = async () => {
     setNameMsg('')
@@ -177,6 +221,59 @@ export default function AccountSettings() {
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button variant="primary" type="button" onClick={savePassword} disabled={savingPw}>
             {savingPw ? '변경 중…' : '비밀번호 변경'}
+          </Button>
+        </div>
+      </div>
+
+      <div className={styles.card}>
+        <h2 className={styles.cardTitle}>사업자 정보 (우리 회사)</h2>
+        <p className={styles.cardDesc}>
+          홈택스 세금계산서 일괄등록 엑셀을 만들 때 '공급자' 정보로 자동 채워집니다.
+        </p>
+
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label}>사업자등록번호 (- 없이)</label>
+            <input
+              className={styles.input}
+              value={bizNumber}
+              onChange={(e) => setBizNumber(e.target.value)}
+              placeholder="예: 5193301796"
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>대표자명</label>
+            <input className={styles.input} value={bizRepName} onChange={(e) => setBizRepName(e.target.value)} />
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>사업장 주소</label>
+          <input className={styles.input} value={bizAddress} onChange={(e) => setBizAddress(e.target.value)} />
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label}>업태</label>
+            <input className={styles.input} value={bizType} onChange={(e) => setBizType(e.target.value)} placeholder="예: 서비스업" />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>종목</label>
+            <input className={styles.input} value={bizItem} onChange={(e) => setBizItem(e.target.value)} placeholder="예: 복합기 임대 및 유지보수" />
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>이메일</label>
+          <input className={styles.input} value={bizEmail} onChange={(e) => setBizEmail(e.target.value)} />
+        </div>
+
+        {bizErr ? <p className={styles.hint} style={{ color: '#b91c1c' }}>{bizErr}</p> : null}
+        {bizMsg ? <p className={styles.hint} style={{ color: '#0f7b3a' }}>{bizMsg}</p> : null}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button variant="primary" type="button" onClick={saveBizInfo} disabled={savingBiz}>
+            {savingBiz ? '저장 중…' : '사업자 정보 저장'}
           </Button>
         </div>
       </div>

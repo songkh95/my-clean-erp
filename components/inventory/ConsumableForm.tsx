@@ -409,21 +409,11 @@ export default function ConsumableForm({
               }}
             >
               <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#374151' }}>제품군으로 일괄 지정</span>
-              <button
+              <Button variant="secondary" size="sm"
                 type="button"
-                onClick={() => setGroupManagerOpen(true)}
-                style={{
-                  border: '1px solid #d1d5db',
-                  background: '#fff',
-                  borderRadius: 4,
-                  padding: '2px 8px',
-                  fontSize: '0.72rem',
-                  cursor: 'pointer',
-                  color: '#374151',
-                }}
-              >
+                onClick={() => setGroupManagerOpen(true)}>
                 제품군 정리/등록
-              </button>
+              </Button>
             </div>
             <select
               value={productGroup}
@@ -478,22 +468,11 @@ export default function ConsumableForm({
                   }}
                 />
               </div>
-              <button
+              <Button variant="primary"
                 type="button"
-                onClick={() => addCompatibleModel()}
-                style={{
-                  marginTop: 4,
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6,
-                  background: '#fff',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem',
-                  whiteSpace: 'nowrap',
-                }}
-              >
+                onClick={() => addCompatibleModel()}>
                 추가
-              </button>
+              </Button>
             </div>
 
             {compatibleModels.length === 0 ? (
@@ -549,7 +528,7 @@ export default function ConsumableForm({
           </div>
 
           <div className={styles.footer}>
-            <Button variant="ghost" onClick={onClose} type="button">취소</Button>
+            <Button variant="danger" onClick={onClose} type="button">취소</Button>
             <Button variant="primary" type="submit" disabled={loading}>저장하기</Button>
           </div>
         </form>

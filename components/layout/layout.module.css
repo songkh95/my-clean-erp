@@ -1,8 +1,8 @@
-/* Shared layout — desktop sidebar + mobile drawer */
+/* 레이아웃 셸: 데스크톱 사이드바 + 모바일 서랍 (DESIGN_SYSTEM.md 8장) */
 .shell {
   display: flex;
   min-height: 100vh;
-  background-color: var(--notion-bg);
+  background-color: var(--c-bg);
 }
 
 .content {
@@ -17,7 +17,7 @@
 .main {
   flex: 1;
   padding: var(--main-pad-top) var(--main-pad-right) var(--main-pad-bottom) var(--main-pad-left);
-  background-color: var(--notion-bg);
+  background-color: var(--c-bg);
   overflow-y: auto;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -27,13 +27,46 @@
   display: none;
 }
 
+/* 아이콘 버튼 (ghost) */
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.125rem;
+  height: 2.125rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-1);
+  background: transparent;
+  color: var(--c-ink-2);
+  font-size: var(--fs-md);
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s;
+}
+
+.iconBtn:hover {
+  background-color: var(--c-subtle);
+  color: var(--c-ink);
+}
+
+.iconBtn:focus-visible,
+.navLink:focus-visible,
+.logoutBtn:focus-visible {
+  outline: 1px solid var(--c-accent);
+  outline-offset: 1px;
+}
+
+/* 사이드바 */
 .sidebar {
   width: var(--sidebar-width);
   height: 100vh;
   height: 100dvh;
-  border-right: 1px solid var(--notion-border);
-  padding: 8px;
-  background-color: var(--notion-bg);
+  border-right: 1px solid var(--c-line);
+  padding: var(--sp-2);
+  background-color: var(--c-bg);
+  color: var(--c-ink-2);
   position: fixed;
   left: 0;
   top: 0;
@@ -49,17 +82,130 @@
   width: var(--sidebar-collapsed);
 }
 
+.sidebarTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: 2.5rem;
+  margin-bottom: var(--sp-4);
+  padding-left: var(--sp-3);
+}
+
+.sidebarTopCollapsed {
+  justify-content: center;
+  padding-left: 0;
+}
+
+.appName {
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  color: var(--c-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 2.5rem;
+  padding: 0 var(--sp-3);
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-0);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
+  line-height: 1.4;
+  color: var(--c-ink-2);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  box-sizing: border-box;
+  transition: color 0.15s;
+}
+
+.navLink:hover {
+  color: var(--c-ink);
+}
+
+.navLinkActive {
+  color: var(--c-ink);
+  font-weight: var(--fw-medium);
+  border-left-color: var(--c-ink);
+}
+
+.navLinkCollapsed {
+  justify-content: center;
+  padding: 0;
+}
+
+.navLinkFill {
+  flex: 1;
+  min-width: 0;
+}
+
+.navIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-md);
+  flex-shrink: 0;
+}
+
+.navLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.navGroupHead {
+  display: flex;
+  align-items: center;
+}
+
+/* 하위 메뉴: 세로선 없이 들여쓰기로 구분 (아이콘 폭 + 간격만큼) */
+.navChildren {
+  display: flex;
+  flex-direction: column;
+}
+
+.navLinkChild {
+  min-height: 2.125rem;
+  padding-left: calc(var(--sp-3) + var(--fs-md) + var(--sp-3));
+}
+
+.sidebarFooter {
+  padding: var(--sp-3) var(--sp-3) var(--sp-1);
+  border-top: 1px solid var(--c-line);
+  font-size: var(--fs-xs);
+  color: var(--c-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 상단 헤더 */
 .header {
   height: var(--header-height);
   min-height: var(--header-height);
   max-height: var(--header-height);
-  background-color: var(--notion-bg);
-  border-bottom: 1px solid var(--notion-border);
-  color: var(--notion-main-text);
+  background-color: var(--c-bg);
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-ink);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--sp-2);
   padding: 0 var(--main-pad-right) 0 var(--main-pad-left);
   position: sticky;
   top: 0;
@@ -71,7 +217,7 @@
 .headerLeft {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-2);
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
@@ -79,66 +225,41 @@
 
 .menuBtn {
   display: none;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--notion-border);
-  border-radius: var(--radius-md);
-  background: var(--notion-soft-bg);
-  color: var(--notion-main-text);
-  font-size: 0.95rem;
-  line-height: 1;
-  cursor: pointer;
-  flex-shrink: 0;
+  margin-left: calc(-1 * var(--sp-2));
 }
 
-.pageTitle {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0;
-  letter-spacing: -0.01em;
+.headerTitle {
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  color: var(--c-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .headerRight {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-3);
   flex-shrink: 0;
   max-width: 55%;
 }
 
 .userMeta {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.8rem;
-  color: var(--notion-sub-text);
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
   min-width: 0;
-  max-width: 200px;
+  max-width: 20rem;
   overflow: hidden;
 }
 
-.userAvatar {
-  width: 24px;
-  height: 24px;
-  background-color: var(--notion-soft-bg);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.65rem;
-  border: 1px solid var(--notion-border);
-  flex-shrink: 0;
-}
-
 .userName {
-  font-weight: 500;
+  color: var(--c-ink);
+  font-weight: var(--fw-medium);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -146,68 +267,45 @@
 }
 
 .userEmail {
-  color: var(--notion-sub-text);
-  font-weight: 400;
+  color: var(--c-ink-3);
+  font-weight: var(--fw-regular);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* secondary 버튼 (sm) */
 .logoutBtn {
-  font-weight: 500 !important;
-  min-height: 30px !important;
-  height: 30px !important;
-  padding: 0 10px !important;
-  font-size: 0.78rem !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-1);
+  background: transparent;
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
+  cursor: pointer;
   flex-shrink: 0;
+  transition: background-color 0.15s;
+}
+
+.logoutBtn:hover {
+  background-color: var(--c-subtle);
 }
 
 .userLoading {
-  font-size: 0.8rem;
-  color: var(--notion-sub-text);
-}
-
-.navLink {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 4px;
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: background 0.2s;
-  color: var(--notion-sub-text);
-  white-space: nowrap;
-  overflow: hidden;
-  min-height: 40px;
-  box-sizing: border-box;
-}
-
-.navLinkActive {
-  font-weight: 600;
-  background-color: var(--notion-soft-bg);
-  color: var(--notion-main-text);
-}
-
-.navLinkCollapsed {
-  justify-content: center;
+  font-size: var(--fs-sm);
+  color: var(--c-ink-3);
 }
 
 @media (max-width: 768px) {
   .content {
     margin-left: 0 !important;
-  }
-
-  .main {
-    padding: 8px 10px 16px;
-  }
-
-  .header {
-    padding: 0 10px;
-    gap: 6px;
   }
 
   .menuBtn {
@@ -218,7 +316,7 @@
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.4);
+    background: rgba(26, 26, 26, 0.32);
     z-index: 150;
     border: none;
     padding: 0;
@@ -226,50 +324,35 @@
   }
 
   .sidebar {
-    width: min(280px, 86vw) !important;
+    width: min(20rem, 86vw) !important;
     transform: translateX(-105%);
-    box-shadow: 8px 0 28px rgba(15, 23, 42, 0.12);
-    padding-top: max(8px, env(safe-area-inset-top));
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding-top: max(var(--sp-2), env(safe-area-inset-top));
+    padding-bottom: max(var(--sp-2), env(safe-area-inset-bottom));
   }
 
   .sidebarOpen {
     transform: translateX(0);
+    box-shadow: var(--shadow-float);
   }
 
   .sidebarCollapsed {
-    width: min(280px, 86vw) !important;
-  }
-
-  .pageTitle {
-    font-size: 0.92rem;
-  }
-
-  .userEmail,
-  .userName {
-    display: none;
+    width: min(20rem, 86vw) !important;
   }
 
   .userMeta {
-    max-width: 28px;
+    display: none;
   }
 
   .headerRight {
-    gap: 6px;
     max-width: none;
   }
 
-  .logoutBtn {
-    min-height: 28px !important;
-    height: 28px !important;
-    padding: 0 8px !important;
-    font-size: 0.72rem !important;
+  /* 터치 대상 확보 */
+  .navLink {
+    min-height: 2.75rem;
   }
 
-  .navLink {
-    min-height: 44px;
-    font-size: 0.95rem;
-    padding: 10px 12px;
+  .navLinkChild {
+    min-height: 2.5rem;
   }
 }
-

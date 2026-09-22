@@ -1,23 +1,26 @@
 'use client'
 
+import Button from '@/components/ui/Button'
 import React, { useMemo } from 'react'
 import { HistoryItem } from '@/app/types'
+import styles from '@/app/accounting/accounting.module.css'
 
 interface Props {
   loading: boolean
   items: HistoryItem[]
   viewMode: 'all' | 'machine'
-  isEditMode: boolean
+  checkedIds: Set<string>
+  editingId: string | null
   errorMap?: Map<string, { bw: boolean, col: boolean, bw_a3: boolean, col_a3: boolean }>
   onInputChange: (id: string, field: keyof HistoryItem, val: string) => void
   onStatement: (item: HistoryItem) => void
-  onRebill: (item: HistoryItem) => void
-  onDelete: (item: HistoryItem) => void
+  onTaxInvoice: (item: HistoryItem) => void
+  onToggleCheck: (id: string) => void
 }
 
 export default function HistoryTable({
-  loading, items, viewMode, isEditMode, errorMap,
-  onInputChange, onStatement, onRebill, onDelete
+  loading, items, viewMode, checkedIds, editingId, errorMap,
+  onInputChange, onStatement, onTaxInvoice, onToggleCheck
 }: Props) {
 
   // 1. 데이터 정렬
@@ -44,44 +47,45 @@ export default function HistoryTable({
   }, [items, viewMode]);
 
   return (
-    <div style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #ddd', overflow: 'hidden', minHeight: '600px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-        <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                <thead style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ccc', color: '#444' }}>
+    <div className={styles.section}>
+        <div className={styles.tableContainer} style={{ overflowX: 'auto' }}>
+            <table className={styles.table} style={{ tableLayout: 'auto' }}>
+                <thead>
                     <tr>
-                        <th style={{ padding: '10px', width: '40px', borderRight: '1px solid #ddd' }}>No.</th>
-                        <th style={{ padding: '10px', width: '180px', borderRight: '1px solid #ddd', textAlign: 'left' }}>기계명 (S/N)</th>
-                        
-                        <th style={{ padding: '10px', width: '50px', borderRight: '1px solid #ddd', whiteSpace: 'nowrap' }} rowSpan={2}>
+                        <th className={styles.th} style={{ width: '32px' }}></th>
+                        <th className={styles.th} style={{ width: '40px' }}>No.</th>
+                        <th className={styles.th} style={{ width: '180px', textAlign: 'left' }}>기계명 (S/N)</th>
+
+                        <th className={styles.th} style={{ width: '50px' }} rowSpan={2}>
                             청구월
                         </th>
 
-                        <th style={{ padding: '8px', width: '160px', borderRight: '1px solid #ddd', backgroundColor: '#f0f0f0', verticalAlign:'middle' }}>
+                        <th className={styles.th} style={{ width: '160px', backgroundColor: '#f0f0f0' }}>
                             전월 지침<br/>
                             <span style={{fontSize:'0.75rem', fontWeight:'normal', color:'#666'}}>(A4/A3 흑·칼)</span>
                         </th>
 
-                        <th style={{ padding: '8px', width: '160px', borderRight: '1px solid #ddd', backgroundColor: '#e3f2fd', verticalAlign:'middle' }}>
+                        <th className={styles.th} style={{ width: '160px', backgroundColor: '#e3f2fd' }}>
                             당월 지침<br/>
                             <span style={{fontSize:'0.75rem', fontWeight:'normal', color:'#666'}}>(A4/A3 흑·칼)</span>
                         </th>
 
-                        <th style={{ padding: '8px', borderRight: '1px solid #ddd', width: '120px', verticalAlign:'middle' }}>
+                        <th className={styles.th} style={{ width: '120px' }}>
                             실사용 / 추가 매수
                         </th>
 
-                        <th style={{ padding: '10px', width: '90px', textAlign: 'right', borderRight: '1px solid #ddd' }}>청구금액<br />(VAT포함)</th>
-                        <th style={{ padding: '10px', width: '100px', textAlign: 'center' }}>관리</th>
+                        <th className={styles.th} style={{ width: '90px', textAlign: 'right' }}>청구금액<br />(VAT포함)</th>
+                        <th className={styles.th} style={{ width: '100px' }}>발행</th>
                     </tr>
                 </thead>
                 <tbody>
                     {loading ? (
-                        <tr><td colSpan={8} style={{ padding: '60px', textAlign: 'center' }}>데이터를 불러오는 중입니다...</td></tr>
+                        <tr><td colSpan={9} className={styles.td} style={{ padding: '60px' }}>데이터를 불러오는 중입니다...</td></tr>
                     ) : items.length === 0 ? (
-                        <tr><td colSpan={8} style={{ padding: '60px', textAlign: 'center', color: '#888' }}>조회된 청구 이력이 없습니다.</td></tr>
+                        <tr><td colSpan={9} className={styles.td} style={{ padding: '60px', color: 'var(--notion-sub-text)' }}>조회된 청구 이력이 없습니다.</td></tr>
                     ) : (
                         sortedItems.map((item, idx) => {
-                            const isPaid = item.settlement.is_paid
+                            const isLocked = item.settlement.is_paid
                             const inventory = item.inventory
                             const isNewGroup = viewMode === 'machine' && idx > 0 && sortedItems[idx - 1].inventory?.serial_number !== item.inventory?.serial_number
 
@@ -94,9 +98,9 @@ export default function HistoryTable({
                             const extraBw = Math.max(0, pureTotalBw - (inventory?.plan_basic_cnt_bw || 0))
                             const extraCol = Math.max(0, pureTotalCol - (inventory?.plan_basic_cnt_col || 0))
 
-                            // ✅ 수정 모드가 켜져있고, 입금이 안 된 상태라면 수정 가능
-                            const isInputDisabled = isPaid || !isEditMode
-                            
+                            // ✅ 체크박스로 선택 → "수정" 버튼을 누른 딱 1건만 입력 가능
+                            const isInputDisabled = isLocked || editingId !== item.id
+
                             // 에러 체크
                             const err = errorMap?.get(item.id);
                             const hasErr = err && (err.bw || err.col || err.bw_a3 || err.col_a3);
@@ -104,55 +108,63 @@ export default function HistoryTable({
                             return (
                                 <React.Fragment key={item.id}>
                                     {isNewGroup && (
-                                        <tr><td colSpan={8} style={{ height: '30px', backgroundColor: '#f4f4f4', borderTop: '2px solid #ccc', borderBottom: '1px solid #ccc' }}></td></tr>
+                                        <tr><td colSpan={9} style={{ height: '30px', backgroundColor: 'var(--notion-soft-bg)', borderTop: '2px solid var(--notion-border)', borderBottom: '1px solid var(--notion-border)' }}></td></tr>
                                     )}
-                                    <tr style={{ backgroundColor: item.is_modified ? '#fffbe6' : '#fff', borderBottom: '1px solid #eee', opacity: isPaid ? 0.7 : 1 }}>
-                                        <td style={{ textAlign: 'center', color: '#888' }}>{idx + 1}</td>
-                                        <td style={{ padding: '12px' }}>
+                                    <tr style={{ backgroundColor: item.is_modified ? '#fffbe6' : undefined, opacity: isLocked ? 0.7 : 1 }}>
+                                        <td className={styles.td}>
+                                            <input
+                                                type="checkbox"
+                                                checked={checkedIds.has(item.id)}
+                                                disabled={isLocked}
+                                                onChange={() => onToggleCheck(item.id)}
+                                                title={isLocked ? '이미 처리된 건은 선택할 수 없습니다' : undefined}
+                                            />
+                                        </td>
+                                        <td className={styles.td} style={{ color: 'var(--notion-sub-text)' }}>{idx + 1}</td>
+                                        <td className={styles.td} style={{ textAlign: 'left', padding: '12px' }}>
                                             <div style={{ fontWeight: 'bold', color: '#333', fontSize: '0.9rem' }}>{inventory?.model_name || '-'}</div>
                                             <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '2px' }}>{inventory?.serial_number || '-'}</div>
                                         </td>
-                                        
-                                        <td style={{ textAlign: 'center' }}>
+
+                                        <td className={styles.td}>
                                             <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>
                                                 {String(item.settlement.billing_month).padStart(2, '0')}월
                                             </div>
-                                            {isPaid && <div style={{ fontSize: '0.75rem', color: '#2e7d32', fontWeight: 'bold', marginTop: '2px' }}>[완료]</div>}
                                         </td>
 
                                         {/* ✅ 전월 지침 (에러여도 수정 가능하도록 조건 변경) */}
-                                        <td style={{ padding: '8px', backgroundColor: '#fafafa', borderRight: '1px solid #ddd' }}>
+                                        <td className={styles.td} style={{ padding: '8px', backgroundColor: '#fafafa' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#666', width: '20px' }}>A4</span>
-                                                    <InputCell 
-                                                        value={item.prev_count_bw} 
+                                                    <InputCell
+                                                        value={item.prev_count_bw}
                                                         disabled={isInputDisabled} // 에러 조건 제거
                                                         isError={!!err?.bw}
-                                                        onChange={(v) => onInputChange(item.id, 'prev_count_bw', v)} 
+                                                        onChange={(v) => onInputChange(item.id, 'prev_count_bw', v)}
                                                     />
-                                                    <InputCell 
-                                                        value={item.prev_count_col} 
+                                                    <InputCell
+                                                        value={item.prev_count_col}
                                                         disabled={isInputDisabled} // 에러 조건 제거
                                                         isError={!!err?.col}
-                                                        color="#0070f3" 
-                                                        onChange={(v) => onInputChange(item.id, 'prev_count_col', v)} 
+                                                        color="#0070f3"
+                                                        onChange={(v) => onInputChange(item.id, 'prev_count_col', v)}
                                                     />
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#666', width: '20px' }}>A3</span>
-                                                    <InputCell 
-                                                        value={item.prev_count_bw_a3} 
+                                                    <InputCell
+                                                        value={item.prev_count_bw_a3}
                                                         disabled={isInputDisabled} // 에러 조건 제거
                                                         isError={!!err?.bw_a3}
-                                                        onChange={(v) => onInputChange(item.id, 'prev_count_bw_a3', v)} 
+                                                        onChange={(v) => onInputChange(item.id, 'prev_count_bw_a3', v)}
                                                     />
-                                                    <InputCell 
-                                                        value={item.prev_count_col_a3} 
+                                                    <InputCell
+                                                        value={item.prev_count_col_a3}
                                                         disabled={isInputDisabled} // 에러 조건 제거
                                                         isError={!!err?.col_a3}
-                                                        color="#0070f3" 
-                                                        onChange={(v) => onInputChange(item.id, 'prev_count_col_a3', v)} 
+                                                        color="#0070f3"
+                                                        onChange={(v) => onInputChange(item.id, 'prev_count_col_a3', v)}
                                                     />
                                                 </div>
                                                 {hasErr && (
@@ -164,7 +176,7 @@ export default function HistoryTable({
                                         </td>
 
                                         {/* 당월 지침 */}
-                                        <td style={{ padding: '8px', backgroundColor: '#f0f8ff', borderRight: '1px solid #ddd' }}>
+                                        <td className={styles.td} style={{ padding: '8px', backgroundColor: '#f0f8ff' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#666', width: '20px' }}>A4</span>
@@ -180,7 +192,7 @@ export default function HistoryTable({
                                         </td>
 
                                         {/* 실사용 / 추가 */}
-                                        <td style={{ padding: '8px', borderRight: '1px solid #ddd', verticalAlign:'middle' }}>
+                                        <td className={styles.td} style={{ padding: '8px', textAlign: 'left' }}>
                                             <div style={{ display:'flex', flexDirection:'column', gap:'8px', fontSize:'0.8rem' }}>
                                                 <div style={{ display:'flex', flexDirection:'column', gap:'2px' }}>
                                                     <span style={{ color:'#555', fontWeight:'bold', fontSize:'0.75rem' }}>기본</span>
@@ -203,34 +215,17 @@ export default function HistoryTable({
                                             </div>
                                         </td>
 
-                                        <td style={{ textAlign: 'right', padding: '12px', fontWeight: 'bold', color: '#171717', fontSize: '0.9rem', borderRight: '1px solid #ddd' }}>
+                                        <td className={styles.td} style={{ textAlign: 'right', padding: '12px', fontWeight: 'bold', color: '#171717', fontSize: '0.9rem' }}>
                                             {Math.floor(item.calculated_amount * 1.1).toLocaleString()}원
                                         </td>
 
-                                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                                        <td className={styles.td} style={{ padding: '8px' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                                <button 
-                                                    onClick={() => onStatement(item)}
-                                                    style={{ fontSize: '0.75rem', padding: '3px 8px', border: '1px solid #0070f3', color: '#0070f3', backgroundColor: 'white', borderRadius: '4px', cursor: 'pointer', width: '100%' }}
-                                                >
-                                                    🧾 명세서
-                                                </button>
-                                                
-                                                <button 
-                                                    onClick={() => onRebill(item)}
-                                                    disabled={isPaid}
-                                                    style={{ fontSize: '0.75rem', padding: '3px 8px', border: '1px solid #ffa500', color: '#ffa500', backgroundColor: 'white', borderRadius: '4px', cursor: isPaid ? 'not-allowed' : 'pointer', opacity: isPaid ? 0.5 : 1, width: '100%' }}
-                                                >
-                                                    🔄 재청구
-                                                </button>
+                                                <Button variant="secondary" size="sm"
+                                                    onClick={() => onStatement(item)}> 명세서 </Button>
 
-                                                <button 
-                                                    onClick={() => onDelete(item)}
-                                                    disabled={isPaid}
-                                                    style={{ fontSize: '0.75rem', padding: '3px 8px', border: '1px solid #d93025', color: '#d93025', backgroundColor: 'white', borderRadius: '4px', cursor: isPaid ? 'not-allowed' : 'pointer', opacity: isPaid ? 0.5 : 1, width: '100%' }}
-                                                >
-                                                    🗑️ 삭제
-                                                </button>
+                                                <Button variant="secondary" size="sm"
+                                                    onClick={() => onTaxInvoice(item)}> 세금계산서 </Button>
                                             </div>
                                         </td>
                                     </tr>
@@ -246,10 +241,10 @@ export default function HistoryTable({
 }
 
 // ✅ InputCell 업데이트: 커서 스타일 수정
-function InputCell({ 
-  value, onChange, disabled, color = '#333', bold = false, isError = false 
-}: { 
-  value: number, onChange: (val: string) => void, disabled?: boolean, color?: string, bold?: boolean, isError?: boolean 
+function InputCell({
+  value, onChange, disabled, color = '#333', bold = false, isError = false
+}: {
+  value: number, onChange: (val: string) => void, disabled?: boolean, color?: string, bold?: boolean, isError?: boolean
 }) {
     return (
         <input
@@ -259,8 +254,8 @@ function InputCell({
             disabled={disabled}
             style={{
                 width: '60px',
-                border: isError ? '1px solid #ff4d4f' : '1px solid #d1d1d1',
-                borderRadius: '4px',
+                border: isError ? '1px solid #ff4d4f' : '1px solid var(--notion-border)',
+                borderRadius: 'var(--radius-sm)',
                 padding: '4px',
                 textAlign: 'right',
                 fontSize: '0.85rem',
@@ -272,7 +267,7 @@ function InputCell({
                 boxShadow: disabled ? 'none' : '0 1px 1px rgba(0,0,0,0.05)',
                 boxSizing: 'border-box',
                 // ✅ 'not-allowed'를 제거하고 'text' 또는 'auto'로 변경 (요청사항 반영)
-                cursor: 'text' 
+                cursor: 'text'
             }}
             onFocus={(e) => {
                 if (!isError && !disabled) {
@@ -282,7 +277,7 @@ function InputCell({
             }}
             onBlur={(e) => {
                 if (!isError) {
-                    e.target.style.border = '1px solid #d1d1d1';
+                    e.target.style.border = '1px solid var(--notion-border)';
                     e.target.style.boxShadow = '0 1px 1px rgba(0,0,0,0.05)';
                 }
             }}

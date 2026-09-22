@@ -1,6 +1,7 @@
 // components/client/ClientList.tsx
 'use client'
 
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import React, { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase'
 import ClientForm from './ClientForm'
@@ -62,7 +63,7 @@ export default function ClientList() {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-  const [issuesOpen, setIssuesOpen] = useState(true)
+  const [issuesOpen, setIssuesOpen] = useState(false)
   
   // 모달 상태
   const [isRegModalOpen, setIsRegModalOpen] = useState(false)
@@ -278,7 +279,7 @@ export default function ClientList() {
             style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
             onClick={() => setIssuesOpen((v) => !v)}
           >
-            <span>{issuesOpen ? '▼' : '▶'}</span>
+            {issuesOpen ? <ChevronDown size="1em" strokeWidth={1.5} aria-hidden /> : <ChevronRight size="1em" strokeWidth={1.5} aria-hidden />}
             문제 해결이 필요한 내용 {clientIssues.length}건
           </div>
           {issuesOpen && (
@@ -512,7 +513,7 @@ export default function ClientList() {
                                 }
                               }}>요금제</Button>
                               <Button variant="outline" size="sm" onClick={() => handleReplaceClick(asset)}>교체</Button>
-                              <Button variant="danger" size="sm" onClick={() => handleWithdrawClick(asset)} style={{ border: '1px solid #ff4d4f', background: 'transparent' }}>철수</Button>
+                              <Button variant="danger" size="sm" onClick={() => handleWithdrawClick(asset)}>철수</Button>
                             </div>
                           </td>
                         </tr>

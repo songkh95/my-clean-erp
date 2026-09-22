@@ -46,21 +46,32 @@
 }
 
 .tab {
-  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
   cursor: pointer;
-  font-weight: 500;
-  color: #666;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
+  color: var(--c-ink-2);
   border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+  transition: color 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
-  font-size: 0.88rem;
+}
+
+.tab:hover {
+  color: var(--c-ink);
+}
+
+.tab svg {
+  font-size: var(--fs-md);
 }
 
 .tabActive {
-  font-weight: 700;
-  color: #0070f3;
-  border-bottom-color: #0070f3;
+  font-weight: var(--fw-medium);
+  color: var(--c-ink);
+  border-bottom-color: var(--c-ink);
 }
 
 /* 검색 및 필터 컨트롤 영역 */
@@ -285,8 +296,7 @@
   }
 
   .tab {
-    padding: 6px 8px;
-    font-size: 0.75rem;
+    padding: var(--sp-2);
   }
 
   .controls {

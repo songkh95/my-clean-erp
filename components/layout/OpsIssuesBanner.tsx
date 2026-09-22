@@ -8,7 +8,7 @@ import styles from './OpsIssuesBanner.module.css'
 
 export default function OpsIssuesBanner() {
   const [groups, setGroups] = useState<OpsIssueGroup[]>([])
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
