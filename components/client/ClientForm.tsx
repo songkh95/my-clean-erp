@@ -296,9 +296,10 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
     }
   }
 
-  /** Enter = Tab처럼 다음 입력으로 이동 (저장 제출 방지) */
+  /** Enter = 저장 확인창 열기 (바로 저장되지 않음) */
   const handleFormKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
-    if (e.key !== 'Enter') return
+    if (e.key !== 'Enter' || e.defaultPrevented) return
+    if (e.nativeEvent.isComposing) return // 한글 조합 중 Enter
     const target = e.target as HTMLElement
     const tag = target.tagName
     if (tag === 'TEXTAREA') return
@@ -307,27 +308,8 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
 
     e.preventDefault()
     e.stopPropagation()
-
-    const form = e.currentTarget
-    const nodes = Array.from(
-      form.querySelectorAll<HTMLElement>(
-        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
-      )
-    ).filter((el) => {
-      if ((el as HTMLInputElement).type === 'checkbox') return false
-      const rect = el.getBoundingClientRect()
-      return rect.width > 0 && rect.height > 0
-    })
-
-    const idx = nodes.indexOf(target)
-    if (idx === -1) return
-    const next = nodes[idx + 1]
-    if (next) {
-      next.focus()
-      if (next instanceof HTMLInputElement || next instanceof HTMLTextAreaElement) {
-        next.select?.()
-      }
-    }
+    if (loading) return
+    setConfirmSaveOpen(true)
   }
 
   const handleSubmit = (e: FormEvent) => {

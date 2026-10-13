@@ -1,5 +1,6 @@
 'use client'
 
+import { useEnterSaveConfirm } from '@/components/ui/useEnterSaveConfirm'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase'
 import Button from './../ui/Button'
@@ -224,6 +225,8 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
     return () => clearTimeout(timer)
   }, [formData.serial_number])
 
+  const handleEnterSave = useEnterSaveConfirm()
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -304,7 +307,7 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
     <div className={styles.overlay} style={overlayZIndex != null ? { zIndex: overlayZIndex } : undefined}>
       <div className={styles.modal}>
         <h2 className={styles.title}>{isEditMode ? '✏️ 장비 수정' : '📦 신규 등록'}</h2>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={handleEnterSave}>
           <div className={styles.grid3}>
             <InputField label="종류" as="select" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
               <option value="A3 레이저복합기">A3 레이저복합기</option>

@@ -1,5 +1,6 @@
 'use client'
 
+import { consumableLabel } from '@/utils/consumableLabel'
 import { Info } from 'lucide-react'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Button from '@/components/ui/Button'
@@ -342,6 +343,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
         log.memo,
         log.manager?.name,
         ...(log.parts_usage || []).map((p) => p.consumable?.model_name),
+        ...(log.parts_usage || []).map((p) => consumableLabel(p.consumable)),
       ]
         .filter(Boolean)
         .join(' ')
@@ -975,21 +977,28 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           <div className={styles.clampInner}>
             {log.parts_usage && log.parts_usage.length > 0
               ? (() => {
-                  const merged = new Map<string, { name: string; qty: number; pending: boolean }>()
+                  // 분류·색상으로 묶어 보여주고 (토너 K), 모델명은 마우스를 올리면 보이게 한다
+                  const merged = new Map<string, { name: string; models: Set<string>; qty: number; pending: boolean }>()
                   for (const p of log.parts_usage) {
-                    const id = p.consumable?.id || p.consumable_id || p.consumable?.model_name || '?'
-                    const name = p.consumable?.model_name || '?'
-                    const prev = merged.get(id)
+                    const name = consumableLabel(p.consumable)
+                    const model = String(p.consumable?.model_name || '').trim()
+                    const prev = merged.get(name)
                     const pendingStock = p.stock_status === 'pending'
                     if (prev) {
                       prev.qty += Number(p.quantity) || 0
                       prev.pending = prev.pending || pendingStock
+                      if (model) prev.models.add(model)
                     } else {
-                      merged.set(id, { name, qty: Number(p.quantity) || 0, pending: pendingStock })
+                      merged.set(name, {
+                        name,
+                        models: new Set(model ? [model] : []),
+                        qty: Number(p.quantity) || 0,
+                        pending: pendingStock,
+                      })
                     }
                   }
                   return Array.from(merged.values()).map((p, i) => (
-                    <span key={`${log.id}-part-${i}`}>
+                    <span key={`${log.id}-part-${i}`} title={p.models.size > 0 ? Array.from(p.models).join(', ') : undefined}>
                       {i > 0 ? ', ' : ''}
                       {p.name}({p.qty})
                       {p.pending ? <span className={styles.pendingTag}> 미입고</span> : null}

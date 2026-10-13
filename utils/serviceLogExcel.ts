@@ -1,3 +1,4 @@
+import { consumableLabel } from '@/utils/consumableLabel'
 import * as XLSX from 'xlsx'
 import { ServiceLog } from '@/app/types'
 
@@ -40,7 +41,7 @@ function partsToText(log: ServiceLog) {
   if (!log.parts_usage?.length) return ''
   const merged = new Map<string, { name: string; qty: number }>()
   for (const p of log.parts_usage) {
-    const name = p.consumable?.model_name || '?'
+    const name = consumableLabel(p.consumable)
     const prev = merged.get(name)
     if (prev) prev.qty += Number(p.quantity) || 0
     else merged.set(name, { name, qty: Number(p.quantity) || 0 })

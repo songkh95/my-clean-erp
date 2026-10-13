@@ -590,7 +590,7 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
         id,
         quantity,
         stock_status,
-        consumable:consumables(id, model_name, current_stock, product_group)
+        consumable:consumables(id, model_name, category, color, is_regenerated, current_stock, product_group)
       ),
       images:service_log_images(id)
     `
@@ -602,7 +602,7 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
       parts_usage:service_parts_usage(
         id,
         quantity,
-        consumable:consumables(id, model_name, current_stock, product_group)
+        consumable:consumables(id, model_name, category, color, is_regenerated, current_stock, product_group)
       )
     `
 

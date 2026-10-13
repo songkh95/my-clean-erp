@@ -1,5 +1,6 @@
 'use client'
 
+import { useEnterSaveConfirm } from '@/components/ui/useEnterSaveConfirm'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '../ui/Button'
@@ -235,6 +236,8 @@ export default function ConsumableForm({
     setFormData(merged)
   }
 
+  const handleEnterSave = useEnterSaveConfirm()
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.model_name.trim()) return alert('모델명(품명)을 입력해주세요.')
@@ -289,7 +292,7 @@ export default function ConsumableForm({
             재고를 0으로 두면 사용분은 <strong>미입고</strong>로 남고, 자산관리에서 입고·확정할 수 있습니다.
           </p>
         ) : null}
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={handleEnterSave}>
           <InputField
             label="소모품 종류 *"
             as="select"

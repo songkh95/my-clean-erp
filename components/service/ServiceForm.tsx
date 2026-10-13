@@ -1,5 +1,6 @@
 'use client'
 
+import { useEnterSaveConfirm } from '@/components/ui/useEnterSaveConfirm'
 import { useState, useEffect, useMemo, useRef, type CSSProperties } from 'react'
 import { createClient } from '@/utils/supabase'
 import Button from '@/components/ui/Button'
@@ -417,6 +418,8 @@ export default function ServiceForm({
     return true
   }
 
+  const handleEnterSave = useEnterSaveConfirm()
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const nameOnly = skipClientRegister && allowSkipClient
@@ -512,7 +515,7 @@ export default function ServiceForm({
           {editData ? formTitle.edit : formTitle.create}
         </h2>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={handleEnterSave}>
           <div className={styles.formGrid}>
             <div style={{ marginBottom: 16, position: 'relative' }}>
               <label
