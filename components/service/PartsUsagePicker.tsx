@@ -358,9 +358,10 @@ export default function PartsUsagePicker({
   }
 
   const updateQty = (index: number, quantity: number) => {
+    // 음수 = 현장에서 철수해 돌아온 수량(회수). 0은 저장할 때 걸러진다
     const next = [...usedParts]
-    next[index] = { ...next[index], quantity: Math.max(0, quantity) }
-    onChange(next.filter((p) => p.quantity > 0))
+    next[index] = { ...next[index], quantity }
+    onChange(next)
   }
 
   const removeRow = (index: number) => {
@@ -549,20 +550,25 @@ export default function PartsUsagePicker({
         ) : (
           usedParts.map((row, idx) => {
             const over = status === '완료' && row.quantity > row.max_stock
+            const isReturn = row.quantity < 0
             return (
               <div key={`${row.consumable_id}-${idx}`} className={styles.selectedRow}>
                 <span className={styles.selectedName}>{nameOf(row.consumable_id)}</span>
                 <input
-                  className={styles.qty}
+                  className={`${styles.qty} ${isReturn ? styles.qtyReturn : ''}`}
                   type="number"
-                  min={1}
                   value={row.quantity}
                   disabled={disabled}
+                  title="아래 화살표로 0보다 작게 내리면 현장에서 철수해 돌아온 회수 수량입니다"
                   style={{ borderColor: over ? '#b45309' : undefined }}
-                  onChange={(e) => updateQty(idx, Number(e.target.value) || 0)}
+                  onChange={(e) => updateQty(idx, Math.trunc(Number(e.target.value) || 0))}
                 />
                 <span className={styles.avail} style={{ color: over ? '#b45309' : undefined }}>
-                  {over ? `가용 ${row.max_stock} · 초과분은 미입고` : `가용 ${row.max_stock}`}
+                  {isReturn
+                    ? `회수 · 재고 +${Math.abs(row.quantity)}`
+                    : over
+                      ? `가용 ${row.max_stock} · 초과분은 미입고`
+                      : `가용 ${row.max_stock}`}
                 </span>
                 <Button variant="danger" size="sm"
                   type="button"
@@ -576,8 +582,16 @@ export default function PartsUsagePicker({
         )}
       </div>
 
+      {usedParts.some((p) => p.quantity < 0) && status !== '완료' ? (
+        <p className={styles.warn}>
+          회수(마이너스) 수량은 상태가 「완료」일 때만 저장할 수 있습니다. 지금 상태({status || '미지정'})로는
+          저장되지 않으니, 상태를 완료로 바꾸거나 회수 줄을 지워 주세요.
+        </p>
+      ) : null}
+
       <p className={styles.hint}>
         「부품 저장」/일지 저장 시에만 반영됩니다. 재고가 부족하면 완료 시 미입고(가출고)로 남습니다.
+        수량을 0보다 작게 내리면 현장에서 철수해 돌아온 회수로 보고, 완료 시 재고가 늘어납니다.
       </p>
 
       {missingChoice && selectedMachine ? (

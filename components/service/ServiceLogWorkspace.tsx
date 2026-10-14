@@ -40,14 +40,10 @@ function clientLabel(log: Partial<ServiceLog> | null | undefined) {
 }
 
 const STATUS_OPTIONS = [
+  { value: '미방문', label: '미방문' },
   { value: '접수', label: '접수' },
   { value: '완료', label: '완료' },
   { value: '보류', label: '보류' },
-]
-
-const STATUS_OPTIONS_WITH_UNVISITED = [
-  { value: '미방문', label: '미방문' },
-  ...STATUS_OPTIONS,
 ]
 
 type PendingFields = Record<string, string | number | null>
@@ -844,7 +840,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
         <EditableCell
           value={log.status}
           type="select"
-          options={dummy ? STATUS_OPTIONS_WITH_UNVISITED : STATUS_OPTIONS}
+          options={STATUS_OPTIONS}
           disabled={locked}
           className={styles.tdCenter}
           display={

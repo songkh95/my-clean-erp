@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from '@/components/ui/Toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import PartsUsagePicker, { type UsedPartRow } from '@/components/service/PartsUsagePicker'
@@ -119,9 +120,13 @@ export default function PartsEditModal({ isOpen, log, locked = false, onClose, o
 
   const handleSave = async () => {
     if (!log || locked) return
+    if (log.status !== '완료' && usedParts.some((p) => Number(p.quantity) < 0)) {
+      toast.error('회수(마이너스) 수량은 상태가 「완료」일 때만 저장할 수 있습니다.')
+      return
+    }
     setLoading(true)
     const payload = usedParts
-      .filter((p) => p.consumable_id && p.quantity > 0)
+      .filter((p) => p.consumable_id && Number(p.quantity) !== 0)
       .map((p) => ({ consumable_id: p.consumable_id, quantity: Number(p.quantity) }))
 
     const res = await updateServicePartsAction(log.id, payload)

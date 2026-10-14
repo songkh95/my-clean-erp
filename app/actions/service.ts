@@ -48,15 +48,19 @@ function normalizeParts(parts: PartUsage[]): { ok: true; parts: PartUsage[] } | 
   for (const part of parts || []) {
     if (!part?.consumable_id) continue
     const qty = Number(part.quantity)
-    if (!Number.isFinite(qty) || !Number.isInteger(qty) || qty <= 0) {
-      return { ok: false, message: '소모품 수량은 1 이상의 정수여야 합니다.' }
+    if (!Number.isFinite(qty) || !Number.isInteger(qty)) {
+      return { ok: false, message: '소모품 수량은 정수여야 합니다.' }
     }
+    // 음수 = 현장에서 철수해 돌아온 수량(회수). 0은 저장하지 않음
+    if (qty === 0) continue
     merged.set(part.consumable_id, (merged.get(part.consumable_id) || 0) + qty)
   }
 
   return {
     ok: true,
-    parts: Array.from(merged.entries()).map(([consumable_id, quantity]) => ({ consumable_id, quantity })),
+    parts: Array.from(merged.entries())
+      .map(([consumable_id, quantity]) => ({ consumable_id, quantity }))
+      .filter((p) => p.quantity !== 0),
   }
 }
 
@@ -78,6 +82,12 @@ async function planPartsAllocation(
   }
 
   if (!willBeDone) {
+    if (parts.some((p) => p.quantity < 0)) {
+      return {
+        ok: false,
+        message: '회수(마이너스) 수량은 상태가 「완료」일 때만 저장할 수 있습니다. 상태를 완료로 바꾸거나 회수 줄을 지워 주세요.',
+      }
+    }
     return {
       ok: true,
       rows: parts.map((p) => ({ ...p, stock_status: 'none' as const })),
@@ -106,6 +116,12 @@ async function planPartsAllocation(
     const item = byId.get(part.consumable_id)
     if (!item) {
       return { ok: false, message: `알 수 없는 소모품이 포함되어 있습니다.` }
+    }
+    // 회수(음수)는 재고가 늘어나는 쪽이라 가용 재고 검사 없이 그대로 반영
+    if (part.quantity < 0) {
+      rows.push({ consumable_id: part.consumable_id, quantity: part.quantity, stock_status: 'deducted' })
+      toDeduct.push({ consumable_id: part.consumable_id, quantity: part.quantity })
+      continue
     }
     if (!remainingAvail.has(part.consumable_id)) {
       remainingAvail.set(
@@ -149,14 +165,15 @@ function deductedPartsFromRows(
       return logWasDone // legacy
     })
     .map((p) => ({ consumable_id: p.consumable_id, quantity: Number(p.quantity) || 0 }))
-    .filter((p) => p.quantity > 0)
+    .filter((p) => p.quantity !== 0)
 }
 
 /** amount > 0 차감(출고), amount < 0 복구(입고). 실패 시 throw */
 async function applyStockChange(supabase: AppSupabase, parts: PartUsage[], direction: 'out' | 'in') {
   for (const part of parts) {
     const qty = Number(part.quantity) || 0
-    if (qty <= 0) continue
+    if (qty === 0) continue
+    // qty 가 음수(회수)면 out → 재고 증가, in → 재고 감소로 자연히 뒤집힌다
     // out → 재고 감소(-), in → 재고 증가(+)
     const delta = direction === 'out' ? -qty : qty
 
@@ -908,6 +925,14 @@ export async function patchServiceLogAction(
         await insertPartsRows(supabase, logId, plan.rows)
         stockTouched = true
       } else if (wasDone && !willBeDone && oldRows.length > 0) {
+        // 회수(마이너스)는 완료 상태에서만 둘 수 있으므로, 상태를 되돌리기 전에 회수 줄을 먼저 지우게 한다
+        if (oldRows.some((r: any) => Number(r.quantity) < 0)) {
+          return {
+            success: false,
+            message:
+              '회수(마이너스) 수량이 있는 일지는 완료 상태에서만 둘 수 있습니다. 상태를 바꾸려면 교체/배송에서 회수 줄을 먼저 지워 주세요.',
+          }
+        }
         const toRestore = deductedPartsFromRows(oldRows, true)
         // H5: 재고 복구가 실제로 성공한 뒤에만 부품 사용 내역을 'none'으로 갱신
         // (복구 실패 시 부품 사용 내역은 그대로 유지되어 재고와 어긋나지 않음)

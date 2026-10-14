@@ -127,6 +127,18 @@
   color: #6b7280;
 }
 
+.qtyReturn {
+  border-color: var(--c-danger);
+  color: var(--c-danger);
+}
+
+.warn {
+  margin: 6px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-danger);
+  line-height: 1.5;
+}
+
 .selectedRow {
   display: flex;
   align-items: center;

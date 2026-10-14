@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from '@/components/ui/Toast'
 import { useEnterSaveConfirm } from '@/components/ui/useEnterSaveConfirm'
 import { useState, useEffect, useMemo, useRef, type CSSProperties } from 'react'
 import { createClient } from '@/utils/supabase'
@@ -380,16 +381,23 @@ export default function ServiceForm({
   }, [formData.client_id])
 
   const validatePartsForSubmit = (): boolean => {
-    const filled = usedParts.filter((p) => p.consumable_id)
+    // 음수 = 현장에서 철수해 돌아온 회수 수량. 0은 저장하지 않음
+    const filled = usedParts.filter((p) => p.consumable_id && Number(p.quantity) !== 0)
     for (const part of filled) {
       const qty = Number(part.quantity)
-      if (!Number.isInteger(qty) || qty <= 0) {
-        alert('소모품 수량은 1 이상의 정수여야 합니다.')
+      if (!Number.isInteger(qty)) {
+        alert('소모품 수량은 정수여야 합니다.')
         return false
       }
     }
 
-    if (formData.status !== '완료') return true
+    if (formData.status !== '완료') {
+      if (filled.some((p) => Number(p.quantity) < 0)) {
+        toast.error('회수(마이너스) 수량은 상태가 「완료」일 때만 저장할 수 있습니다.')
+        return false
+      }
+      return true
+    }
 
     const shortages: string[] = []
     const needed = new Map<string, number>()
@@ -397,6 +405,7 @@ export default function ServiceForm({
       needed.set(part.consumable_id, (needed.get(part.consumable_id) || 0) + Number(part.quantity))
     }
     for (const [id, qty] of needed) {
+      if (qty <= 0) continue // 회수만 있거나 상쇄된 소모품은 재고가 늘어나므로 검사 대상이 아님
       const item = consumables.find((c) => c.id === id)
       const name = item?.model_name || id
       let available = Number(item?.current_stock) || 0
@@ -434,7 +443,7 @@ export default function ServiceForm({
     setLoading(true)
 
     const payloadParts = usedParts
-      .filter((p) => p.consumable_id)
+      .filter((p) => p.consumable_id && Number(p.quantity) !== 0)
       .map((p) => ({ consumable_id: p.consumable_id, quantity: Number(p.quantity) }))
 
     const freeMachine =
@@ -860,6 +869,7 @@ export default function ServiceForm({
               <option value="접수">접수 (예정)</option>
               <option value="완료">완료 (처리됨)</option>
               <option value="보류">보류</option>
+              <option value="미방문">미방문 (방문하지 않음)</option>
             </InputField>
             <InputField
               label="담당자 *"
