@@ -1,6 +1,7 @@
 // components/client/ClientList.tsx
 'use client'
 
+import { formatYyMmDd, remainingLabel } from '@/utils/contractPeriod'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import React, { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase'
@@ -25,34 +26,21 @@ import { useSortableData } from '@/utils/tableSort'
 
 type ClientSortKey = 'name' | 'contact' | 'assets'
 
-/** YYYY-MM-DD → YY.MM.DD */
-function formatYyMmDd(dateStr: string): string {
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return '-'
-  const yy = String(d.getFullYear()).slice(-2)
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yy}.${mm}.${dd}`
-}
-
-/** D-day 표기: 남은 날이면 음수(-1 = 내일 만료), 지났으면 양수(+1 = 어제 만료) */
-function getDday(dateStr: string): string {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const end = new Date(dateStr)
-  end.setHours(0, 0, 0, 0)
-  const diff = Math.round((today.getTime() - end.getTime()) / 86400000)
-  if (diff === 0) return '0'
-  return diff > 0 ? `+${diff}` : `${diff}`
-}
-
-/** 거래처에 설치된 기기 중 가장 임박한 계약 종료일 */
-function earliestContractEnd(assets: Inventory[]): string | null {
-  const dates = assets
-    .map((a) => a.contract_end_date)
-    .filter((d): d is string => Boolean(d))
-    .sort()
-  return dates[0] || null
+/** 거래처에 설치된 기기 중 가장 먼저 끝나는 계약 (종료일 기준) */
+function earliestContract(assets: Inventory[]): { start: string | null; end: string; others: number } | null {
+  const withEnd = assets.filter((a) => Boolean(a.contract_end_date))
+  if (withEnd.length === 0) return null
+  const sorted = [...withEnd].sort((a, b) =>
+    String(a.contract_end_date).localeCompare(String(b.contract_end_date))
+  )
+  const first = sorted[0]
+  // 같은 종료일끼리는 한 건으로 보고, 나머지 기기 수만 뒤에 알려 준다
+  const others = sorted.filter((a) => a.contract_end_date !== first.contract_end_date).length
+  return {
+    start: first.contract_start_date || null,
+    end: String(first.contract_end_date),
+    others,
+  }
 }
 
 export default function ClientList() {
@@ -339,6 +327,7 @@ export default function ClientList() {
         <div onClick={() => requestSort('assets')} style={{ cursor: 'pointer', userSelect: 'none' }} title="클릭하여 정렬">
           기기(대수){sortIndicator('assets')}
         </div>
+        <div>계약기간</div>
         <div style={{ textAlign: 'right' }}>관리</div>
       </div>
 
@@ -351,7 +340,8 @@ export default function ClientList() {
           .map((a) => String(a.model_name || '').trim())
           .filter(Boolean)
           .join(', ')
-        const contractEnd = earliestContractEnd(assets)
+        const contract = earliestContract(assets)
+        const expired = contract ? remainingLabel(contract.end) === '만료' : false
 
         return (
           <div key={client.id} className={styles.clientRow}>
@@ -381,18 +371,31 @@ export default function ClientList() {
                 {client.phone || client.contact_person || '-'}
               </div>
               <div className={styles.machineCell}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div className={styles.machineCount}>{assets.length}대</div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--notion-sub-text)' }}>
-                    {contractEnd ? `${formatYyMmDd(contractEnd)} (${getDday(contractEnd)})` : '-'}
-                  </span>
-                </div>
+                <div className={styles.machineCount}>{assets.length}대</div>
                 {machineNames ? (
                   <div className={styles.machineNames} title={machineNames}>
                     {machineNames}
                   </div>
                 ) : (
                   <div className={styles.machineNames}>-</div>
+                )}
+              </div>
+              <div className={styles.contractCell}>
+                {contract ? (
+                  <>
+                    <div className={styles.contractPeriod}>
+                      {contract.start ? formatYyMmDd(contract.start) : '?'} ~ {formatYyMmDd(contract.end)}
+                      {' / '}
+                      <span className={expired ? styles.contractExpired : styles.contractLeft}>
+                        {remainingLabel(contract.end)}
+                      </span>
+                    </div>
+                    {contract.others > 0 ? (
+                      <div className={styles.contractOthers}>외 {contract.others}건</div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className={styles.contractPeriod}>-</div>
                 )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>

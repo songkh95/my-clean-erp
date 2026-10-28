@@ -673,6 +673,59 @@
   max-width: 100%;
 }
 
+.addVisitBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-1);
+  background: transparent;
+  color: var(--c-ink-3);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  cursor: pointer;
+  /* 평소에는 숨기고, 줄에 마우스를 올리거나 키보드로 초점이 오면 보인다 */
+  opacity: 0;
+}
+
+.tr:hover .addVisitBtn,
+.addVisitBtn:focus-visible {
+  opacity: 1;
+}
+
+.addVisitBtn:hover {
+  background: var(--c-subtle);
+  color: var(--c-ink);
+}
+
+/* 방문 횟수: 이름 뒤 숫자 하나 (누르면 그 기간의 방문 펼치기) */
+.visitCountBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  padding: 0.1rem 0.25rem;
+  border: none;
+  border-radius: var(--radius-1);
+  background: var(--c-subtle);
+  color: var(--c-ink-2);
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.visitCountBtn:hover {
+  background: var(--c-line);
+  color: var(--c-ink);
+}
+
 .clientNameBtn {
   display: inline-flex;
   align-items: center;
@@ -706,46 +759,6 @@
 .clientNameExpandable:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.expandChevronBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  padding: 0 2px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: inherit;
-  font: inherit;
-  border-radius: 4px;
-}
-
-.expandChevronBtn:hover {
-  background: #f3f4f6;
-}
-
-.expandChevron {
-  flex-shrink: 0;
-  font-size: 0.65rem;
-  color: #6b7280;
-  width: 10px;
-}
-
-.historyCountBadge {
-  flex-shrink: 0;
-  margin-left: 2px;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 4px;
-  border-radius: 7px;
-  background: #e5e7eb;
-  color: #4b5563;
-  font-size: 0.58rem;
-  font-weight: 700;
-  line-height: 14px;
-  text-align: center;
 }
 
 .historyIndent {

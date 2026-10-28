@@ -1,7 +1,7 @@
 'use client'
 
 import { consumableLabel } from '@/utils/consumableLabel'
-import { Info } from 'lucide-react'
+import { Info, Plus, X } from 'lucide-react'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Button from '@/components/ui/Button'
 import ServiceForm from '@/components/service/ServiceForm'
@@ -83,6 +83,11 @@ function isDummyId(id: string) {
   return id.startsWith('dummy_')
 }
 
+/** 「+」로 직접 추가한 빈 입력 줄 (저장 전까지만 화면에 있음) */
+function isExtraRowId(id: string) {
+  return id.startsWith('dummy_extra_')
+}
+
 function daysBetween(from: string, to: string) {
   const a = new Date(from)
   const b = new Date(to)
@@ -162,7 +167,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
   const [clientSort, setClientSort] = useState<'asc' | 'desc'>('asc')
   const [statusSort, setStatusSort] = useState<'asc' | 'desc'>('asc')
   const [visitPin, setVisitPin] = useState<'none' | 'visited' | 'unvisited'>('none')
-  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('all')
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('month')
   const [periodYear, setPeriodYear] = useState(() => new Date().getFullYear())
   const [periodMonth, setPeriodMonth] = useState(() => new Date().getMonth() + 1)
   const [customFrom, setCustomFrom] = useState('')
@@ -171,6 +176,8 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
   const [deleteMode, setDeleteMode] = useState(false)
   const [galleryLog, setGalleryLog] = useState<ServiceLog | null>(null)
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({})
+  /** 같은 달에 두 번째 방문을 바로 입력하려고 추가한 빈 줄들 */
+  const [extraRows, setExtraRows] = useState<ServiceLog[]>([])
   const [orgLabel, setOrgLabel] = useState('')
   const [myUserId, setMyUserId] = useState<string | null>(null)
   const [schemaWarning, setSchemaWarning] = useState<string | null>(null)
@@ -263,7 +270,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
   }
 
   const displayLogs = useMemo(() => {
-    return logs.map((log) => {
+    return [...logs, ...extraRows].map((log) => {
       const patch = pending[log.id]
       if (!patch) return log
       const next = { ...log, ...patch } as ServiceLog
@@ -295,7 +302,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       }
       return next
     })
-  }, [logs, pending, employees, machineOptions])
+  }, [logs, extraRows, pending, employees, machineOptions])
 
   const periodRange = useMemo(
     () => getPeriodRange(periodPreset, periodYear, periodMonth, customFrom, customTo),
@@ -308,6 +315,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       ? displayLogs
       : displayLogs.filter((log) => {
           const isUnvisited = log.status === '미방문' || isDummyId(log.id) || !log.visit_date
+          if (isExtraRowId(log.id)) return true
           if (isUnvisited) return includeUnvisited
           return log.visit_date >= from && log.visit_date <= to
         })
@@ -316,7 +324,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     const keysWithReal = new Set(
       inPeriod.filter((l) => !isDummyId(l.id)).map((l) => groupKeyOf(l))
     )
-    return inPeriod.filter((l) => !isDummyId(l.id) || !keysWithReal.has(groupKeyOf(l)))
+    return inPeriod.filter((l) => isExtraRowId(l.id) || !isDummyId(l.id) || !keysWithReal.has(groupKeyOf(l)))
   }, [displayLogs, periodRange])
 
   const filteredLogs = useMemo(() => {
@@ -385,14 +393,15 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
 
     return order.map((key) => {
       const items = buckets.get(key) || []
-      const dummies = items.filter((l) => isDummyId(l.id))
+      const extras = items.filter((l) => isExtraRowId(l.id))
+      const dummies = items.filter((l) => isDummyId(l.id) && !isExtraRowId(l.id))
       const reals = items
         .filter((l) => !isDummyId(l.id))
         .sort((a, b) => String(b.visit_date || '').localeCompare(String(a.visit_date || '')))
       // 방문 기록이 있으면 최신 방문이 대표, 없으면 미방문
-      const primary = reals[0] || dummies[0] || items[0]
+      const primary = reals[0] || dummies[0] || extras[0] || items[0]
       const history = reals.filter((l) => l.id !== primary.id)
-      return { key, primary, history }
+      return { key, primary, history, extras: extras.filter((l) => l.id !== primary.id) }
     })
   }, [sortedLogs])
 
@@ -456,7 +465,8 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
   }, [rowGroups, visitPin, statsMonthPrefix, periodPreset, periodRange, sortBy, statusSort, clientSort])
 
   const summaryStats = useMemo(() => {
-    const source = periodLogs
+    // 저장 전 빈 줄은 통계에 넣지 않는다
+    const source = periodLogs.filter((l) => !isExtraRowId(l.id))
     const clientIds = new Set<string>()
     const machineIds = new Set<string>()
 
@@ -484,6 +494,45 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       rowCount: rowGroups.length,
     }
   }, [periodLogs, rowGroups.length, statsMonthPrefix, periodPreset, periodRange])
+
+  /** 「+」: 이 거래처·기기에 같은 달 방문을 하나 더 적을 수 있는 빈 줄을 만든다 */
+  const addExtraRow = (base: ServiceLog) => {
+    if (locked) return
+    const { from, to } = periodRange
+    const today = todayStr()
+    // 보고 있는 기간 안에 있어야 줄이 보이므로, 오늘이 기간 밖이면 기간 시작일로 맞춘다
+    const visitDate = !from || !to || (today >= from && today <= to) ? today : from
+    const id = `dummy_extra_${base.client_id || 'c'}_${base.inventory_id || 'none'}_${Date.now()}`
+    const row: ServiceLog = {
+      ...base,
+      id,
+      status: '접수',
+      service_type: base.service_type || 'A/S',
+      visit_date: visitDate,
+      symptom: '',
+      action_detail: '',
+      memo: '',
+      spare_stock: '',
+      spare_stock_at: null,
+      meter_bw: 0,
+      meter_col: 0,
+      manager_id: myUserId || null,
+      manager: undefined,
+      parts_usage: [],
+      images: [],
+    } as ServiceLog
+    setExtraRows((prev) => [...prev, row])
+  }
+
+  /** 저장 전 빈 줄 치우기 */
+  const removeExtraRow = (id: string) => {
+    setExtraRows((prev) => prev.filter((r) => r.id !== id))
+    setPending((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }
 
   const toggleExpand = (key: string) => {
     setExpandedKeys((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -543,7 +592,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
 
     try {
       for (const [id, fields] of Object.entries(pending)) {
-        const base = logs.find((l) => l.id === id)
+        const base = logs.find((l) => l.id === id) || extraRows.find((l) => l.id === id)
         if (!base) {
           errors.push('일부 행을 찾을 수 없습니다. 새로고침 후 다시 시도하세요.')
           continue
@@ -606,6 +655,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           for (const id of savedIds) delete next[id]
           return next
         })
+        setExtraRows((prev) => prev.filter((r) => !savedIds.includes(r.id)))
         await fetchLogs({ clearPending: false })
       }
 
@@ -793,9 +843,11 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       historyCount: number
       expanded: boolean
       isHistory: boolean
+      isExtra?: boolean
     }
   ) => {
     const dummy = isDummyId(log.id)
+    const extra = isExtraRowId(log.id)
     const dirty = Boolean(pending[log.id])
     const completed = log.status === '완료' && !dummy
     const hasImages = Array.isArray(log.images) && log.images.length > 0
@@ -820,7 +872,20 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           title="더블클릭: 일지 수정 · 거래처명 클릭으로도 수정"
         >
           <div className={styles.noCell}>
-            {deleteMode && !dummy ? (
+            {extra ? (
+              <button
+                type="button"
+                className={styles.deleteBtn}
+                title="추가한 빈 줄 치우기 (저장 전)"
+                aria-label="추가한 빈 줄 치우기"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeExtraRow(log.id)
+                }}
+              >
+                <X size="1em" strokeWidth={1.5} aria-hidden />
+              </button>
+            ) : deleteMode && !dummy ? (
               <button
                 type="button"
                 className={styles.deleteBtn}
@@ -883,23 +948,6 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
             {log.client?.is_deleted ? (
               <span className={styles.clientWarn} title="삭제된 거래처 — 일지 데이터는 유지됩니다">!</span>
             ) : null}
-            {canExpand ? (
-              <button
-                type="button"
-                className={styles.expandChevronBtn}
-                title={opts.expanded ? '과거 방문 접기' : '과거 방문 펼치기'}
-                aria-label={opts.expanded ? '과거 방문 접기' : '과거 방문 펼치기'}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  toggleExpand(opts.groupKey)
-                }}
-              >
-                <span className={styles.expandChevron} aria-hidden>
-                  {opts.expanded ? '▾' : '▸'}
-                </span>
-                <span className={styles.historyCountBadge}>{opts.historyCount}</span>
-              </button>
-            ) : null}
             <button
               type="button"
               className={`${styles.clientNameBtn} ${log.client?.is_deleted ? styles.clientDeletedName : ''}`}
@@ -917,6 +965,35 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
                   : ''}
               </span>
             </button>
+            {canExpand ? (
+              <button
+                type="button"
+                className={styles.visitCountBtn}
+                title={`이번 기간 방문 ${opts.historyCount + 1}회 — ${opts.expanded ? '접기' : '펼치기'}`}
+                aria-label={`이번 기간 방문 ${opts.historyCount + 1}회`}
+                aria-expanded={opts.expanded}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleExpand(opts.groupKey)
+                }}
+              >
+                {opts.historyCount + 1}
+              </button>
+            ) : null}
+            {!opts.isHistory && !opts.isExtra && !locked && log.client_id ? (
+              <button
+                type="button"
+                className={styles.addVisitBtn}
+                title="이 거래처에 방문 한 건 더 입력"
+                aria-label="방문 한 건 더 입력"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  addExtraRow(log)
+                }}
+              >
+                <Plus size="1em" strokeWidth={1.5} aria-hidden />
+              </button>
+            ) : null}
           </span>
         </td>
 
@@ -1391,6 +1468,17 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
                     isHistory: false,
                   }),
                 ]
+                group.extras.forEach((ex, xi) => {
+                  rows.push(
+                    renderLogRow(ex, `${index + 1}+${xi + 1}`, {
+                      groupKey: group.key,
+                      historyCount: 0,
+                      expanded,
+                      isHistory: false,
+                      isExtra: true,
+                    })
+                  )
+                })
                 if (expanded) {
                   group.history.forEach((h, hi) => {
                     rows.push(
