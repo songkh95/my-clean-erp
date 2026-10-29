@@ -1272,6 +1272,13 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           {log.action_detail ? (
             <span className={`${styles.cardLine} ${styles.cardAction}`}>{log.action_detail}</span>
           ) : null}
+          {log.spare_stock ? (
+            <span className={styles.cardStock}>
+              <span className={styles.cardStockLabel}>현재 재고</span>
+              {log.spare_stock}
+              <span className={styles.cardStockLabel}>({log.spare_stock_at || log.visit_date || '-'})</span>
+            </span>
+          ) : null}
           {parts ? (
             <span className={styles.cardParts}>
               <Package size="1em" strokeWidth={1.5} aria-hidden /> {parts}

@@ -963,6 +963,21 @@
   color: var(--c-ink-2);
 }
 
+.cardStock {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--c-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardStockLabel {
+  color: var(--c-ink-3);
+}
+
 .cardParts {
   display: flex;
   align-items: center;
