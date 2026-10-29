@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
 import styles from './InventoryList.module.css'
 import Button from './../ui/Button'
+import { Trash2 } from 'lucide-react'
 import { Inventory, Client } from '@/app/types'
 // ✅ Server Actions 임포트
 import { deleteInventoryAction, restoreInventoryAction } from '@/app/actions/inventory'
@@ -20,6 +21,12 @@ interface InventoryListProps {
 type SortKey =
   | 'model_name' | 'serial_number' | 'status' | 'client'
   | 'department' | 'contract_type' | 'category' | 'brand' | 'purchase_price'
+
+const MOBILE_SORTS: [SortKey, string][] = [
+  ['model_name', '제품명'],
+  ['status', '상태'],
+  ['client', '설치처'],
+]
 
 export default function InventoryList({ type, refreshTrigger, onCountChange }: InventoryListProps) {
   const [items, setItems] = useState<Inventory[]>([])
@@ -137,7 +144,7 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
   })
 
   // 표 헤더 클릭 정렬
-  const { sortedItems, requestSort, sortIndicator } = useSortableData<Inventory, SortKey>(
+  const { sortedItems, sortState, requestSort, sortIndicator } = useSortableData<Inventory, SortKey>(
     filteredItems,
     (item, key) => {
       if (key === 'status') return displayStatus(item)
@@ -175,6 +182,74 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
               onChange={e => setSearchTerm(e.target.value)}
               className={styles.searchInput}
             />
+          </div>
+
+          <div className={styles.sortBar}>
+            <span className={styles.sortBarLabel}>정렬</span>
+            {MOBILE_SORTS.map(([key, label]) => {
+              const active = sortState?.key === key
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`${styles.sortChip} ${active ? styles.sortChipActive : ''}`}
+                  aria-pressed={active}
+                  onClick={() => requestSort(key)}
+                >
+                  {label}{active ? (sortState?.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className={styles.mobileList}>
+            {sortedItems.length === 0 ? (
+              <div className={styles.noDataRow}>검색 결과가 없습니다.</div>
+            ) : (
+              sortedItems.map((item) => {
+                const sub = [item.serial_number, item.client?.name, (item as any).department]
+                  .filter(Boolean)
+                  .join(' · ')
+                return (
+                  <div key={item.id} className={styles.mRow}>
+                    <button
+                      type="button"
+                      className={styles.mMain}
+                      onClick={(e) => handleEditClick(e as any, item)}
+                    >
+                      <span className={styles.mName}>{item.model_name}</span>
+                      <span className={styles.mSub}>{sub || '-'}</span>
+                    </button>
+                    <div className={styles.mRight}>
+                      <span
+                        className={`${styles.statusBadge} ${
+                          item.is_deleted
+                            ? styles.statusTrash
+                            : item.status === '창고'
+                              ? styles.statusWarehouse
+                              : styles.statusInstalled
+                        }`}
+                      >
+                        {displayStatus(item)}
+                      </span>
+                      <span className={styles.mPrice}>{item.contract_type || '-'}</span>
+                    </div>
+                    {item.is_deleted ? (
+                      <button type="button" className={styles.mActionBtn} onClick={() => handleRestore(item.id)}>복구</button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`${styles.mActionBtn} ${styles.mDeleteBtn}`}
+                        aria-label="삭제"
+                        onClick={() => handleDelete(item.id)}
+                      >
+                        <Trash2 size="1em" strokeWidth={1.5} aria-hidden />
+                      </button>
+                    )}
+                  </div>
+                )
+              })
+            )}
           </div>
 
           <div className={styles.tableContainer}>

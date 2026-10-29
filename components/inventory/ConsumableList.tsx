@@ -1,6 +1,7 @@
 'use client'
 
 import Button from '@/components/ui/Button'
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import React, { useState, useEffect, useMemo } from 'react'
 import {
   getConsumablesAction,
@@ -22,6 +23,12 @@ type SortKey =
   | 'model_name' | 'category' | 'color' | 'code' | 'product_group'
   | 'compatible_models' | 'current_stock' | 'unit_price' | 'stock_value'
 
+const MOBILE_SORTS: [SortKey, string][] = [
+  ['current_stock', '재고'],
+  ['model_name', '모델명'],
+  ['unit_price', '단가'],
+]
+
 export default function ConsumableList({ tab }: Props) {
   const { settings, ready } = useAppSettings()
   const [items, setItems] = useState<any[]>([])
@@ -31,6 +38,8 @@ export default function ConsumableList({ tab }: Props) {
   const [searchTerm, setSearchTerm] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   const [groupManagerOpen, setGroupManagerOpen] = useState(false)
+  /** 「정리 필요」 안내는 기본 접힘 */
+  const [incompleteOpen, setIncompleteOpen] = useState(false)
 
   const categoriesForTab = useMemo(() => {
     if (tab === 'consumables') return settings.stock.consumableCategories
@@ -122,7 +131,7 @@ export default function ConsumableList({ tab }: Props) {
   }
 
   // 표 헤더 클릭 정렬
-  const { sortedItems, requestSort, sortIndicator } = useSortableData<any, SortKey>(
+  const { sortedItems, sortState, requestSort, sortIndicator } = useSortableData<any, SortKey>(
     filteredItems,
     (item, key) => {
       if (key === 'compatible_models') {
@@ -161,8 +170,32 @@ export default function ConsumableList({ tab }: Props) {
           fontSize: '0.82rem',
           color: '#92400e',
         }}>
-          <strong>정리 필요 {incomplete.length}건</strong>
-          {' — '}토너/드럼 색상 미선택 또는 호환 기기 미등록 품목이 있습니다. 일지 매칭이 안 될 수 있으니 수정해 주세요.
+          <button
+            type="button"
+            onClick={() => setIncompleteOpen((v) => !v)}
+            aria-expanded={incompleteOpen}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              width: '100%',
+              padding: 0,
+              border: 'none',
+              background: 'none',
+              color: 'inherit',
+              font: 'inherit',
+              textAlign: 'left',
+              cursor: 'pointer',
+            }}
+          >
+            {incompleteOpen
+              ? <ChevronDown size="1em" strokeWidth={1.5} aria-hidden />
+              : <ChevronRight size="1em" strokeWidth={1.5} aria-hidden />}
+            <strong>정리 필요 {incomplete.length}건</strong>
+          </button>
+          {incompleteOpen ? (
+          <>
+          토너/드럼 색상 미선택 또는 호환 기기 미등록 품목이 있습니다. 일지 매칭이 안 될 수 있으니 수정해 주세요.
           <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {incomplete.slice(0, 8).map((c) => (
               <button
@@ -185,6 +218,8 @@ export default function ConsumableList({ tab }: Props) {
             ))}
             {incomplete.length > 8 ? <span>…</span> : null}
           </div>
+          </>
+          ) : null}
         </div>
       )}
 
@@ -233,6 +268,73 @@ export default function ConsumableList({ tab }: Props) {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+      </div>
+
+      <div className={styles.sortBar}>
+        <span className={styles.sortBarLabel}>정렬</span>
+        {MOBILE_SORTS.map(([key, label]) => {
+          const active = sortState?.key === key
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`${styles.sortChip} ${active ? styles.sortChipActive : ''}`}
+              aria-pressed={active}
+              onClick={() => requestSort(key)}
+            >
+              {label}{active ? (sortState?.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className={styles.mobileList}>
+        {loading ? (
+          <div className={styles.noDataRow}>데이터를 불러오는 중...</div>
+        ) : sortedItems.length === 0 ? (
+          <div className={styles.noDataRow}>등록된 자재가 없습니다.</div>
+        ) : (
+          sortedItems.map((item) => {
+            const stock = Number(item.current_stock || 0)
+            const hidden = item.is_active === false
+            const name = [item.category, item.color].filter(Boolean).join(' ') || item.model_name
+            const sub = [item.model_name, item.product_group].filter(Boolean).join(' · ')
+            return (
+              <div key={item.id} className={`${styles.mRow} ${hidden ? styles.mRowHidden : ''}`}>
+                <button
+                  type="button"
+                  className={styles.mMain}
+                  onClick={() => { setSelectedItem(item); setIsModalOpen(true) }}
+                >
+                  <span className={styles.mName}>
+                    {name}
+                    {item.is_regenerated ? <span className={styles.mTag}>재생</span> : null}
+                    {hidden ? <span className={styles.mTag}>숨김</span> : null}
+                  </span>
+                  <span className={styles.mSub}>{sub || '-'}</span>
+                </button>
+                <div className={styles.mRight}>
+                  <span className={`${styles.mStock} ${stock < lowThreshold ? styles.mStockLow : ''}`}>
+                    {stock.toLocaleString()}
+                  </span>
+                  <span className={styles.mPrice}>{Number(item.unit_price || 0).toLocaleString()}원</span>
+                </div>
+                {hidden ? (
+                  <button type="button" className={styles.mActionBtn} onClick={() => handleRestore(item.id)}>복구</button>
+                ) : (
+                  <button
+                    type="button"
+                    className={`${styles.mActionBtn} ${styles.mDeleteBtn}`}
+                    aria-label="삭제"
+                    onClick={() => handleDelete(item.id)}
+                  >
+                    <Trash2 size="1em" strokeWidth={1.5} aria-hidden />
+                  </button>
+                )}
+              </div>
+            )
+          })
+        )}
       </div>
 
       <div className={styles.tableContainer}>
