@@ -102,6 +102,10 @@ export default function ServiceForm({
   const [formData, setFormData] = useState(() => buildInitialServiceForm(logKind))
   const [usedParts, setUsedParts] = useState<UsedPartRow[]>([])
   const [pendingImages, setPendingImages] = useState<LocalFile[]>([])
+
+  /** dummy_ 로 시작하는 미방문 행은 아직 저장된 일지가 아니므로 「새로 만들기」로 다룬다 */
+  const editingId =
+    editData?.id && !String(editData.id).startsWith('dummy_') ? String(editData.id) : null
   const [clientQuery, setClientQuery] = useState('')
   const [clientMenuOpen, setClientMenuOpen] = useState(false)
   const [skipClientRegister, setSkipClientRegister] = useState(false)
@@ -467,8 +471,8 @@ export default function ServiceForm({
     }
 
     let result: any
-    if (editData) {
-      result = await updateServiceLogAction(editData.id, payload, payloadParts)
+    if (editingId) {
+      result = await updateServiceLogAction(editingId, payload, payloadParts)
     } else {
       result = await createServiceLogAction(payload, payloadParts)
     }
@@ -482,7 +486,7 @@ export default function ServiceForm({
     savedRef.current = true
     sessionCreatedRef.current = []
 
-    const logId = editData?.id || result.id
+    const logId = editingId || result.id
     if (logId && pendingImages.length > 0) {
       const up = await uploadPendingServiceImages(logId, pendingImages)
       if (!up.ok) {
@@ -494,7 +498,7 @@ export default function ServiceForm({
       }
     }
 
-    alert(result.message || (editData ? '수정되었습니다.' : '저장되었습니다.'))
+    alert(result.message || (editingId ? '수정되었습니다.' : '저장되었습니다.'))
     onSuccess()
     onClose()
     setLoading(false)
@@ -521,7 +525,7 @@ export default function ServiceForm({
     <div className={styles.modalOverlay}>
       <div className={styles.modal} style={{ width: 760, maxWidth: '100%' }}>
         <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '20px' }}>
-          {editData ? formTitle.edit : formTitle.create}
+          {editingId ? formTitle.edit : formTitle.create}
         </h2>
 
         <form onSubmit={handleSubmit} onKeyDown={handleEnterSave}>
@@ -973,7 +977,7 @@ export default function ServiceForm({
           </div>
 
           <ServiceImages
-            logId={editData?.id}
+            logId={editingId ?? undefined}
             pendingFiles={pendingImages}
             onPendingChange={setPendingImages}
           />
@@ -981,7 +985,7 @@ export default function ServiceForm({
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
             <Button variant="danger" onClick={handleCancel} type="button">취소</Button>
             <Button variant="primary" type="submit" disabled={loading}>
-              {loading ? '저장 중…' : editData ? '수정완료' : '저장하기'}
+              {loading ? '저장 중…' : editingId ? '수정완료' : '저장하기'}
             </Button>
           </div>
         </form>

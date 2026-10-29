@@ -1,7 +1,7 @@
 'use client'
 
 import { consumableLabel } from '@/utils/consumableLabel'
-import { Info, Plus, X } from 'lucide-react'
+import { ChevronDown, Image as ImageIcon, Info, MoreVertical, Package, Plus, Search, X } from 'lucide-react'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Button from '@/components/ui/Button'
 import ServiceForm from '@/components/service/ServiceForm'
@@ -12,6 +12,7 @@ import EditableCell from '@/components/service/EditableCell'
 import ResizableTh from '@/components/service/ResizableTh'
 import ServiceLogGuideModal from '@/components/service/ServiceLogGuideModal'
 import PanelRefreshButton from '@/components/ui/PanelRefreshButton'
+import Modal from '@/components/ui/Modal'
 import styles from '@/app/service/service.module.css'
 import {
   getServiceLogsAction,
@@ -77,6 +78,27 @@ const STATUS_ORDER = ['미방문', '접수', '보류', '완료'] as const
 function statusRank(status: string | null | undefined) {
   const i = STATUS_ORDER.indexOf((status || '') as (typeof STATUS_ORDER)[number])
   return i === -1 ? STATUS_ORDER.length : i
+}
+
+/** 카드에 한 줄로 보여줄 교체/배송 요약 ("토너 K(1), 드럼 C(2) 미입고") */
+function partsSummary(log: ServiceLog): string {
+  const list = log.parts_usage
+  if (!list || list.length === 0) return ''
+  const merged = new Map<string, { qty: number; pending: boolean }>()
+  for (const p of list) {
+    const name = consumableLabel(p.consumable)
+    const prev = merged.get(name)
+    const pending = p.stock_status === 'pending'
+    if (prev) {
+      prev.qty += Number(p.quantity) || 0
+      prev.pending = prev.pending || pending
+    } else {
+      merged.set(name, { qty: Number(p.quantity) || 0, pending })
+    }
+  }
+  return Array.from(merged.entries())
+    .map(([name, v]) => `${name}(${v.qty})${v.pending ? ' 미입고' : ''}`)
+    .join(', ')
 }
 
 function isDummyId(id: string) {
@@ -163,9 +185,10 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
   >({})
   const [query, setQuery] = useState('')
   const [locked, setLocked] = useState(false)
-  const [sortBy, setSortBy] = useState<'client' | 'status'>('client')
+  const [sortBy, setSortBy] = useState<'client' | 'status' | 'visit'>('client')
   const [clientSort, setClientSort] = useState<'asc' | 'desc'>('asc')
   const [statusSort, setStatusSort] = useState<'asc' | 'desc'>('asc')
+  const [visitSort, setVisitSort] = useState<'asc' | 'desc'>('asc')
   const [visitPin, setVisitPin] = useState<'none' | 'visited' | 'unvisited'>('none')
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('month')
   const [periodYear, setPeriodYear] = useState(() => new Date().getFullYear())
@@ -183,6 +206,11 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
   const [schemaWarning, setSchemaWarning] = useState<string | null>(null)
   const [excelOpen, setExcelOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
+  /* 모바일(≤768px) 헤더 상태 */
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [periodSheetOpen, setPeriodSheetOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
   const widthsReady = useRef(false)
   const machineCache = React.useRef<
     Record<string, { value: string; label: string; department?: string | null }[]>
@@ -449,6 +477,19 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       groups = scored.map((s) => s.g)
     }
 
+    if (sortBy === 'visit') {
+      const dir = visitSort === 'asc' ? 1 : -1
+      groups = [...groups].sort((a, b) => {
+        // 날짜 없는 건(미방문)은 방향과 상관없이 아래로
+        const da = String(a.primary.visit_date || '')
+        const db = String(b.primary.visit_date || '')
+        if (!da && !db) return 0
+        if (!da) return 1
+        if (!db) return -1
+        return da.localeCompare(db) * dir
+      })
+    }
+
     if (sortBy === 'status') {
       const statusDir = statusSort === 'asc' ? 1 : -1
       const clientDir = clientSort === 'asc' ? 1 : -1
@@ -462,7 +503,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     }
 
     return groups
-  }, [rowGroups, visitPin, statsMonthPrefix, periodPreset, periodRange, sortBy, statusSort, clientSort])
+  }, [rowGroups, visitPin, statsMonthPrefix, periodPreset, periodRange, sortBy, statusSort, clientSort, visitSort])
 
   const summaryStats = useMemo(() => {
     // 저장 전 빈 줄은 통계에 넣지 않는다
@@ -574,10 +615,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
 
   const openLogEditor = (log: ServiceLog) => {
     if (locked) return
-    if (isDummyId(log.id)) {
-      alert('미방문 행은 표에서 내용을 입력·저장해 일지를 먼저 등록한 뒤 수정할 수 있습니다.')
-      return
-    }
+    // 미방문(dummy) 행은 아직 저장된 일지가 아니므로 내용을 채운 「새 일지」로 연다
     setSelectedLog(log)
     setIsModalOpen(true)
   }
@@ -814,6 +852,33 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     { value: '', label: '(미지정)' },
     ...employees.map((e) => ({ value: e.id, label: e.name || '(이름 없음)' })),
   ]
+
+  const SORT_CHIPS = [
+    { key: 'client' as const, label: '거래처명' },
+    { key: 'visit' as const, label: '방문일' },
+    { key: 'status' as const, label: '상태' },
+  ]
+
+  const sortDirOf = (key: 'client' | 'status' | 'visit') =>
+    key === 'client' ? clientSort : key === 'status' ? statusSort : visitSort
+
+  /** 같은 기준을 다시 누르면 오름↔내림, 다른 기준은 오름차순부터 */
+  const cycleSort = (key: 'client' | 'status' | 'visit') => {
+    const flip = (d: 'asc' | 'desc') => (d === 'asc' ? 'desc' : 'asc')
+    const setDir = key === 'client' ? setClientSort : key === 'status' ? setStatusSort : setVisitSort
+    if (sortBy === key) setDir((d) => flip(d))
+    else {
+      setSortBy(key)
+      setDir('asc')
+    }
+  }
+
+  const periodLabel =
+    periodPreset === 'all'
+      ? '전체 기간'
+      : periodPreset === 'custom'
+        ? `${customFrom || '처음'} ~ ${customTo || '오늘'}`
+        : `${periodYear}년 ${periodMonth}월`
 
   const renderVisitDisplay = (log: ServiceLog) => {
     const current = log.visit_date || ''
@@ -1150,6 +1215,129 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     )
   }
 
+  /** 모바일(≤768px)용 카드 한 장. 데스크톱 표와 같은 데이터를 세로로 보여준다. */
+  const renderLogCard = (
+    log: ServiceLog,
+    opts: {
+      groupKey: string
+      historyCount: number
+      expanded: boolean
+      isHistory: boolean
+      isExtra?: boolean
+    }
+  ) => {
+    const dummy = isDummyId(log.id)
+    const extra = isExtraRowId(log.id)
+    const dirty = Boolean(pending[log.id])
+    const hasImages = Array.isArray(log.images) && log.images.length > 0
+    const imageCount = hasImages ? log.images!.length : 0
+    const canExpand = !opts.isHistory && opts.historyCount > 0
+    const parts = partsSummary(log)
+    const machine = log.inventory
+      ? `${log.inventory.model_name}${log.inventory.serial_number ? ` (${log.inventory.serial_number})` : ''}`
+      : log.machine_model || ''
+    const meta = [log.visit_date || '날짜 없음', log.service_type, log.manager?.name]
+      .filter(Boolean)
+      .join(' · ')
+
+    return (
+      <div
+        key={`card-${log.id}`}
+        className={`${styles.card} ${opts.isHistory ? styles.cardHistory : ''} ${dirty ? styles.cardDirty : ''}`}
+      >
+        <button
+          type="button"
+          className={styles.cardMain}
+          onClick={() => openLogEditor(log)}
+          disabled={locked}
+          title={locked ? undefined : '탭하면 전체 내용'}
+        >
+          <span className={styles.cardTop}>
+            <span className={styles.cardClient}>
+              {log.client?.is_deleted ? <span className={styles.clientWarn}>!</span> : null}
+              {clientLabel(log)}
+              {log.inventory?.department ? `(${log.inventory.department})` : ''}
+            </span>
+            <span className={`${styles.badge} ${
+              log.status === '완료' ? styles.statusCompleted :
+              log.status === '보류' ? styles.statusHold :
+              log.status === '미방문' ? styles.statusUnvisited : styles.statusReceived
+            }`}>
+              {log.status}
+            </span>
+          </span>
+          <span className={styles.cardMeta}>{meta}</span>
+          {machine ? <span className={styles.cardMachine}>{machine}</span> : null}
+          {log.symptom ? <span className={styles.cardLine}>{log.symptom}</span> : null}
+          {log.action_detail ? (
+            <span className={`${styles.cardLine} ${styles.cardAction}`}>{log.action_detail}</span>
+          ) : null}
+          {parts ? (
+            <span className={styles.cardParts}>
+              <Package size="1em" strokeWidth={1.5} aria-hidden /> {parts}
+            </span>
+          ) : null}
+          {dirty ? <span className={styles.cardDirtyTag}>미저장</span> : null}
+        </button>
+
+        <div className={styles.cardSide}>
+          {extra ? (
+            <button
+              type="button"
+              className={styles.cardIconBtn}
+              aria-label="추가한 빈 줄 치우기"
+              onClick={() => removeExtraRow(log.id)}
+            >
+              <X size="1em" strokeWidth={1.5} aria-hidden />
+            </button>
+          ) : deleteMode && !dummy ? (
+            <button
+              type="button"
+              className={`${styles.cardIconBtn} ${styles.cardDeleteBtn}`}
+              aria-label="삭제"
+              disabled={locked}
+              onClick={() => handleDelete(log.id)}
+            >
+              <X size="1em" strokeWidth={1.5} aria-hidden />
+            </button>
+          ) : null}
+          {!dummy ? (
+            <button
+              type="button"
+              className={styles.cardIconBtn}
+              aria-label={hasImages ? `사진 ${imageCount}장 보기` : '사진 없음'}
+              onClick={() => setGalleryLog(log)}
+            >
+              <ImageIcon size="1em" strokeWidth={1.5} aria-hidden />
+              {hasImages ? <span className={styles.cardPhotoCount}>{imageCount}</span> : null}
+            </button>
+          ) : null}
+          {canExpand ? (
+            <button
+              type="button"
+              className={styles.visitCountBtn}
+              aria-label={`이번 기간 방문 ${opts.historyCount + 1}회`}
+              aria-expanded={opts.expanded}
+              onClick={() => toggleExpand(opts.groupKey)}
+            >
+              {opts.historyCount + 1}
+            </button>
+          ) : null}
+          {!opts.isHistory && !opts.isExtra && !locked && log.client_id ? (
+            <button
+              type="button"
+              className={styles.cardIconBtn}
+              aria-label="방문 한 건 더 입력"
+              onClick={() => addExtraRow(log)}
+            >
+              <Plus size="1em" strokeWidth={1.5} aria-hidden />
+            </button>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.container}>
       {schemaWarning ? (
@@ -1171,6 +1359,118 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           {schemaWarning}
         </div>
       ) : null}
+      {/* 모바일(768px 이하) 헤더: 2줄 */}
+      <div className={styles.mobileBar}>
+        <div className={styles.mobileRow}>
+          <h2 className={styles.mobileTitle}>{meta.title}</h2>
+          {dirtyCount > 0 ? <span className={styles.dirtyBadge}>미저장 {dirtyCount}</span> : null}
+          <button
+            type="button"
+            className={styles.mobileIconBtn}
+            aria-label="찾기"
+            aria-expanded={mobileSearchOpen}
+            onClick={() => setMobileSearchOpen((v) => !v)}
+          >
+            <Search size="1em" strokeWidth={1.5} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.mobileIconBtn}
+            aria-label="메뉴"
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((v) => !v)}
+          >
+            <MoreVertical size="1em" strokeWidth={1.5} aria-hidden />
+          </button>
+        </div>
+
+        {mobileSearchOpen ? (
+          <input
+            className={styles.mobileSearch}
+            type="search"
+            autoFocus
+            placeholder="찾기 (거래처, 증상, S/N, 담당자…)"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        ) : null}
+
+        {mobileMenuOpen ? (
+          <div className={styles.mobileMenu}>
+            <button type="button" className={styles.mobileMenuItem} onClick={() => { toggleLock(); setMobileMenuOpen(false) }}>
+              {locked ? '잠금 해제' : '잠금'}
+            </button>
+            <button
+              type="button"
+              className={styles.mobileMenuItem}
+              disabled={locked}
+              onClick={() => { setSelectedLog(null); setIsModalOpen(true); setMobileMenuOpen(false) }}
+            >
+              {meta.writeLabel.replace('+ ', '')}
+            </button>
+            {logKind === 'service' ? (
+              <button type="button" className={styles.mobileMenuItem} onClick={() => { setExcelOpen(true); setMobileMenuOpen(false) }}>
+                엑셀
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={`${styles.mobileMenuItem} ${styles.mobileMenuDanger}`}
+              disabled={locked}
+              onClick={() => { setDeleteMode((v) => !v); setMobileMenuOpen(false) }}
+            >
+              {deleteMode ? '삭제 취소' : '삭제'}
+            </button>
+            <button type="button" className={styles.mobileMenuItem} onClick={() => { setGuideOpen(true); setMobileMenuOpen(false) }}>
+              사용 안내
+            </button>
+          </div>
+        ) : null}
+
+        <div className={styles.mobileRow}>
+          <button type="button" className={styles.periodPickBtn} onClick={() => setPeriodSheetOpen(true)}>
+            <span>{periodLabel}</span>
+            <ChevronDown size="1em" strokeWidth={1.5} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={styles.countBtn}
+            aria-expanded={statsOpen}
+            onClick={() => setStatsOpen((v) => !v)}
+          >
+            <span>{summaryStats.rowCount}건</span>
+            <ChevronDown size="1em" strokeWidth={1.5} aria-hidden />
+          </button>
+        </div>
+
+        {statsOpen ? (
+          <div className={styles.mobileStats}>
+            <button
+              type="button"
+              className={`${styles.statBtn} ${visitPin === 'none' ? styles.statBtnActive : ''}`}
+              onClick={() => { setVisitPin('none'); setClientSort('asc') }}
+            >
+              거래처 <strong>{summaryStats.clientCount}</strong>
+            </button>
+            <span className={styles.statItem}>기계 <strong>{summaryStats.machineCount}</strong></span>
+            <button
+              type="button"
+              className={`${styles.statBtn} ${visitPin === 'visited' ? styles.statBtnActive : ''}`}
+              onClick={() => setVisitPin((v) => (v === 'visited' ? 'none' : 'visited'))}
+            >
+              방문 완료 <strong>{summaryStats.monthVisited}</strong>
+            </button>
+            <button
+              type="button"
+              className={`${styles.statBtn} ${styles.statWarnBtn} ${visitPin === 'unvisited' ? styles.statBtnActiveWarn : ''}`}
+              onClick={() => setVisitPin((v) => (v === 'unvisited' ? 'none' : 'unvisited'))}
+            >
+              미방문 <strong>{summaryStats.monthUnvisited}</strong>
+            </button>
+          </div>
+        ) : null}
+      </div>
+
       <div className={styles.headerSection}>
         <div className={styles.headerLeft}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1378,6 +1678,72 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
         </div>
       </div>
 
+      <div className={styles.sortBar}>
+        <span className={styles.sortBarLabel}>정렬</span>
+        {SORT_CHIPS.map((c) => {
+          const active = sortBy === c.key
+          return (
+            <button
+              key={c.key}
+              type="button"
+              className={`${styles.sortChip} ${active ? styles.sortChipActive : ''}`}
+              aria-pressed={active}
+              onClick={() => cycleSort(c.key)}
+            >
+              {c.label}{active ? (sortDirOf(c.key) === 'asc' ? ' ↑' : ' ↓') : ''}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className={`${styles.cardList} ${locked ? styles.cardListLocked : ''}`}>
+        {loading ? (
+          <div className={styles.emptyResult}>로딩 중...</div>
+        ) : displayRowGroups.length === 0 ? (
+          <div className={styles.emptyResult}>
+            {query || periodPreset !== 'all'
+              ? '조건에 맞는 기록이 없습니다. 위에서 「전체」 기간을 눌러 보세요.'
+              : '이 회사(조직)에는 아직 일지가 없습니다.'}
+          </div>
+        ) : (
+          displayRowGroups.flatMap((group) => {
+            const expanded = Boolean(expandedKeys[group.key])
+            const cards = [
+              renderLogCard(group.primary, {
+                groupKey: group.key,
+                historyCount: group.history.length,
+                expanded,
+                isHistory: false,
+              }),
+            ]
+            group.extras.forEach((ex) => {
+              cards.push(
+                renderLogCard(ex, {
+                  groupKey: group.key,
+                  historyCount: 0,
+                  expanded,
+                  isHistory: false,
+                  isExtra: true,
+                })
+              )
+            })
+            if (expanded) {
+              group.history.forEach((h) => {
+                cards.push(
+                  renderLogCard(h, {
+                    groupKey: group.key,
+                    historyCount: 0,
+                    expanded: true,
+                    isHistory: true,
+                  })
+                )
+              })
+            }
+            return cards
+          })
+        )}
+      </div>
+
       <div className={`${styles.tableContainer} ${locked ? styles.tableContainerLocked : ''}`}>
         <table className={styles.table} style={{ minWidth: Math.max(tableMinWidth, 100), width: '100%' }}>
           <colgroup>
@@ -1405,7 +1771,16 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
                   상태{sortBy === 'status' ? (statusSort === 'asc' ? ' ↑' : ' ↓') : ''}
                 </button>
               </ResizableTh>
-              <ResizableTh className={styles.th} width={colWidths.visit} minWidth={72} onResize={(w) => setColWidth('visit', w)}>방문일자</ResizableTh>
+              <ResizableTh className={styles.th} width={colWidths.visit} minWidth={72} onResize={(w) => setColWidth('visit', w)}>
+                <button
+                  type="button"
+                  className={styles.sortThBtn}
+                  onClick={() => cycleSort('visit')}
+                  title="방문일자로 정렬"
+                >
+                  방문일자{sortBy === 'visit' ? (visitSort === 'asc' ? ' ↑' : ' ↓') : ''}
+                </button>
+              </ResizableTh>
               <ResizableTh className={styles.th} width={colWidths.type} minWidth={52} onResize={(w) => setColWidth('type', w)}>구분</ResizableTh>
               <ResizableTh className={styles.th} width={colWidths.client} minWidth={72} onResize={(w) => setColWidth('client', w)}>
                 <button
@@ -1497,6 +1872,62 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           </tbody>
         </table>
       </div>
+
+      {dirtyCount > 0 && !locked ? (
+        <div className={styles.mobileSaveBar}>
+          <Button variant="primary" onClick={handleSaveAll} disabled={saving}>
+            {saving ? '저장 중…' : `저장 ${dirtyCount}건`}
+          </Button>
+        </div>
+      ) : null}
+
+      <Modal
+        open={periodSheetOpen}
+        onClose={() => setPeriodSheetOpen(false)}
+        title="기간 선택"
+        size="sm"
+      >
+        <div className={styles.sheetYear}>
+          <button type="button" className={styles.periodYearBtn} aria-label="이전 해" onClick={() => setPeriodYear((y) => y - 1)}>‹</button>
+          <span className={styles.periodYearLabel}>{periodYear}년</span>
+          <button type="button" className={styles.periodYearBtn} aria-label="다음 해" onClick={() => setPeriodYear((y) => y + 1)}>›</button>
+        </div>
+        <div className={styles.sheetMonths}>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={`${styles.periodBtn} ${periodPreset === 'month' && periodMonth === m ? styles.periodBtnActive : ''}`}
+              onClick={() => { setPeriodPreset('month'); setPeriodMonth(m); setPeriodSheetOpen(false) }}
+            >
+              {m}월
+            </button>
+          ))}
+        </div>
+        <div className={styles.sheetRow}>
+          <button
+            type="button"
+            className={`${styles.periodBtn} ${periodPreset === 'all' ? styles.periodBtnActive : ''}`}
+            onClick={() => { setPeriodPreset('all'); setPeriodSheetOpen(false) }}
+          >
+            전체
+          </button>
+          <button
+            type="button"
+            className={`${styles.periodBtn} ${periodPreset === 'custom' ? styles.periodBtnActive : ''}`}
+            onClick={() => setPeriodPreset('custom')}
+          >
+            기간지정
+          </button>
+        </div>
+        {periodPreset === 'custom' ? (
+          <div className={styles.sheetRow}>
+            <input type="date" className={styles.periodDate} value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+            <span className={styles.periodTilde}>~</span>
+            <input type="date" className={styles.periodDate} value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+          </div>
+        ) : null}
+      </Modal>
 
       {logKind === 'service' ? (
       <ServiceExcelModal

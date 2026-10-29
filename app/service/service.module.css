@@ -881,6 +881,304 @@
   color: #6b7280;
 }
 
+/* ── 모바일 카드 목록 (≤768px 에서만 보임, DESIGN_SYSTEM.md) ───────────── */
+.cardList {
+  display: none;
+}
+
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-1);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.cardHistory {
+  padding-left: var(--sp-4);
+  background: var(--c-bg);
+}
+
+.cardDirty {
+  box-shadow: inset 2px 0 0 var(--c-accent);
+}
+
+.cardMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cardMain:disabled {
+  cursor: default;
+}
+
+.cardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.cardClient {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--c-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardMeta {
+  font-size: var(--fs-xs);
+  color: var(--c-ink-2);
+}
+
+.cardMachine {
+  font-size: var(--fs-xs);
+  color: var(--c-ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardLine {
+  font-size: var(--fs-xs);
+  color: var(--c-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardAction {
+  color: var(--c-ink-2);
+}
+
+.cardParts {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: 0.1rem;
+  font-size: var(--fs-xs);
+  color: var(--c-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardDirtyTag {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  font-size: var(--fs-xs);
+  color: var(--c-accent);
+}
+
+.cardSide {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: 0 0 auto;
+  padding-top: 0.1rem;
+}
+
+.cardIconBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 2rem;
+  height: 2rem;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--c-ink-3);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.cardIconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.cardDeleteBtn {
+  color: var(--c-danger);
+}
+
+.cardPhotoCount {
+  font-variant-numeric: tabular-nums;
+  color: var(--c-ink-2);
+}
+
+/* 모바일 헤더 · 정렬 바 · 저장 바 (768px 이하에서만 보임) */
+.mobileBar,
+.sortBar,
+.mobileSaveBar {
+  display: none;
+}
+
+.mobileRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.mobileTitle {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  color: var(--c-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.125rem;
+  height: 2.125rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--c-ink-2);
+  font-size: var(--fs-md);
+  cursor: pointer;
+}
+
+.mobileSearch {
+  width: 100%;
+  height: 2.125rem;
+  margin-top: var(--sp-2);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-1);
+  background: var(--c-surface);
+  color: var(--c-ink);
+  font-size: var(--fs-sm);
+}
+
+.mobileMenu {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--sp-2);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-1);
+  background: var(--c-surface);
+}
+
+.mobileMenuItem {
+  padding: var(--sp-2) var(--sp-3);
+  border: none;
+  border-bottom: 1px solid var(--c-line);
+  background: none;
+  color: var(--c-ink);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mobileMenuItem:last-child {
+  border-bottom: none;
+}
+
+.mobileMenuItem:disabled {
+  color: var(--c-ink-3);
+  cursor: default;
+}
+
+.mobileMenuDanger {
+  color: var(--c-danger);
+}
+
+.periodPickBtn,
+.countBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-1);
+  height: 2.125rem;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-1);
+  background: var(--c-surface);
+  color: var(--c-ink);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.periodPickBtn {
+  flex: 1;
+  min-width: 0;
+}
+
+.countBtn {
+  flex: 0 0 auto;
+  color: var(--c-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.mobileStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.sortBarLabel {
+  font-size: var(--fs-xs);
+  color: var(--c-ink-3);
+}
+
+.sortChip {
+  padding: var(--sp-1) var(--sp-2);
+  border: none;
+  border-radius: var(--radius-1);
+  background: none;
+  color: var(--c-ink-2);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.sortChipActive {
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  font-weight: var(--fw-medium);
+}
+
+.sheetYear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.sheetMonths {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+}
+
+.sheetRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
 @media (max-width: 768px) {
   .container {
     height: auto;
@@ -888,76 +1186,51 @@
     max-height: none;
   }
 
-  .headerSection {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
-  }
-
-  .headerLeft {
-    flex: 1;
-    min-width: 0;
-    gap: 4px;
-  }
-
-  .title {
-    font-size: 0.95rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .hint {
+  .headerSection,
+  .filterStatsRow {
     display: none;
   }
 
-  .toolbar {
-    width: 100%;
-    gap: 4px;
+  .mobileBar {
+    display: block;
+    margin-bottom: var(--sp-2);
   }
 
-  .searchInput {
-    flex: 1;
-    width: auto;
-    min-width: 0;
-    height: 32px;
-    font-size: 0.8rem;
-    padding: 0 8px;
-  }
-
-  .headerActions {
-    width: auto;
-    flex-wrap: nowrap;
-    flex-shrink: 0;
-    gap: 4px;
-  }
-
-  .headerActions > * {
-    flex: 0 0 auto;
-  }
-
-
-  .periodBar {
-    width: 100%;
-    gap: 4px 6px;
-    font-size: 0.75rem;
-  }
-
-  .filterStatsRow {
-    flex-direction: row;
-    flex-wrap: wrap;
+  .sortBar {
+    display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 6px;
-    margin-bottom: 4px;
+    gap: var(--sp-1);
+    padding: var(--sp-1) 0;
+    border-top: 1px solid var(--c-line);
+  }
+
+  .mobileSaveBar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    justify-content: center;
+    padding: var(--sp-2) var(--sp-3);
+    border-top: 1px solid var(--c-line);
+    background: var(--c-surface);
+  }
+
+  .mobileSaveBar > * {
+    width: 100%;
   }
 
   .tableContainer {
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    max-height: min(70dvh, 640px);
+    display: none;
+  }
+
+  .cardList {
+    display: block;
+    overflow-y: auto;
+    border-top: 1px solid var(--c-line);
+    padding-bottom: 4rem;
+    max-height: none;
   }
 
   .th,
