@@ -4,13 +4,15 @@ import React, { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase'
 import styles from './InventoryList.module.css'
 import Button from './../ui/Button'
-import { Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { Inventory, Client } from '@/app/types'
 // ✅ Server Actions 임포트
 import { deleteInventoryAction, restoreInventoryAction } from '@/app/actions/inventory'
 // ✅ 팝업 컴포넌트 재사용
 import InventoryForm from './InventoryForm'
+import MachineHistoryModal from './MachineHistoryModal'
 import { useSortableData } from '@/utils/tableSort'
+import { useSingleFlight } from '@/hooks/useSingleFlight'
 
 interface InventoryListProps {
   type: string
@@ -35,6 +37,10 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
 
   // 상세 보기 상태 (단순 조회용)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const runOnce = useSingleFlight()
+  const [historyFor, setHistoryFor] = useState<Inventory | null>(null)
+  const [clientOptions, setClientOptions] = useState<{ id: string; name: string }[]>([])
+  const [strandedOpen, setStrandedOpen] = useState(false)
   
   // ✅ 팝업(모달) 수정용 상태
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -68,6 +74,14 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
         return
       }
       if (data) setItems(data as Inventory[])
+
+      const { data: clientRows } = await supabase
+        .from('clients')
+        .select('id, name')
+        .eq('organization_id', profile.organization_id)
+        .eq('is_deleted', false)
+        .order('name')
+      setClientOptions((clientRows || []) as { id: string; name: string }[])
     } finally {
       setLoading(false)
     }
@@ -79,7 +93,7 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
   }, [type, refreshTrigger])
 
   // 삭제(휴지통 이동) 액션
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => runOnce(`delete:${id}`, async () => {
     if (confirm('삭제하면 휴지통으로 이동합니다. 계속할까요? (거래처에 설치된 기기는 먼저 철수해야 삭제할 수 있습니다)')) {
       try {
         const result = await deleteInventoryAction(id);
@@ -93,10 +107,10 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
         alert('삭제 실패: ' + e.message);
       }
     }
-  }
+  })
 
   // 휴지통에서 복구
-  const handleRestore = async (id: string) => {
+  const handleRestore = (id: string) => runOnce(`restore:${id}`, async () => {
     if (!confirm('이 기기를 휴지통에서 복구할까요?')) return
     try {
       const result = await restoreInventoryAction(id);
@@ -109,7 +123,7 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
     } catch (e: any) {
       alert('복구 실패: ' + e.message);
     }
-  }
+  })
 
   // ✅ [수정] 버튼 클릭 시 모달 열기
   const handleEditClick = (e: React.MouseEvent, item: Inventory) => {
@@ -171,10 +185,50 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredItems.length])
 
+  /** 거래처 연결 없이 설치·교체전 상태로 남은 기기 — 거래처 화면에서는 보이지 않는다 */
+  const stranded = items.filter(
+    (i) => !i.is_deleted && !i.client_id && (i.status === '설치' || i.status === '교체전(철수)')
+  )
+
   if (loading) return <div className={styles.noDataRow}>데이터를 불러오는 중...</div>
 
   return (
     <div className={styles.container}>
+      {stranded.length > 0 ? (
+        <div className={styles.strandedBox}>
+          <button
+            type="button"
+            className={styles.strandedToggle}
+            aria-expanded={strandedOpen}
+            onClick={() => setStrandedOpen((v) => !v)}
+          >
+            {strandedOpen
+              ? <ChevronDown size="1em" strokeWidth={1.5} aria-hidden />
+              : <ChevronRight size="1em" strokeWidth={1.5} aria-hidden />}
+            <strong>정리 필요 {stranded.length}건</strong>
+          </button>
+          {strandedOpen ? (
+            <div className={styles.strandedBody}>
+              거래처 연결 없이 「설치」 또는 「교체전(철수)」로 남은 기기입니다. 거래처 화면에는 보이지 않으니,
+              상태를 「창고」로 되돌린 뒤 거래처 페이지에서 설치해 주세요.
+              <div className={styles.strandedList}>
+                {stranded.slice(0, 12).map((i) => (
+                  <button
+                    key={i.id}
+                    type="button"
+                    className={styles.strandedChip}
+                    onClick={(e) => handleEditClick(e, i)}
+                  >
+                    {i.model_name} ({i.serial_number}) · {i.status}
+                  </button>
+                ))}
+                {stranded.length > 12 ? <span>…</span> : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className={styles.searchContainer}>
             <input 
               placeholder="모델명, 브랜드, S/N, 설치처 등으로 검색..." 
@@ -234,6 +288,14 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
                       </span>
                       <span className={styles.mPrice}>{item.contract_type || '-'}</span>
                     </div>
+                    <button
+                      type="button"
+                      className={styles.mActionBtn}
+                      onClick={() => setHistoryFor(item)}
+                      aria-label="설치·철수 이력"
+                    >
+                      이력
+                    </button>
                     {item.is_deleted ? (
                       <button type="button" className={styles.mActionBtn} onClick={() => handleRestore(item.id)}>복구</button>
                     ) : (
@@ -326,6 +388,14 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
                                       수정
                                     </Button>
                                     <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => { e.stopPropagation(); setHistoryFor(item); }}
+                                      title="이 기기가 거쳐 간 거래처 기록"
+                                    >
+                                      이력
+                                    </Button>
+                                    <Button
                                       variant="danger"
                                       size="sm"
                                       onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
@@ -384,6 +454,16 @@ export default function InventoryList({ type, refreshTrigger, onCountChange }: I
               </tbody>
             </table>
           </div>
+
+      {historyFor ? (
+        <MachineHistoryModal
+          inventoryId={historyFor.id}
+          machineLabel={`${historyFor.model_name}${historyFor.serial_number ? ` (${historyFor.serial_number})` : ''}`}
+          clients={clientOptions}
+          onClose={() => setHistoryFor(null)}
+          onChanged={fetchItems}
+        />
+      ) : null}
 
       {/* ✅ 수정용 팝업 (InventoryForm 재사용) */}
       <InventoryForm 

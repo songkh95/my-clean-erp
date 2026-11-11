@@ -1,6 +1,7 @@
 'use client'
 
 import { consumableLabel } from '@/utils/consumableLabel'
+import { compactConsumableText, formatConsumableCounts } from '@/utils/consumableCounts'
 import { ChevronDown, Image as ImageIcon, Info, MoreVertical, Package, Plus, Search, X } from 'lucide-react'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Button from '@/components/ui/Button'
@@ -26,6 +27,7 @@ import {
 } from '@/app/actions/service'
 import { ServiceLog } from '@/app/types'
 import { useAppSettings } from '@/hooks/useAppSettings'
+import { useSingleFlight } from '@/hooks/useSingleFlight'
 import { getMyProfileAction } from '@/app/actions/auth'
 
 export type { ServiceLogKind }
@@ -80,25 +82,51 @@ function statusRank(status: string | null | undefined) {
   return i === -1 ? STATUS_ORDER.length : i
 }
 
-/** 카드에 한 줄로 보여줄 교체/배송 요약 ("토너 K(1), 드럼 C(2) 미입고") */
-function partsSummary(log: ServiceLog): string {
+/** 분류별로 묶은 소모품 목록 ("토너 K(1), C(1), 드럼 K(1), 폐토너통(1)") */
+function partsCounts(log: ServiceLog) {
   const list = log.parts_usage
-  if (!list || list.length === 0) return ''
-  const merged = new Map<string, { qty: number; pending: boolean }>()
+  if (!list || list.length === 0) return []
+  const merged = new Map<string, { category: string; color: string; regen: boolean; qty: number; pending: boolean }>()
   for (const p of list) {
-    const name = consumableLabel(p.consumable)
-    const prev = merged.get(name)
+    const c = p.consumable || {}
+    const category = String((c as any).category || '').trim() || consumableLabel(c)
+    const color = String((c as any).color || '').trim()
+    const regen = Boolean((c as any).is_regenerated)
+    const key = `${category}|${color}|${regen ? 'r' : ''}`
+    const prev = merged.get(key)
     const pending = p.stock_status === 'pending'
     if (prev) {
       prev.qty += Number(p.quantity) || 0
       prev.pending = prev.pending || pending
     } else {
-      merged.set(name, { qty: Number(p.quantity) || 0, pending })
+      merged.set(key, { category, color, regen, qty: Number(p.quantity) || 0, pending })
     }
   }
-  return Array.from(merged.entries())
-    .map(([name, v]) => `${name}(${v.qty})${v.pending ? ' 미입고' : ''}`)
-    .join(', ')
+  return Array.from(merged.values())
+}
+
+/** 카드에 한 줄로 보여줄 교체/배송 요약 */
+function partsSummary(log: ServiceLog): string {
+  const counts = partsCounts(log)
+  if (counts.length === 0) return ''
+  return formatConsumableCounts(
+    counts.map((c) => ({
+      category: c.category,
+      color: c.color,
+      is_regenerated: c.regen,
+      qty: c.qty,
+      note: c.pending ? '미입고' : null,
+    }))
+  )
+}
+
+/** 이 행에 적은 재고가 없으면 같은 기기(없으면 거래처)의 마지막 기록을 이어서 쓴다 */
+function spareStockOf(log: ServiceLog): { value: string; at: string; own: boolean } | null {
+  const own = String(log.spare_stock || '').trim()
+  if (own) return { value: compactConsumableText(own), at: log.spare_stock_at || log.visit_date || '-', own: true }
+  const carried = String(log.latest_spare_stock || '').trim()
+  if (carried) return { value: compactConsumableText(carried), at: log.latest_spare_stock_at || '-', own: false }
+  return null
 }
 
 function isDummyId(id: string) {
@@ -172,6 +200,7 @@ function loadColWidths(): Record<ColKey, number> {
 export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?: ServiceLogKind }) {
   const meta = KIND_META[logKind] || KIND_META.service
   const { settings } = useAppSettings()
+  const runOnce = useSingleFlight()
   const [logs, setLogs] = useState<ServiceLog[]>([])
   const [pending, setPending] = useState<Record<string, PendingFields>>({})
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -620,7 +649,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     setIsModalOpen(true)
   }
 
-  const handleSaveAll = async () => {
+  const handleSaveAll = () => runOnce('save-all', async () => {
     if (locked) return alert('잠금 상태입니다. 잠금을 해제한 뒤 저장하세요.')
     if (dirtyCount === 0) return alert('저장할 변경 사항이 없습니다.')
 
@@ -709,9 +738,9 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     } finally {
       setSaving(false)
     }
-  }
+  })
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => runOnce(`delete:${id}`, async () => {
     if (locked) return
     if (!confirm('정말 삭제하시겠습니까? (완료된 건은 재고가 복구됩니다)')) return
     const result = await deleteServiceLogAction(id)
@@ -725,7 +754,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     } else {
       alert(result.message)
     }
-  }
+  })
 
   const handleClose = () => {
     setIsModalOpen(false)
@@ -1112,38 +1141,15 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
                 : '클릭하여 토너·드럼·부품 선택'
           }
         >
-          <div className={styles.clampInner}>
-            {log.parts_usage && log.parts_usage.length > 0
-              ? (() => {
-                  // 분류·색상으로 묶어 보여주고 (토너 K), 모델명은 마우스를 올리면 보이게 한다
-                  const merged = new Map<string, { name: string; models: Set<string>; qty: number; pending: boolean }>()
-                  for (const p of log.parts_usage) {
-                    const name = consumableLabel(p.consumable)
-                    const model = String(p.consumable?.model_name || '').trim()
-                    const prev = merged.get(name)
-                    const pendingStock = p.stock_status === 'pending'
-                    if (prev) {
-                      prev.qty += Number(p.quantity) || 0
-                      prev.pending = prev.pending || pendingStock
-                      if (model) prev.models.add(model)
-                    } else {
-                      merged.set(name, {
-                        name,
-                        models: new Set(model ? [model] : []),
-                        qty: Number(p.quantity) || 0,
-                        pending: pendingStock,
-                      })
-                    }
-                  }
-                  return Array.from(merged.values()).map((p, i) => (
-                    <span key={`${log.id}-part-${i}`} title={p.models.size > 0 ? Array.from(p.models).join(', ') : undefined}>
-                      {i > 0 ? ', ' : ''}
-                      {p.name}({p.qty})
-                      {p.pending ? <span className={styles.pendingTag}> 미입고</span> : null}
-                    </span>
-                  ))
-                })()
-              : <span className={styles.emptyCell}>-</span>}
+          <div
+            className={styles.clampInner}
+            title={
+              log.parts_usage && log.parts_usage.length > 0
+                ? Array.from(new Set(log.parts_usage.map((p) => String(p.consumable?.model_name || "").trim()).filter(Boolean))).join(", ")
+                : undefined
+            }
+          >
+            {partsSummary(log) || <span className={styles.emptyCell}>-</span>}
           </div>
         </td>
 
@@ -1163,18 +1169,21 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           clamp
           disabled={locked}
           className={styles.tdWrap}
-          display={
-            log.spare_stock ? (
-              <span>
-                {log.spare_stock}
-                <span className={styles.spareDate}>
-                  {' '}({log.spare_stock_at || log.visit_date || '-'})
-                </span>
+          display={(() => {
+            const own = String(log.spare_stock || '').trim()
+            const carried = String(log.latest_spare_stock || '').trim()
+            if (!own && !carried) return <span className={styles.emptyCell}>-</span>
+            const value = compactConsumableText(own || carried)
+            const at = own
+              ? (log.spare_stock_at || log.visit_date || '-')
+              : (log.latest_spare_stock_at || '-')
+            return (
+              <span className={own ? undefined : styles.spareCarried} title={own ? undefined : '이전에 기록한 재고'}>
+                {value}
+                <span className={styles.spareDate}> ({at})</span>
               </span>
-            ) : (
-              <span className={styles.emptyCell}>-</span>
             )
-          }
+          })()}
           onSave={(v) => queueEdit(log, { spare_stock: v })}
         />
 
@@ -1233,6 +1242,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     const imageCount = hasImages ? log.images!.length : 0
     const canExpand = !opts.isHistory && opts.historyCount > 0
     const parts = partsSummary(log)
+    const stock = spareStockOf(log)
     const machine = log.inventory
       ? `${log.inventory.model_name}${log.inventory.serial_number ? ` (${log.inventory.serial_number})` : ''}`
       : log.machine_model || ''
@@ -1272,11 +1282,11 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
           {log.action_detail ? (
             <span className={`${styles.cardLine} ${styles.cardAction}`}>{log.action_detail}</span>
           ) : null}
-          {log.spare_stock ? (
-            <span className={styles.cardStock}>
+          {stock ? (
+            <span className={`${styles.cardStock} ${stock.own ? '' : styles.spareCarried}`}>
               <span className={styles.cardStockLabel}>현재 재고</span>
-              {log.spare_stock}
-              <span className={styles.cardStockLabel}>({log.spare_stock_at || log.visit_date || '-'})</span>
+              {stock.value}
+              <span className={styles.cardStockLabel}>({stock.at})</span>
             </span>
           ) : null}
           {parts ? (

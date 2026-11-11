@@ -113,6 +113,7 @@ export default function ServiceForm({
   const [machineMenuOpen, setMachineMenuOpen] = useState(false)
   const sessionCreatedRef = useRef<string[]>([])
   const savedRef = useRef(false)
+  const submittingRef = useRef(false)
   const clientBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const machineBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -435,6 +436,8 @@ export default function ServiceForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // 저장 중에 또 눌러도 한 번만 보낸다
+    if (submittingRef.current) return
     const nameOnly = skipClientRegister && allowSkipClient
     if (nameOnly) {
       if (!clientQuery.trim()) return alert('거래처명을 입력해주세요.')
@@ -444,64 +447,68 @@ export default function ServiceForm({
     if (!formData.manager_id) return alert('담당자를 선택해주세요.')
     if (!validatePartsForSubmit()) return
 
+    submittingRef.current = true
     setLoading(true)
 
-    const payloadParts = usedParts
-      .filter((p) => p.consumable_id && Number(p.quantity) !== 0)
-      .map((p) => ({ consumable_id: p.consumable_id, quantity: Number(p.quantity) }))
+    try {
+      const payloadParts = usedParts
+        .filter((p) => p.consumable_id && Number(p.quantity) !== 0)
+        .map((p) => ({ consumable_id: p.consumable_id, quantity: Number(p.quantity) }))
 
-    const freeMachine =
-      !formData.inventory_id && machineQuery.trim()
-        ? machineQuery.replace(/\s*\([^)]*\)\s*$/, '').trim()
-        : formData.machine_model
+      const freeMachine =
+        !formData.inventory_id && machineQuery.trim()
+          ? machineQuery.replace(/\s*\([^)]*\)\s*$/, '').trim()
+          : formData.machine_model
 
-    const resolvedModel =
-      resolveMachineModel(freeMachine || formData.machine_model || '', [
-        ...officeMachines.map((m) => String(m.model_name || '')),
-        ...machines.map((m) => String(m.model_name || '')),
-      ]) || canonicalizeMachineModel(freeMachine || formData.machine_model || '')
+      const resolvedModel =
+        resolveMachineModel(freeMachine || formData.machine_model || '', [
+          ...officeMachines.map((m) => String(m.model_name || '')),
+          ...machines.map((m) => String(m.model_name || '')),
+        ]) || canonicalizeMachineModel(freeMachine || formData.machine_model || '')
 
-    const payload = {
-      ...formData,
-      log_kind: logKind,
-      client_id: nameOnly ? '' : formData.client_id,
-      client_name: nameOnly ? clientQuery.trim() : formData.client_name || clientQuery.trim(),
-      inventory_id: formData.inventory_id || '',
-      machine_model: resolvedModel || '',
-    }
+      const payload = {
+        ...formData,
+        log_kind: logKind,
+        client_id: nameOnly ? '' : formData.client_id,
+        client_name: nameOnly ? clientQuery.trim() : formData.client_name || clientQuery.trim(),
+        inventory_id: formData.inventory_id || '',
+        machine_model: resolvedModel || '',
+      }
 
-    let result: any
-    if (editingId) {
-      result = await updateServiceLogAction(editingId, payload, payloadParts)
-    } else {
-      result = await createServiceLogAction(payload, payloadParts)
-    }
+      let result: any
+      if (editingId) {
+        result = await updateServiceLogAction(editingId, payload, payloadParts)
+      } else {
+        result = await createServiceLogAction(payload, payloadParts)
+      }
 
-    if (!result.success) {
-      alert(result.message || '저장에 실패했습니다.')
-      setLoading(false)
-      return
-    }
-
-    savedRef.current = true
-    sessionCreatedRef.current = []
-
-    const logId = editingId || result.id
-    if (logId && pendingImages.length > 0) {
-      const up = await uploadPendingServiceImages(logId, pendingImages)
-      if (!up.ok) {
-        alert(`${result.message}\n다만 이미지: ${up.message}`)
-        onSuccess()
-        onClose()
-        setLoading(false)
+      if (!result.success) {
+        alert(result.message || '저장에 실패했습니다.')
         return
       }
-    }
 
-    alert(result.message || (editingId ? '수정되었습니다.' : '저장되었습니다.'))
-    onSuccess()
-    onClose()
-    setLoading(false)
+      savedRef.current = true
+      sessionCreatedRef.current = []
+
+      const logId = editingId || result.id
+      if (logId && pendingImages.length > 0) {
+        const up = await uploadPendingServiceImages(logId, pendingImages)
+        if (!up.ok) {
+          alert(`${result.message}\n다만 이미지: ${up.message}`)
+          onSuccess()
+          onClose()
+          return
+        }
+      }
+
+      alert(result.message || (editingId ? '수정되었습니다.' : '저장되었습니다.'))
+      onSuccess()
+      onClose()
+    } finally {
+      // 서버 오류로 중간에 끊겨도 버튼이 잠긴 채 남지 않게 한다
+      submittingRef.current = false
+      setLoading(false)
+    }
   }
 
   const handleCancel = async () => {

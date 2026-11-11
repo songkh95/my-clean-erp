@@ -253,6 +253,10 @@ export interface ServiceLog {
   created_at: string;
   /** 동일 기기(또는 거래처) 기준 직전 방문일 */
   prev_visit_date?: string | null;
+  /** 같은 기기(없으면 거래처)에서 마지막으로 기록된 현재 재고 — 기간과 무관하게 계속 보여줌 */
+  latest_spare_stock?: string | null;
+  /** 그 재고를 기록한 날 */
+  latest_spare_stock_at?: string | null;
   
   client?: { name: string; is_deleted?: boolean | null };
   inventory?: { model_name: string; serial_number: string; department?: string | null };

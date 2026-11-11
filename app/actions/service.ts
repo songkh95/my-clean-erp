@@ -736,6 +736,36 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
     if (arr.length > 0) lastVisitByKey.set(key, arr[arr.length - 1].visit_date)
   }
 
+  // 거래처별 마지막으로 기록된 현재 재고.
+  // 재고는 적어 둔 날에만 있는 값이 아니라 현장에 남아 있는 양이므로,
+  // 어느 달을 보고 있든 같은 거래처의 모든 행에 이어서 보여준다.
+  // 기계는 다른 거래처로 옮겨갈 수 있으니 기계가 아니라 거래처를 기준으로 잇는다.
+  const spareKeyOf = (log: any) =>
+    log.client_id
+      ? `c:${log.client_id}`
+      : log.inventory_id
+        ? `i:${log.inventory_id}`
+        : `n:${log.client_name || log.id}`
+
+  const latestSpareByKey = new Map<string, { value: string; at: string | null }>()
+  const logsByDate = [...realLogs].sort((a, b) => {
+    const da = a.visit_date || ''
+    const db = b.visit_date || ''
+    if (da !== db) return da.localeCompare(db)
+    return String(a.created_at || '').localeCompare(String(b.created_at || ''))
+  })
+  for (const log of logsByDate) {
+    const value = String(log.spare_stock || '').trim()
+    if (!value) continue
+    latestSpareByKey.set(spareKeyOf(log), { value, at: log.spare_stock_at || log.visit_date || null })
+  }
+  for (const log of realLogs) {
+    const latest = latestSpareByKey.get(spareKeyOf(log))
+    if (!latest) continue
+    log.latest_spare_stock = latest.value
+    log.latest_spare_stock_at = latest.at
+  }
+
   // 판매/출장: 미방문 더미 행 없음
   if (kind !== 'service') {
     return { success: true, data: realLogs }
@@ -802,6 +832,8 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
       created_at: new Date().toISOString(),
       parts_usage: [],
       prev_visit_date: lastVisitByKey.get(`i:${m.id}`) || null,
+      latest_spare_stock: latestSpareByKey.get(`c:${m.client_id}`)?.value || null,
+      latest_spare_stock_at: latestSpareByKey.get(`c:${m.client_id}`)?.at || null,
     }))
 
   // 4. [거래처 기준] 기계 없는 거래처의 미방문 더미 (과거 일지 유무와 무관)
@@ -833,6 +865,8 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
       created_at: new Date().toISOString(),
       parts_usage: [],
       prev_visit_date: lastVisitByKey.get(`c:${c.id}`) || null,
+      latest_spare_stock: latestSpareByKey.get(`c:${c.id}`)?.value || null,
+      latest_spare_stock_at: latestSpareByKey.get(`c:${c.id}`)?.at || null,
     }))
 
   const combinedData = [...realLogs, ...machineDummyLogs, ...clientDummyLogs]

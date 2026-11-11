@@ -352,6 +352,104 @@ export async function withdrawInventoryAction(
 }
 
 // ----------------------------------------------------------------------
+// 6. 창고에 있는 기기를 거래처에 설치 (새로 등록하지 않고 옮기기)
+// ----------------------------------------------------------------------
+export async function assignMachineToClientAction(
+  inventoryId: string,
+  clientId: string,
+  data: {
+    initial_counts: { bw: number; col: number; bw_a3: number; col_a3: number }
+    contract: { start_date: string; end_date: string }
+    memo: string
+  }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.' }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.' }
+  const orgId = profile.organization_id
+
+  try {
+    const { data: asset } = await supabase
+      .from('inventory')
+      .select('id, status, client_id, is_deleted, model_name')
+      .eq('id', inventoryId)
+      .eq('organization_id', orgId)
+      .maybeSingle()
+
+    if (!asset) return { success: false, message: '기기를 찾을 수 없습니다.' }
+    if (asset.is_deleted) return { success: false, message: '휴지통에 있는 기기는 설치할 수 없습니다. 먼저 복구해 주세요.' }
+    if (asset.client_id) {
+      return {
+        success: false,
+        message: '이미 다른 거래처에 설치된 기기입니다. 그 거래처에서 [철수] 또는 [교체]를 먼저 해 주세요.',
+      }
+    }
+
+    const { error: invErr } = await supabase
+      .from('inventory')
+      .update({
+        status: '설치',
+        client_id: clientId,
+        initial_count_bw: data.initial_counts.bw,
+        initial_count_col: data.initial_counts.col,
+        initial_count_bw_a3: data.initial_counts.bw_a3,
+        initial_count_col_a3: data.initial_counts.col_a3,
+        contract_start_date: data.contract.start_date || null,
+        contract_end_date: data.contract.end_date || null,
+      })
+      .eq('id', inventoryId)
+      .eq('organization_id', orgId)
+
+    if (invErr) throw new Error('설치 처리 실패: ' + invErr.message)
+
+    const { error: histErr } = await supabase.from('machine_history').insert({
+      inventory_id: inventoryId,
+      client_id: clientId,
+      organization_id: orgId,
+      action_type: 'INSTALL',
+      bw_count: data.initial_counts.bw,
+      col_count: data.initial_counts.col,
+      bw_a3_count: data.initial_counts.bw_a3,
+      col_a3_count: data.initial_counts.col_a3,
+      memo: data.memo ? `설치: ${data.memo}` : '설치',
+      is_replacement: false,
+    })
+    if (histErr) throw new Error('설치 이력 기록 실패: ' + histErr.message)
+
+    revalidatePath('/clients')
+    revalidatePath('/inventory')
+    return { success: true, message: '거래처에 설치했습니다. 설치 이력이 기록되었습니다.' }
+  } catch (e: any) {
+    return { success: false, message: e.message || '처리 중 오류가 발생했습니다.' }
+  }
+}
+
+/** 거래처에 설치할 수 있는 기기 — 창고에 있거나, 거래처 연결이 끊긴 채 남은 기기 */
+export async function getAssignableMachinesAction() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.', data: [] as any[] }
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.', data: [] as any[] }
+
+  const { data, error } = await supabase
+    .from('inventory')
+    .select('*')
+    .eq('organization_id', profile.organization_id)
+    .is('client_id', null)
+    .neq('is_deleted', true)
+    .in('status', ['창고', '교체전(철수)'])
+    .order('model_name')
+
+  if (error) return { success: false, message: '조회 실패: ' + error.message, data: [] as any[] }
+  return { success: true, data: (data || []) as any[] }
+}
+
+// ----------------------------------------------------------------------
 // 5. 기기 교체(맞교환) 처리 액션 (✅ 최종 업데이트: 명시적 Plan 적용)
 // ----------------------------------------------------------------------
 export async function replaceInventoryAction(

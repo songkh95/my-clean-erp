@@ -242,6 +242,53 @@
   gap: 4px;
 }
 
+.strandedBox {
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-1);
+  background: var(--c-subtle);
+}
+
+.strandedToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--c-ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.strandedBody {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--c-ink-2);
+  line-height: 1.5;
+}
+
+.strandedList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.strandedChip {
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-1);
+  background: var(--c-surface);
+  color: var(--c-ink);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
 /* 모바일(768px 이하) 목록 — 왼쪽 이름, 오른쪽 숫자 */
 .mobileList,
 .sortBar {

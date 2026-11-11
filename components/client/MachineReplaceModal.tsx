@@ -64,7 +64,9 @@ export default function MachineReplaceModal({ oldAsset, clientId, onClose, onSuc
         .from('inventory')
         .select('*')
         .eq('organization_id', profile.organization_id)
-        .eq('status', '창고')
+        .is('client_id', null)
+        .neq('is_deleted', true)
+        .in('status', ['창고', '교체전(철수)'])
       
       if (data) setWarehouseItems(data as Inventory[])
     }

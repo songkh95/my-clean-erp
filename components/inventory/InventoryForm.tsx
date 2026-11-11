@@ -227,6 +227,25 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
 
   const handleEnterSave = useEnterSaveConfirm()
 
+  /** 상태를 「설치」가 아닌 값으로 바꾸면 거래처 연결이 끊긴다 — 조용히 끊지 않고 알려 준다 */
+  const handleStatusChange = (next: string) => {
+    const losesClient = next !== '설치' && Boolean(formData.client_id)
+    // 설치된 기기를 창고로 보내는 것은 저장 단계에서 막힌다 — 여기서 바로 안내하고 되돌린다
+    if (next === '창고' && editData?.id && editData.client_id) {
+      alert("거래처에 설치된 기계는 직접 '창고'로 바꿀 수 없습니다. 거래처 페이지에서 [철수] 또는 [교체]를 이용해 주세요. (이력이 남습니다)")
+      return
+    }
+    if (losesClient) {
+      const ok = confirm(
+        '상태를 바꾸면 이 기기의 거래처 연결이 해제됩니다.\n' +
+        '설치·철수 이력은 남지 않습니다. 이력을 남기려면 거래처 페이지의 [철수] 또는 [교체]를 쓰세요.\n\n' +
+        '그래도 상태를 바꿀까요?'
+      )
+      if (!ok) return
+    }
+    setFormData({ ...formData, status: next, client_id: next === '설치' ? formData.client_id : '' })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -240,8 +259,11 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
     if (formData.status === '설치' && !formData.client_id) return alert('설치 상태일 경우 거래처를 선택해야 합니다.')
     
     if (editData && editData.id) {
-      if ((editData.status === '교체전(철수)' || editData.status === '설치') && formData.status === '창고') {
-        alert("거래처에 등록된 기계는 직접 '창고'로 변경할 수 없습니다. [거래처 관리]에서 '철수' 기능을 이용하시거나 정산을 완료해주세요.");
+      // 거래처에 연결된 기기를 몰래 창고로 보내면 설치·철수 이력이 비므로 막는다.
+      // 거래처 연결이 이미 끊긴 기기(교체전(철수) 등)는 창고로 되돌릴 수 있어야 한다.
+      const stillAtClient = Boolean(editData.client_id)
+      if (stillAtClient && (editData.status === '교체전(철수)' || editData.status === '설치') && formData.status === '창고') {
+        alert("거래처에 설치된 기계는 직접 '창고'로 바꿀 수 없습니다. 거래처 페이지에서 [철수] 또는 [교체]를 이용해 주세요. (이력이 남습니다)");
         return;
       }
     }
@@ -323,10 +345,11 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
               <option value="컬러">컬러</option>
               <option value="흑백">흑백</option>
             </InputField>
-            <InputField label="상태" as="select" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value, client_id: e.target.value === '설치' ? formData.client_id : '' })}>
+            <InputField label="상태" as="select" value={formData.status} onChange={e => handleStatusChange(e.target.value)}>
               <option value="창고">창고</option><option value="설치">설치됨</option>
               <option value="수리중">수리중</option><option value="폐기">폐기</option>
-              <option value="교체전(철수)">교체전(철수)</option>
+              {/* 교체전(철수)는 정산을 되돌릴 때 시스템이 쓰는 값. 이미 그 상태인 기기에만 보인다 */}
+              {editData?.status === '교체전(철수)' ? <option value="교체전(철수)">교체전(철수)</option> : null}
             </InputField>
           </div>
 

@@ -963,6 +963,10 @@
   color: var(--c-ink-2);
 }
 
+.spareCarried {
+  color: var(--c-ink-3);
+}
+
 .cardStock {
   display: flex;
   align-items: baseline;

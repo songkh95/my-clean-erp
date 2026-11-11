@@ -14,6 +14,7 @@ import PanelRefreshButton from '@/components/ui/PanelRefreshButton'
 import styles from './InventoryList.module.css'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { useSortableData } from '@/utils/tableSort'
+import { useSingleFlight } from '@/hooks/useSingleFlight'
 
 interface Props {
   tab: 'consumables' | 'parts' | 'others'
@@ -31,6 +32,7 @@ const MOBILE_SORTS: [SortKey, string][] = [
 
 export default function ConsumableList({ tab }: Props) {
   const { settings, ready } = useAppSettings()
+  const runOnce = useSingleFlight()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -78,7 +80,7 @@ export default function ConsumableList({ tab }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, ready, categoriesKey, showInactive])
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => runOnce(`delete:${id}`, async () => {
     if (!confirm('이 자재를 삭제할까요?\n(서비스 일지에서 사용된 경우 완전 삭제 대신 목록에서만 숨깁니다.)')) return
     const res = await deleteConsumableAction(id)
     if (res.success) {
@@ -87,9 +89,9 @@ export default function ConsumableList({ tab }: Props) {
     } else {
       alert(res.message)
     }
-  }
+  })
 
-  const handleRestore = async (id: string) => {
+  const handleRestore = (id: string) => runOnce(`restore:${id}`, async () => {
     const res = await restoreConsumableAction(id)
     if (res.success) {
       alert(res.message || '복구되었습니다.')
@@ -97,7 +99,7 @@ export default function ConsumableList({ tab }: Props) {
     } else {
       alert(res.message)
     }
-  }
+  })
 
   const incomplete = useMemo(() => {
     return items.filter((c) => {

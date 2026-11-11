@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase'
 import ClientForm from './ClientForm'
 import PlanSettingModal from './PlanSettingModal'
 import MachineReplaceModal from './MachineReplaceModal'
+import MachineAssignModal from './MachineAssignModal'
 import MachineWithdrawModal from './MachineWithdrawModal'
 import InventoryForm from '../inventory/InventoryForm'
 import Button from '@/components/ui/Button' 
@@ -60,6 +61,8 @@ export default function ClientList() {
   const [selectedAssetForPlan, setSelectedAssetForPlan] = useState<{id: string, clientId: string} | null>(null)
   
   const [addMachineModalOpen, setAddMachineModalOpen] = useState(false)
+  const [assignModalOpen, setAssignModalOpen] = useState(false)
+  const [clientForAssign, setClientForAssign] = useState<Client | null>(null)
   const [clientForMachineAdd, setClientForMachineAdd] = useState<Client | null>(null)
   const [editMachineModalOpen, setEditMachineModalOpen] = useState(false)
   const [selectedAssetForEdit, setSelectedAssetForEdit] = useState<Inventory | null>(null)
@@ -91,6 +94,7 @@ export default function ClientList() {
           .select('*')
           .eq('organization_id', profile.organization_id)
           .not('client_id', 'is', null)
+          .neq('is_deleted', true) // 휴지통에 있는 기기는 거래처 목록에 세지 않는다
           .order('created_at', { ascending: true })
         
         const map: {[key: string]: Inventory[]} = {}
@@ -134,6 +138,12 @@ export default function ClientList() {
     if (newSet.has(clientId)) newSet.delete(clientId)
     else newSet.add(clientId)
     setExpandedRows(newSet)
+  }
+
+  const handleAssignMachineClick = (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation()
+    setClientForAssign(client)
+    setAssignModalOpen(true)
   }
 
   const handleAddMachineClick = (e: React.MouseEvent, client: Client) => {
@@ -465,9 +475,14 @@ export default function ClientList() {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <div className={styles.sectionTitle} style={{ marginBottom: 0 }}>📦 설치된 자산 목록</div>
-                  <Button variant="outline" size="sm" onClick={(e) => handleAddMachineClick(e, client)}>
-                    + 기계 추가
-                  </Button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <Button variant="outline" size="sm" onClick={(e) => handleAssignMachineClick(e, client)} title="이미 등록된 창고 기기를 이 거래처에 설치">
+                      창고 기기 가져오기
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={(e) => handleAddMachineClick(e, client)} title="새 기기를 등록하면서 설치">
+                      + 기계 추가
+                    </Button>
+                  </div>
                 </div>
 
                 {assets.length === 0 ? (
@@ -532,6 +547,14 @@ export default function ClientList() {
 
       {isRegModalOpen && <ClientForm isOpen={isRegModalOpen} onClose={() => setIsRegModalOpen(false)} onSuccess={fetchClients} editData={selectedClient} />}
       {planModalOpen && selectedAssetForPlan && <PlanSettingModal inventoryId={selectedAssetForPlan.id} clientId={selectedAssetForPlan.clientId} onClose={() => { setPlanModalOpen(false); setSelectedAssetForPlan(null) }} onUpdate={fetchClients} />}
+      {assignModalOpen && clientForAssign && (
+        <MachineAssignModal
+          clientId={clientForAssign.id}
+          clientName={clientForAssign.name || ''}
+          onClose={() => { setAssignModalOpen(false); setClientForAssign(null) }}
+          onSuccess={fetchClients}
+        />
+      )}
       {addMachineModalOpen && clientForMachineAdd && <InventoryForm isOpen={addMachineModalOpen} onClose={() => { setAddMachineModalOpen(false); setClientForMachineAdd(null) }} onSuccess={fetchClients} editData={{ status: '설치', client_id: clientForMachineAdd.id }} />}
       {editMachineModalOpen && selectedAssetForEdit && (
         <InventoryForm
