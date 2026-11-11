@@ -1276,11 +1276,43 @@ export async function getConsumablesAction() {
   })
 }
 
-export async function getClientMachinesAction(clientId: string) {
+/**
+ * 일지에서 고를 수 있는 기기 목록.
+ * includeId 를 주면 그 기기는 철수·교체돼 지금 이 거래처에 없어도 목록에 남긴다.
+ * (과거 일지를 열었을 때 기기 칸이 빈 채로 보이지 않도록)
+ */
+export async function getClientMachinesAction(clientId: string, includeId?: string) {
   const supabase = await createClient()
   if (!clientId) return []
-  const { data } = await supabase.from('inventory').select('id, model_name, serial_number, department').eq('client_id', clientId).eq('status', '설치')
-  return data || []
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+  if (!profile?.organization_id) return []
+  const orgId = profile.organization_id
+
+  const { data } = await supabase
+    .from('inventory')
+    .select('id, model_name, serial_number, department, status, client_id')
+    .eq('organization_id', orgId)
+    .eq('client_id', clientId)
+    .eq('status', '설치')
+
+  const list = (data || []) as any[]
+
+  if (includeId && !list.some((m) => m.id === includeId)) {
+    const { data: kept } = await supabase
+      .from('inventory')
+      .select('id, model_name, serial_number, department, status, client_id')
+      .eq('organization_id', orgId)
+      .eq('id', includeId)
+      .maybeSingle()
+
+    // 지금은 이 거래처에 없는 기기 — 과거 일지의 기록이므로 표시만 다르게 해서 남긴다
+    if (kept) list.unshift({ ...kept, is_past: true })
+  }
+
+  return list
 }
 
 /** 사무실(창고) 재고 기기 — 판매_출장 일지 모델 선택용 */

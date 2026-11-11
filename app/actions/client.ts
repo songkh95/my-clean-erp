@@ -100,43 +100,29 @@ export async function deleteClientAction(id: string) {
 
     if (countErr) throw countErr
 
-    // H1: 거래처를 지워도 연결된 기기가 남는 문제 방지 — 삭제 전 창고로 회수
+    // 설치된 기기가 있으면 삭제를 막는다.
+    // 자동 회수로 지우면 최종 카운터를 0으로 기록해 그 달 사용량 청구 근거가 사라진다.
     const { data: linkedMachines, error: machErr } = await supabase
       .from('inventory')
-      .select('id')
+      .select('id, model_name, serial_number')
       .eq('organization_id', orgId)
       .eq('client_id', id)
 
     if (machErr) throw machErr
 
-    let recalled = 0
     if (linkedMachines && linkedMachines.length > 0) {
-      const machineIds = linkedMachines.map((m) => m.id)
-      const { error: recallErr } = await supabase
-        .from('inventory')
-        .update({ status: '창고', client_id: null })
-        .in('id', machineIds)
-        .eq('organization_id', orgId)
-      if (recallErr) throw recallErr
-
-      const { error: histErr } = await supabase.from('machine_history').insert(
-        machineIds.map((invId) => ({
-          inventory_id: invId,
-          client_id: id,
-          organization_id: orgId,
-          action_type: 'WITHDRAW',
-          bw_count: 0,
-          col_count: 0,
-          bw_a3_count: 0,
-          col_a3_count: 0,
-          memo: '거래처 삭제로 자동 회수',
-          is_replacement: false,
-          recorded_at: new Date().toISOString(),
-        }))
-      )
-      if (histErr) throw histErr
-
-      recalled = machineIds.length
+      const names = linkedMachines
+        .slice(0, 3)
+        .map((m) => `${m.model_name}(${m.serial_number})`)
+        .join(', ')
+      const more = linkedMachines.length > 3 ? ` 외 ${linkedMachines.length - 3}대` : ''
+      return {
+        success: false,
+        message:
+          `이 거래처에 기기 ${linkedMachines.length}대가 설치되어 있습니다: ${names}${more}
+` +
+          '각 기기를 [철수]로 처리한 뒤(최종 카운터가 기록됩니다) 거래처를 삭제해 주세요.',
+      }
     }
 
     const { error } = await supabase
@@ -151,7 +137,6 @@ export async function deleteClientAction(id: string) {
     revalidatePath('/inventory')
 
     const parts = ['삭제되었습니다.']
-    if (recalled > 0) parts.push(`연결된 기기 ${recalled}대는 창고로 회수되었습니다.`)
     if ((count || 0) > 0) {
       parts.push(`서비스 일지 ${count}건은 그대로 유지되며, 일지에서 거래처명 옆에 경고가 표시됩니다.`)
     } else {

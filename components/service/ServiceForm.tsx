@@ -355,7 +355,8 @@ export default function ServiceForm({
         }
 
         if (editData.client_id) {
-          getClientMachinesAction(editData.client_id).then(setMachines)
+          // 철수된 기기라도 이 일지에 적힌 기기는 목록에 남긴다
+          getClientMachinesAction(editData.client_id, editData.inventory_id || undefined).then(setMachines)
         }
       } else {
         setSkipClientRegister(false)
@@ -379,11 +380,11 @@ export default function ServiceForm({
 
   useEffect(() => {
     if (formData.client_id) {
-      getClientMachinesAction(formData.client_id).then(setMachines)
+      getClientMachinesAction(formData.client_id, editData?.inventory_id || undefined).then(setMachines)
     } else {
       setMachines([])
     }
-  }, [formData.client_id])
+  }, [formData.client_id, editData?.inventory_id])
 
   const validatePartsForSubmit = (): boolean => {
     // 음수 = 현장에서 철수해 돌아온 회수 수량. 0은 저장하지 않음
@@ -842,7 +843,7 @@ export default function ServiceForm({
                 <option value="">(기기 없음/일반 방문)</option>
                 {machines.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.model_name} ({m.serial_number})
+                    {m.model_name} ({m.serial_number}){m.is_past ? ' · 철수' : ''}
                   </option>
                 ))}
               </InputField>

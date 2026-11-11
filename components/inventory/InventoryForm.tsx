@@ -228,6 +228,9 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
   const handleEnterSave = useEnterSaveConfirm()
 
   /** 상태를 「설치」가 아닌 값으로 바꾸면 거래처 연결이 끊긴다 — 조용히 끊지 않고 알려 준다 */
+  /** 이미 거래처에 설치되어 저장된 기기 — 거래처 칸을 잠근다 */
+  const clientLocked = Boolean(editData?.id && editData?.client_id)
+
   const handleStatusChange = (next: string) => {
     const losesClient = next !== '설치' && Boolean(formData.client_id)
     // 설치된 기기를 창고로 보내는 것은 저장 단계에서 막힌다 — 여기서 바로 안내하고 되돌린다
@@ -354,7 +357,16 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
           </div>
 
           <div className={`${styles.highlightBox} ${formData.status === '설치' ? styles.activeBox : ''}`}>
-            <InputField label="🏢 설치 거래처 (현재 위치)" as="select" disabled={formData.status !== '설치'} value={formData.client_id} onChange={e => setFormData({ ...formData, client_id: e.target.value })} style={{ marginBottom: 16 }}>
+            <InputField
+              label="설치 거래처 (현재 위치)"
+              as="select"
+              /* 이미 거래처에 설치된 기기는 여기서 옮기지 않는다 — 이력 없이 옮겨지면 요금제·정산이 어긋난다 */
+              disabled={formData.status !== '설치' || clientLocked}
+              value={formData.client_id}
+              onChange={e => setFormData({ ...formData, client_id: e.target.value })}
+              hint={clientLocked ? '거래처를 바꾸려면 거래처 페이지에서 [철수] 또는 [교체]를 이용해 주세요. (설치·철수 이력이 남습니다)' : undefined}
+              style={{ marginBottom: 16 }}
+            >
               <option value="">거래처 선택</option>
               {clients.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </InputField>

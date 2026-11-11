@@ -6,6 +6,35 @@ import { revalidatePath } from 'next/cache'
 import { Inventory } from '@/app/types'
 import { toMachineModelName } from '@/utils/suggestMatch'
 
+/**
+ * 철수·교체 전에 확인: 이 기기가 '다음 달 이후' 정산에 이미 들어가 있으면 막는다.
+ * 지난 달·이번 달 정산은 정상(그 달까지 쓴 청구)이므로 통과시킨다.
+ */
+async function futureSettlementBlock(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  inventoryId: string
+): Promise<string | null> {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+
+  const { data, error } = await supabase
+    .from('settlements')
+    .select('billing_year, billing_month, settlement_details!inner(inventory_id)')
+    .eq('organization_id', orgId)
+    .eq('settlement_details.inventory_id', inventoryId)
+    .or(`billing_year.gt.${year},and(billing_year.eq.${year},billing_month.gt.${month})`)
+    .limit(1)
+
+  // 확인 자체가 실패하면 작업을 막지 않는다 (철수는 현장에서 이미 끝난 일)
+  if (error) return null
+  const row = (data || [])[0] as { billing_year?: number; billing_month?: number } | undefined
+  if (!row) return null
+
+  return `${row.billing_year}년 ${row.billing_month}월 정산에 이 기기가 이미 들어가 있습니다. 청구 이력에서 그 정산을 지우거나 다시 청구한 뒤 철수·교체해 주세요.`
+}
+
 // ----------------------------------------------------------------------
 // 1. 자산 등록 액션
 // ----------------------------------------------------------------------
@@ -315,8 +344,11 @@ export async function withdrawInventoryAction(
   if (!profile?.organization_id) return { success: false, message: '조직 정보를 찾을 수 없습니다.' }
 
   try {
+    const blocked = await futureSettlementBlock(supabase, profile.organization_id, inventoryId)
+    if (blocked) return { success: false, message: blocked }
+
     // 1) 기계 이력(History) 기록: '철수' 상태로 저장
-    const { error: historyError } = await supabase.from('machine_history').insert({
+    const { data: histRow, error: historyError } = await supabase.from('machine_history').insert({
       inventory_id: inventoryId,
       client_id: clientId,
       organization_id: profile.organization_id,
@@ -327,17 +359,23 @@ export async function withdrawInventoryAction(
       col_a3_count: counts.col_a3,
       memo: `철수: ${memo}`,
       is_replacement: false
-    })
+    }).select('id').single()
 
     if (historyError) throw new Error('이력 기록 실패: ' + historyError.message)
 
-    // 2) 기계 상태 변경: 창고로 이동 및 거래처 연결 해제
+    // 2) 기계 상태 변경: 창고로 이동, 거래처 연결 해제, 요금제·계약 비우기
     const { error: invError } = await supabase.from('inventory').update({
       status: '창고',
       client_id: null,
-    }).eq('id', inventoryId)
+      // 요금제·계약·합산 그룹은 그대로 둔다: 회계 등록 화면이 이 값으로 그 달 마지막 청구를 계산한다.
+      // 다음 거래처로 따라가지 않도록 비우는 일은 설치(가져오기·교체) 시점에 한다.
+    }).eq('id', inventoryId).eq('organization_id', profile.organization_id)
 
-    if (invError) throw new Error('상태 변경 실패: ' + invError.message)
+    if (invError) {
+      // 이력만 남고 기기는 그대로인 어긋난 상태를 만들지 않는다
+      if (histRow?.id) await supabase.from('machine_history').delete().eq('id', histRow.id)
+      throw new Error('상태 변경 실패: ' + invError.message)
+    }
 
     revalidatePath('/clients')
     revalidatePath('/inventory')
@@ -399,6 +437,16 @@ export async function assignMachineToClientAction(
         initial_count_col_a3: data.initial_counts.col_a3,
         contract_start_date: data.contract.start_date || null,
         contract_end_date: data.contract.end_date || null,
+        // 전 거래처의 요금제·합산 그룹·청구일은 가져오지 않는다 (설치 후 [요금제]에서 정함)
+        plan_basic_fee: 0,
+        plan_basic_cnt_bw: 0,
+        plan_basic_cnt_col: 0,
+        plan_price_bw: 0,
+        plan_price_col: 0,
+        plan_weight_a3_bw: 0,
+        plan_weight_a3_col: 0,
+        billing_date: null,
+        billing_group_id: null,
       })
       .eq('id', inventoryId)
       .eq('organization_id', orgId)
@@ -482,99 +530,40 @@ export async function replaceInventoryAction(
   const orgId = profile.organization_id
 
   try {
-    // 2) 기존 기기 정보 가져오기 (그룹 ID 확인용)
-    const { data: oldAsset } = await supabase
-      .from('inventory')
-      .select('*')
-      .eq('id', oldAssetId)
-      .eq('organization_id', orgId)
-      .single()
-    
-    if (!oldAsset) throw new Error('기존 기기 정보를 찾을 수 없습니다.')
-
-    // [Step 1] 기존 기기 회수 처리
-    // 1-1. 회수 이력 기록
-    const { error: histErr1 } = await supabase.from('machine_history').insert({
-      inventory_id: oldAssetId,
-      client_id: clientId,
-      organization_id: orgId,
-      action_type: 'WITHDRAW',
-      bw_count: data.final_counts.bw,
-      col_count: data.final_counts.col,
-      bw_a3_count: data.final_counts.bw_a3,
-      col_a3_count: data.final_counts.col_a3,
-      memo: `교체로 인한 회수: ${data.memo}`,
-      is_replacement: true
-    })
-    if (histErr1) throw new Error('회수 이력 기록 실패: ' + histErr1.message)
-
-    // 1-2. 기존 기기 상태 변경 (창고행) & 그룹 설정
-    let groupId = oldAsset.billing_group_id
-    if (!groupId) {
-      groupId = crypto.randomUUID()
-      await supabase.from('inventory').update({ billing_group_id: groupId }).eq('id', oldAssetId)
+    for (const target of [oldAssetId, newAssetId]) {
+      const blocked = await futureSettlementBlock(supabase, orgId, target)
+      if (blocked) return { success: false, message: blocked }
     }
 
-    const { error: invErr1 } = await supabase.from('inventory').update({
-      status: '창고',
-      client_id: null,
-      billing_group_id: groupId // 그룹 ID 유지
-    }).eq('id', oldAssetId)
-    
-    if (invErr1) throw new Error('기존 기기 상태 변경 실패: ' + invErr1.message)
-
-
-    // [Step 2] 새 기기 설치 처리 (전달받은 Plan 적용)
-    const newMachinePayload = {
-      status: '설치',
-      client_id: clientId,
-      initial_count_bw: data.new_initial_counts.bw,
-      initial_count_col: data.new_initial_counts.col,
-      initial_count_bw_a3: data.new_initial_counts.bw_a3,
-      initial_count_col_a3: data.new_initial_counts.col_a3,
-      contract_start_date: data.contract.start_date || null,
-      contract_end_date: data.contract.end_date || null,
-      billing_group_id: groupId, // ✅ 기존 기기와 연결
-      
-      // ✅ 팝업에서 확정된 요금제 적용 (승계 또는 신규)
-      plan_basic_fee: data.plan.basic_fee,
-      plan_basic_cnt_bw: data.plan.basic_cnt_bw,
-      plan_basic_cnt_col: data.plan.basic_cnt_col,
-      plan_price_bw: data.plan.price_bw,
-      plan_price_col: data.plan.price_col,
-      plan_weight_a3_bw: data.plan.weight_a3_bw,
-      plan_weight_a3_col: data.plan.weight_a3_col,
-      // 기존 기기의 청구일자는 그대로 승계하는 것이 안전함
-      billing_date: oldAsset.billing_date
-    }
-
-    const { error: invErr2 } = await supabase
-      .from('inventory')
-      .update(newMachinePayload)
-      .eq('id', newAssetId)
-      .eq('organization_id', orgId)
-    
-    if (invErr2) throw new Error('새 기기 정보 업데이트 실패: ' + invErr2.message)
-
-    // 2-3. 새 기기 설치 이력 기록
-    const { error: histErr2 } = await supabase.from('machine_history').insert({
-      inventory_id: newAssetId,
-      client_id: clientId,
-      organization_id: orgId,
-      action_type: 'INSTALL',
-      bw_count: data.new_initial_counts.bw,
-      col_count: data.new_initial_counts.col,
-      bw_a3_count: data.new_initial_counts.bw_a3,
-      col_a3_count: data.new_initial_counts.col_a3,
-      memo: `교체로 인한 설치`,
-      is_replacement: true
+    // 회수 이력 → 구기기 회수 → 신기기 설치 → 설치 이력을 DB 함수 한 번(= 한 트랜잭션)으로 처리한다.
+    // 중간에 실패하면 전부 되돌아가므로 구기기만 빠진 어긋난 상태가 생기지 않는다.
+    const { error: rpcErr } = await (supabase as any).rpc('replace_machine_tx', {
+      p_client: clientId,
+      p_old: oldAssetId,
+      p_new: newAssetId,
+      p_final: data.final_counts,
+      p_init: data.new_initial_counts,
+      p_contract: { start_date: data.contract.start_date || '', end_date: data.contract.end_date || '' },
+      p_plan: data.plan,
+      p_memo: data.memo || '',
     })
-    if (histErr2) throw new Error('설치 이력 기록 실패: ' + histErr2.message)
+
+    if (rpcErr) {
+      // 함수가 아직 설치되지 않은 DB (sql/replace_machine_tx.sql 미실행)
+      if (/does not exist|42883|schema cache/i.test(rpcErr.message || '')) {
+        return {
+          success: false,
+          message:
+            '교체 처리 함수가 데이터베이스에 없습니다. Supabase SQL Editor에서 sql/replace_machine_tx.sql 을 한 번 실행한 뒤 다시 시도해 주세요.',
+        }
+      }
+      throw new Error(rpcErr.message)
+    }
 
     revalidatePath('/clients')
     revalidatePath('/inventory')
     revalidatePath('/accounting')
-    
+
     return { success: true, message: '기계 교체 및 계약 설정이 완료되었습니다.' }
 
   } catch (error: any) {
