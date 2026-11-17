@@ -91,7 +91,7 @@ export default function CostingCalculator() {
   const [clients, setClients] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
   // 소모품은 한 번 맞춰두면 잘 안 고치므로 접어 둔다 — 값은 그대로 계산에 들어간다
-  const [showParts, setShowParts] = useState(false)
+  const [showParts, setShowParts] = useState(true)
   const [showUsage, setShowUsage] = useState(false)
 
   const [editId, setEditId] = useState<string | null>(null)

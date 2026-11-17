@@ -65,7 +65,14 @@
 .grid2 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--sp-1) var(--sp-3);
+  gap: var(--sp-2) var(--sp-3);
+}
+
+/* 입력칸(ui 의 .field)은 아래 여백을 기본으로 갖는다 — 여기서는 간격을 grid/flex 로만 준다 */
+.grid2 > div,
+.partRow > div,
+.saveRow > div {
+  margin-bottom: 0;
 }
 
 @media (max-width: 520px) {
@@ -243,8 +250,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--sp-2);
-  padding: var(--sp-1) 0;
+  gap: var(--sp-1) var(--sp-2);
+  padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--c-line);
 }
 
