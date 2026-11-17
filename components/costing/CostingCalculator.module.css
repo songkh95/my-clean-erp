@@ -248,8 +248,9 @@
   border-bottom: 1px solid var(--c-line);
 }
 
+/* 줄바꿈이 일어나도 이름 칸이 남은 자리를 먹어 늘어나지 않도록 고정폭으로 둔다 */
 .partName {
-  flex: 1 1 8rem;
+  flex: 0 1 10rem;
   min-width: 7rem;
 }
 
