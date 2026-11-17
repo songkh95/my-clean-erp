@@ -90,6 +90,9 @@ export default function CostingCalculator() {
   const [message, setMessage] = useState('')
   const [clients, setClients] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
+  // 소모품은 한 번 맞춰두면 잘 안 고치므로 접어 둔다 — 값은 그대로 계산에 들어간다
+  const [showParts, setShowParts] = useState(false)
+  const [showUsage, setShowUsage] = useState(false)
 
   const [editId, setEditId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -406,9 +409,17 @@ export default function CostingCalculator() {
           <section className={styles.section}>
             <div className={styles.sectionHead}>
               <h2 className={styles.sectionTitle}>소모품</h2>
-              <span className={styles.sectionNote}>계약 {n.months}개월 사용량 포함</span>
+              <button type="button" className={styles.toggle} onClick={() => setShowParts((x) => !x)}>
+                {showParts ? '숨기기' : '펼치기'}
+              </button>
             </div>
-            {parts.map((p, idx) => {
+            {!showParts ? (
+              <p className={styles.note}>
+                {parts.length}개 · 1장당 흑백 {perBw.toFixed(2)}원 · 칼라 {perCol.toFixed(2)}원 · 월 소모품비{' '}
+                {won(r.consumable)}
+              </p>
+            ) : null}
+            {showParts ? parts.map((p, idx) => {
               // 라벨은 첫 줄에만 — 아래 줄까지 반복하면 영역만 높아진다
               const lab = (cls: string) => (idx === 0 ? cls : `${cls} ${styles.hideLabels}`)
               return (
@@ -475,7 +486,8 @@ export default function CostingCalculator() {
                 </div>
               </div>
               )
-            })}
+            }) : null}
+            {showParts ? (
             <div className={styles.partsFoot}>
               <Button
                 variant="secondary"
@@ -489,6 +501,7 @@ export default function CostingCalculator() {
                 1장당 — 흑백 {perBw.toFixed(2)}원 · 칼라 {perCol.toFixed(2)}원
               </span>
             </div>
+            ) : null}
           </section>
         </div>
 
@@ -720,8 +733,16 @@ export default function CostingCalculator() {
           <section className={styles.section}>
             <div className={styles.sectionHead}>
               <h2 className={styles.sectionTitle}>소모품 사용량</h2>
-              <span className={styles.sectionNote}>계약 {n.months}개월 기준</span>
+              <button type="button" className={styles.toggle} onClick={() => setShowUsage((x) => !x)}>
+                {showUsage ? '숨기기' : '펼치기'}
+              </button>
             </div>
+            {!showUsage ? (
+              <p className={styles.note}>
+                계약 {n.months}개월 소모품비 {won(r.consumable * n.months)} — 펼치면 품목별 교체 주기와 준비 개수가
+                나옵니다.
+              </p>
+            ) : (
             <Table>
               <thead>
                 <tr>
@@ -777,6 +798,7 @@ export default function CostingCalculator() {
                 </tr>
               </tbody>
             </Table>
+            )}
           </section>
         </div>
       </div>
