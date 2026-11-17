@@ -244,8 +244,19 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--sp-2);
-  padding: var(--sp-3) 0;
+  padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--c-line);
+}
+
+/* 라벨은 첫 줄에만 보이게 두고, 아래 줄은 자리만 지운다 (읽어주는 도구에는 그대로 남는다) */
+.hideLabels > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* 줄바꿈이 일어나도 이름 칸이 남은 자리를 먹어 늘어나지 않도록 고정폭으로 둔다 */

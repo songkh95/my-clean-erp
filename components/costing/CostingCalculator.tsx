@@ -408,11 +408,14 @@ export default function CostingCalculator() {
               <h2 className={styles.sectionTitle}>소모품</h2>
               <span className={styles.sectionNote}>계약 {n.months}개월 사용량 포함</span>
             </div>
-            {parts.map((p, idx) => (
+            {parts.map((p, idx) => {
+              // 라벨은 첫 줄에만 — 아래 줄까지 반복하면 영역만 높아진다
+              const lab = (cls: string) => (idx === 0 ? cls : `${cls} ${styles.hideLabels}`)
+              return (
               <div className={styles.partRow} key={`${p.name}-${idx}`}>
                 <Input
                   label="이름"
-                  containerClassName={styles.partName}
+                  containerClassName={lab(styles.partName)}
                   value={p.name}
                   onChange={(e) => updatePart(idx, { name: (e.target as HTMLInputElement).value })}
                 />
@@ -420,7 +423,7 @@ export default function CostingCalculator() {
                   label="단가"
                   inputMode="decimal"
                   className={styles.num}
-                  containerClassName={styles.partSmall}
+                  containerClassName={lab(styles.partSmall)}
                   value={withCommas(p.price)}
                   onChange={(e) => updatePart(idx, { price: parseNum((e.target as HTMLInputElement).value) })}
                 />
@@ -428,7 +431,7 @@ export default function CostingCalculator() {
                   label="라이프"
                   inputMode="decimal"
                   className={styles.num}
-                  containerClassName={styles.partSmall}
+                  containerClassName={lab(styles.partSmall)}
                   value={withCommas(p.life)}
                   onChange={(e) => updatePart(idx, { life: parseNum((e.target as HTMLInputElement).value) })}
                 />
@@ -436,14 +439,14 @@ export default function CostingCalculator() {
                   label="수"
                   inputMode="decimal"
                   className={styles.num}
-                  containerClassName={styles.partTiny}
+                  containerClassName={lab(styles.partTiny)}
                   value={String(p.qty)}
                   onChange={(e) => updatePart(idx, { qty: parseNum((e.target as HTMLInputElement).value) || 1 })}
                 />
                 <Input
                   label="적용"
                   as="select"
-                  containerClassName={styles.partApply}
+                  containerClassName={lab(styles.partApply)}
                   value={p.apply}
                   onChange={(e) => updatePart(idx, { apply: (e.target as HTMLSelectElement).value as PartApply })}
                 >
@@ -471,7 +474,8 @@ export default function CostingCalculator() {
                   </Button>
                 </div>
               </div>
-            ))}
+              )
+            })}
             <div className={styles.partsFoot}>
               <Button
                 variant="secondary"
