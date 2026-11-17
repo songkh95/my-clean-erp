@@ -584,6 +584,20 @@ export default function CostingCalculator() {
             <div className={styles.sectionHead}>
               <h2 className={styles.sectionTitle}>월 렌탈료 내역</h2>
             </div>
+            {(() => {
+              // 적자면 비용이 막대를 가득 채운다 — 남는 칸이 없다는 게 곧 적자라는 뜻
+              const spent = r.depreciation + r.consumable + r.fixed
+              const denom = Math.max(r.revenue, spent) || 1
+              const w = (x: number) => `${((Math.max(0, x) / denom) * 100).toFixed(2)}%`
+              return (
+                <div className={`${styles.bar} ${r.profit < 0 ? styles.barLoss : ''}`} aria-hidden="true">
+                  <span className={styles.segDep} style={{ width: w(r.depreciation) }} />
+                  <span className={styles.segCons} style={{ width: w(r.consumable) }} />
+                  {v.showFixed ? <span className={styles.segFix} style={{ width: w(r.fixed) }} /> : null}
+                  <span className={styles.segProfit} style={{ width: w(r.profit) }} />
+                </div>
+              )
+            })()}
             <div className={styles.lines}>
               <div className={styles.line}>
                 <span className={styles.lineLabel}>월 렌탈료</span>
@@ -593,7 +607,7 @@ export default function CostingCalculator() {
                 </span>
               </div>
               <div className={styles.line}>
-                <span className={styles.lineLabel}>
+                <span className={`${styles.lineLabel} ${styles.cDep}`}>
                   기계 감가<span className={styles.lineBasis}>({n.life}개월로 나눔)</span>
                 </span>
                 <span className={styles.lineValues}>
@@ -602,7 +616,7 @@ export default function CostingCalculator() {
                 </span>
               </div>
               <div className={styles.line}>
-                <span className={styles.lineLabel}>
+                <span className={`${styles.lineLabel} ${styles.cCons}`}>
                   소모품비
                   <span className={styles.lineBasis}>
                     ({v.showVolume ? '예상 월 ' : '기본매수 '}
@@ -616,7 +630,7 @@ export default function CostingCalculator() {
               </div>
               {v.showFixed ? (
                 <div className={styles.line}>
-                  <span className={styles.lineLabel}>월 고정비</span>
+                  <span className={`${styles.lineLabel} ${styles.cFix}`}>월 고정비</span>
                   <span className={styles.lineValues}>
                     <span className={styles.lineValue}>{won(r.fixed)}</span>
                     <span className={styles.linePct}>{pct(r.fixed, r.revenue)}</span>
@@ -624,7 +638,9 @@ export default function CostingCalculator() {
                 </div>
               ) : null}
               <div className={`${styles.line} ${styles.lineTotal}`}>
-                <span className={styles.lineLabel}>순이익</span>
+                <span className={`${styles.lineLabel} ${r.profit < 0 ? styles.negText : styles.cProfit}`}>
+                  순이익
+                </span>
                 <span className={styles.lineValues}>
                   <span className={`${styles.lineValue} ${r.profit < 0 ? styles.negText : ''}`}>{won(r.profit)}</span>
                   <span className={styles.linePct}>{pct(r.profit, r.revenue)}</span>

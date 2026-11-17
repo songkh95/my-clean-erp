@@ -165,6 +165,43 @@
   line-height: 1.7;
 }
 
+/* 구성비 막대 (DESIGN_SYSTEM.md 7.4-1) */
+.bar {
+  display: flex;
+  height: 0.5rem;
+  border-radius: var(--radius-1);
+  overflow: hidden;
+  background: var(--c-subtle);
+  margin-bottom: var(--sp-3);
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+}
+
+.segDep {
+  background: var(--c-ink-2);
+}
+
+.segCons {
+  background: var(--c-accent);
+}
+
+.segFix {
+  background: var(--c-warning);
+}
+
+.segProfit {
+  background: var(--c-success);
+}
+
+/* 적자: 비용이 막대를 가득 채우고 테두리로 표시한다 */
+.barLoss {
+  outline: 1px solid var(--c-danger);
+  outline-offset: -1px;
+}
+
 /* 금액 줄 (렌탈료 내역, 한계) */
 .lines {
   display: flex;
@@ -370,4 +407,21 @@
   text-align: center;
   font-size: var(--fs-sm);
   color: var(--c-ink-3);
+}
+
+/* 막대 칸과 같은 색으로 줄 제목을 맞춘다 (.lineLabel 뒤에 와야 적용된다) */
+.cDep {
+  color: var(--c-ink-2);
+}
+
+.cCons {
+  color: var(--c-accent);
+}
+
+.cFix {
+  color: var(--c-warning);
+}
+
+.cProfit {
+  color: var(--c-success);
 }
