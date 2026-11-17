@@ -17,7 +17,7 @@
 .col {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
+  gap: var(--sp-4);
   min-width: 0;
 }
 
@@ -32,7 +32,7 @@
   gap: var(--sp-3);
   padding-bottom: var(--sp-2);
   border-bottom: 1px solid var(--c-line-strong);
-  margin-bottom: var(--sp-3);
+  margin-bottom: var(--sp-2);
 }
 
 .sectionTitle {
@@ -65,7 +65,7 @@
 .grid2 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--sp-2) var(--sp-3);
+  gap: var(--sp-1) var(--sp-3);
 }
 
 @media (max-width: 520px) {
@@ -75,7 +75,7 @@
 }
 
 .subGrid {
-  margin-top: var(--sp-3);
+  margin-top: var(--sp-1);
 }
 
 .num {
@@ -84,7 +84,7 @@
 }
 
 .note {
-  margin: var(--sp-2) 0 0;
+  margin: var(--sp-1) 0 0;
   font-size: var(--fs-xs);
   color: var(--c-ink-2);
   line-height: 1.6;
@@ -244,7 +244,7 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--sp-2);
-  padding: var(--sp-2) 0;
+  padding: var(--sp-1) 0;
   border-bottom: 1px solid var(--c-line);
 }
 
@@ -302,7 +302,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-  margin-top: var(--sp-3);
+  margin-top: var(--sp-2);
 }
 
 .perPage {
