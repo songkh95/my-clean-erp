@@ -202,6 +202,69 @@ export type Database = {
           },
         ]
       }
+      cost_simulations: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          inputs: Json
+          memo: string | null
+          model: string | null
+          name: string
+          organization_id: string
+          parts: Json
+          summary: Json
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inputs?: Json
+          memo?: string | null
+          model?: string | null
+          name?: string
+          organization_id: string
+          parts?: Json
+          summary?: Json
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inputs?: Json
+          memo?: string | null
+          model?: string | null
+          name?: string
+          organization_id?: string
+          parts?: Json
+          summary?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_simulations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_simulations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dashboard_todos: {
         Row: {
           created_at: string

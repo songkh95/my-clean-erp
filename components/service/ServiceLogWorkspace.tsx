@@ -134,6 +134,22 @@ function isDummyId(id: string) {
 }
 
 /** 「+」로 직접 추가한 빈 입력 줄 (저장 전까지만 화면에 있음) */
+/**
+ * 목록 순서는 '저장된 값'으로만 잡는다.
+ * 지금 쓰고 있는 줄의 날짜·상태를 바꿀 때마다 줄이 다른 자리로 옮겨가지 않도록,
+ * 정렬·기간 필터는 아직 저장되지 않은 수정분을 보지 않는다.
+ * 저장이 끝나면 목록을 다시 불러오므로 그때 평소 정렬(최신 날짜 위)로 자리를 잡는다.
+ */
+function orderDateOf(log: ServiceLog): string {
+  const kept = (log as any).sort_visit_date
+  return String((kept === undefined ? log.visit_date : kept) || '')
+}
+
+function orderStatusOf(log: ServiceLog): string {
+  const kept = (log as any).sort_status
+  return String((kept === undefined ? log.status : kept) || '')
+}
+
 function isExtraRowId(id: string) {
   return id.startsWith('dummy_extra_')
 }
@@ -331,6 +347,9 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       const patch = pending[log.id]
       if (!patch) return log
       const next = { ...log, ...patch } as ServiceLog
+      // 자리(정렬·기간)는 저장된 값 기준으로 유지한다
+      ;(next as any).sort_visit_date = (log as any).sort_visit_date ?? log.visit_date ?? ''
+      ;(next as any).sort_status = (log as any).sort_status ?? log.status ?? ''
       if ('manager_id' in patch) {
         const emp = employees.find((e) => e.id === patch.manager_id)
         next.manager = { name: emp?.name || '' }
@@ -371,10 +390,11 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
     const inPeriod = !from || !to
       ? displayLogs
       : displayLogs.filter((log) => {
-          const isUnvisited = log.status === '미방문' || isDummyId(log.id) || !log.visit_date
+          const keptDate = orderDateOf(log)
+          const isUnvisited = orderStatusOf(log) === '미방문' || isDummyId(log.id) || !keptDate
           if (isExtraRowId(log.id)) return true
           if (isUnvisited) return includeUnvisited
-          return log.visit_date >= from && log.visit_date <= to
+          return keptDate >= from && keptDate <= to
         })
 
     // 같은 기기/거래처에 기간 내 실일지가 있으면 미방문 더미는 숨김 (통계·목록 중복 방지)
@@ -421,8 +441,8 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       const nameB = b.client?.name || b.client_name || ''
       const byName = nameA.localeCompare(nameB, 'ko')
       if (byName !== 0) return byName * clientDir
-      const dateA = a.visit_date || ''
-      const dateB = b.visit_date || ''
+      const dateA = orderDateOf(a)
+      const dateB = orderDateOf(b)
       if (dateA !== dateB) {
         if (!dateA) return 1
         if (!dateB) return -1
@@ -454,7 +474,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       const dummies = items.filter((l) => isDummyId(l.id) && !isExtraRowId(l.id))
       const reals = items
         .filter((l) => !isDummyId(l.id))
-        .sort((a, b) => String(b.visit_date || '').localeCompare(String(a.visit_date || '')))
+        .sort((a, b) => orderDateOf(b).localeCompare(orderDateOf(a)))
       // 방문 기록이 있으면 최신 방문이 대표, 없으면 미방문
       const primary = reals[0] || dummies[0] || extras[0] || items[0]
       const history = reals.filter((l) => l.id !== primary.id)
@@ -471,8 +491,8 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
   }, [periodPreset, periodYear, periodMonth])
 
   const isPeriodStatLog = (log: ServiceLog) => {
-    if (log.status === '미방문' || isDummyId(log.id) || !log.visit_date) return true
-    const visit = String(log.visit_date || '')
+    const visit = orderDateOf(log)
+    if (orderStatusOf(log) === '미방문' || isDummyId(log.id) || !visit) return true
     if (periodPreset === 'custom') {
       const { from, to } = periodRange
       if (!from || !to) return true
@@ -483,11 +503,11 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
 
   /** 선택 기간 방문 완료: 상태가 완료인 건 */
   const isMonthVisitedLog = (log: ServiceLog) =>
-    log.status === '완료' && isPeriodStatLog(log)
+    orderStatusOf(log) === '완료' && isPeriodStatLog(log)
 
   /** 선택 기간 미방문: 완료 이외(접수·보류·미방문 등) */
   const isMonthUnvisitedLog = (log: ServiceLog) =>
-    log.status !== '완료' && isPeriodStatLog(log)
+    orderStatusOf(log) !== '완료' && isPeriodStatLog(log)
 
   /** 이번 달 방문 완료/미방문 클릭 시 해당 그룹을 위로 / 상태 정렬 시 상태끼리 묶음 */
   const displayRowGroups = useMemo(() => {
@@ -510,8 +530,8 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       const dir = visitSort === 'asc' ? 1 : -1
       groups = [...groups].sort((a, b) => {
         // 날짜 없는 건(미방문)은 방향과 상관없이 아래로
-        const da = String(a.primary.visit_date || '')
-        const db = String(b.primary.visit_date || '')
+        const da = orderDateOf(a.primary)
+        const db = orderDateOf(b.primary)
         if (!da && !db) return 0
         if (!da) return 1
         if (!db) return -1
@@ -523,7 +543,7 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       const statusDir = statusSort === 'asc' ? 1 : -1
       const clientDir = clientSort === 'asc' ? 1 : -1
       groups = [...groups].sort((a, b) => {
-        const byStatus = (statusRank(a.primary.status) - statusRank(b.primary.status)) * statusDir
+        const byStatus = (statusRank(orderStatusOf(a.primary)) - statusRank(orderStatusOf(b.primary))) * statusDir
         if (byStatus !== 0) return byStatus
         const nameA = a.primary.client?.name || a.primary.client_name || ''
         const nameB = b.primary.client?.name || b.primary.client_name || ''
@@ -590,7 +610,10 @@ export default function ServiceLogWorkspace({ logKind = 'service' }: { logKind?:
       manager: undefined,
       parts_usage: [],
       images: [],
-    } as ServiceLog
+      // 자리는 「+」를 누른 줄이 그 순간 있던 자리를 그대로 쓴다 (쓰는 중에 옮겨가지 않게)
+      sort_visit_date: orderDateOf(base),
+      sort_status: orderStatusOf(base),
+    } as unknown as ServiceLog
     setExtraRows((prev) => [...prev, row])
   }
 

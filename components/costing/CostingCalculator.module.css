@@ -1,0 +1,349 @@
+/* 원가계산 — DESIGN_SYSTEM.md 기준 (토큰만 사용, 박스 없이 hairline으로 구역 나눔) */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-8);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-6);
+  }
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+
+.section {
+  min-width: 0;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--c-line-strong);
+  margin-bottom: var(--sp-4);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  color: var(--c-ink);
+}
+
+.sectionNote {
+  font-size: var(--fs-xs);
+  color: var(--c-ink-3);
+}
+
+.toggle {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--c-accent);
+  cursor: pointer;
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-3);
+}
+
+@media (max-width: 520px) {
+  .grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.subGrid {
+  margin-top: var(--sp-3);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-ink-2);
+  line-height: 1.6;
+}
+
+/* 판정 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-4) var(--sp-3);
+}
+
+@media (max-width: 520px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.kpi {
+  min-width: 0;
+}
+
+.kpiLabel {
+  font-size: var(--fs-xs);
+  color: var(--c-ink-3);
+}
+
+.kpiValue {
+  margin-top: var(--sp-1);
+  font-family: var(--font-heading);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-ink);
+}
+
+.kpiSub {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
+  color: var(--c-ink-2);
+  margin-left: var(--sp-1);
+}
+
+.verdict {
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--c-line);
+}
+
+.verdictTitle {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+}
+
+.good {
+  color: var(--c-success);
+}
+
+.warn {
+  color: var(--c-warning);
+}
+
+.bad {
+  color: var(--c-danger);
+}
+
+.verdictWhy {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--c-ink-2);
+  line-height: 1.7;
+}
+
+/* 금액 줄 (렌탈료 내역, 한계) */
+.lines {
+  display: flex;
+  flex-direction: column;
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--c-line);
+  font-size: var(--fs-sm);
+}
+
+.line:last-child {
+  border-bottom: 0;
+}
+
+.lineTotal {
+  border-top: 1px solid var(--c-line-strong);
+  border-bottom: 0;
+  font-weight: var(--fw-bold);
+}
+
+.lineLabel {
+  color: var(--c-ink-2);
+  min-width: 0;
+}
+
+.lineBasis {
+  color: var(--c-ink-3);
+  font-size: var(--fs-xs);
+  margin-left: var(--sp-1);
+}
+
+.lineValues {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  white-space: nowrap;
+}
+
+.lineValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-medium);
+  color: var(--c-ink);
+}
+
+.linePct {
+  font-size: var(--fs-xs);
+  color: var(--c-ink-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.5rem;
+  text-align: right;
+}
+
+.negText {
+  color: var(--c-danger);
+}
+
+/* 수입 내역 */
+.breakdown {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-ink-2);
+  line-height: 1.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdownSum {
+  display: inline-block;
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-ink);
+  font-weight: var(--fw-medium);
+}
+
+/* 소모품 입력 줄 */
+.partRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.partName {
+  flex: 1 1 8rem;
+  min-width: 7rem;
+}
+
+.partSmall {
+  flex: 0 0 5.5rem;
+}
+
+.partTiny {
+  flex: 0 0 3.5rem;
+}
+
+.partApply {
+  flex: 0 0 7rem;
+}
+
+.partEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-left: auto;
+  padding-bottom: var(--sp-1);
+}
+
+.partUsed {
+  font-size: var(--fs-xs);
+  color: var(--c-ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.partsFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+.perPage {
+  font-size: var(--fs-xs);
+  color: var(--c-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 저장 줄 */
+.saveRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3);
+}
+
+.saveName {
+  flex: 1 1 12rem;
+}
+
+.saveField {
+  flex: 0 1 10rem;
+}
+
+.saveActions {
+  display: flex;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-1);
+}
+
+.listSummary {
+  font-size: var(--fs-sm);
+  color: var(--c-ink-2);
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+
+.linkButton {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--c-accent);
+  cursor: pointer;
+  text-align: left;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.empty {
+  padding: var(--sp-8) 0;
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--c-ink-3);
+}

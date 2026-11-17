@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   Building2,
+  Calculator,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -55,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { name: '견적서', path: '/quotes', icon: FileText },
+  { name: '원가계산', path: '/costing', icon: Calculator },
   { name: '월 정산 등록', path: '/accounting/registration', icon: SquarePen },
   { name: '청구 이력', path: '/accounting/history', icon: History },
   { name: '수금 현황', path: '/accounting/dashboard', icon: Wallet },

@@ -222,6 +222,7 @@
 | 재고 | 📦 | `Package` |
 | 서비스 | 🛠️ | `Wrench` |
 | 견적서 | 📄 | `FileText` |
+| 원가계산 | - | `Calculator` |
 | 월 정산 등록 | 📝 | `SquarePen` |
 | 청구 이력 | 🕒 | `History` |
 | 수금 현황 | 📊 | `Wallet` |
