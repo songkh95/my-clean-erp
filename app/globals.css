@@ -20,6 +20,16 @@
   --c-success: #1E6B3A;
   --shadow-float: 0 8px 24px rgba(26, 26, 26, 0.12);
 
+  /* ── 구성비 막대 (7.4-1) — 막대는 밝게, 같은 뜻의 글자는 읽히게 한 단계 진하게 ── */
+  --c-part-dep: #845EF7;
+  --c-part-dep-text: #6741D9;
+  --c-part-cons: #339AF0;
+  --c-part-cons-text: #1971C2;
+  --c-part-fix: #FFA94D;
+  --c-part-fix-text: #D9480F;
+  --c-part-profit: #51CF66;
+  --c-part-profit-text: #2B8A3E;
+
   /* ── 글꼴 (3.1) — 실제 값은 화면 설정에서 html 에 주입 ── */
   --font-heading: 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif;
   --font-body: 'Pretendard Variable', 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;

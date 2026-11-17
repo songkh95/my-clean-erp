@@ -168,7 +168,7 @@
 /* 구성비 막대 (DESIGN_SYSTEM.md 7.4-1) */
 .bar {
   display: flex;
-  height: 0.5rem;
+  height: 0.625rem;
   border-radius: var(--radius-1);
   overflow: hidden;
   background: var(--c-subtle);
@@ -181,19 +181,19 @@
 }
 
 .segDep {
-  background: var(--c-ink-2);
+  background: var(--c-part-dep);
 }
 
 .segCons {
-  background: var(--c-accent);
+  background: var(--c-part-cons);
 }
 
 .segFix {
-  background: var(--c-warning);
+  background: var(--c-part-fix);
 }
 
 .segProfit {
-  background: var(--c-success);
+  background: var(--c-part-profit);
 }
 
 /* 적자: 비용이 막대를 가득 채우고 테두리로 표시한다 */
@@ -411,17 +411,21 @@
 
 /* 막대 칸과 같은 색으로 줄 제목을 맞춘다 (.lineLabel 뒤에 와야 적용된다) */
 .cDep {
-  color: var(--c-ink-2);
+  color: var(--c-part-dep-text);
+  font-weight: var(--fw-medium);
 }
 
 .cCons {
-  color: var(--c-accent);
+  color: var(--c-part-cons-text);
+  font-weight: var(--fw-medium);
 }
 
 .cFix {
-  color: var(--c-warning);
+  color: var(--c-part-fix-text);
+  font-weight: var(--fw-medium);
 }
 
 .cProfit {
-  color: var(--c-success);
+  color: var(--c-part-profit-text);
+  font-weight: var(--fw-medium);
 }
