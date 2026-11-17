@@ -17,7 +17,7 @@
 .col {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-8);
+  gap: var(--sp-6);
   min-width: 0;
 }
 
@@ -32,7 +32,7 @@
   gap: var(--sp-3);
   padding-bottom: var(--sp-2);
   border-bottom: 1px solid var(--c-line-strong);
-  margin-bottom: var(--sp-4);
+  margin-bottom: var(--sp-3);
 }
 
 .sectionTitle {
@@ -65,7 +65,7 @@
 .grid2 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--sp-3);
+  gap: var(--sp-2) var(--sp-3);
 }
 
 @media (max-width: 520px) {
@@ -84,7 +84,7 @@
 }
 
 .note {
-  margin: var(--sp-3) 0 0;
+  margin: var(--sp-2) 0 0;
   font-size: var(--fs-xs);
   color: var(--c-ink-2);
   line-height: 1.6;
@@ -261,12 +261,12 @@
 
 /* 줄바꿈이 일어나도 이름 칸이 남은 자리를 먹어 늘어나지 않도록 고정폭으로 둔다 */
 .partName {
-  flex: 0 1 10rem;
-  min-width: 7rem;
+  flex: 0 1 9rem;
+  min-width: 6rem;
 }
 
 .partSmall {
-  flex: 0 0 5.5rem;
+  flex: 0 0 5rem;
 }
 
 .partTiny {
@@ -274,22 +274,27 @@
 }
 
 .partApply {
-  flex: 0 0 7rem;
+  flex: 0 0 6.5rem;
 }
 
 .partEnd {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   margin-left: auto;
   padding-bottom: var(--sp-1);
+  min-width: 0;
 }
 
+/* 좁은 화면에서는 줄바꿈 대신 글자를 잘라 한 줄을 지킨다 */
 .partUsed {
   font-size: var(--fs-xs);
   color: var(--c-ink-3);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .partsFoot {
