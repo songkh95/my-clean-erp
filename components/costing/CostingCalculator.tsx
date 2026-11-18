@@ -607,8 +607,9 @@ export default function CostingCalculator() {
                 </span>
               </div>
               <div className={styles.line}>
-                <span className={`${styles.lineLabel} ${styles.cDep}`}>
-                  기계 감가<span className={styles.lineBasis}>({n.life}개월로 나눔)</span>
+                <span className={`${styles.lineLabel} ${styles.lineNamed}`}>
+                  기계 감가<span className={`${styles.dot} ${styles.dotDep}`} />
+                  <span className={styles.lineBasis}>({n.life}개월로 나눔)</span>
                 </span>
                 <span className={styles.lineValues}>
                   <span className={styles.lineValue}>{won(r.depreciation)}</span>
@@ -616,8 +617,8 @@ export default function CostingCalculator() {
                 </span>
               </div>
               <div className={styles.line}>
-                <span className={`${styles.lineLabel} ${styles.cCons}`}>
-                  소모품비
+                <span className={`${styles.lineLabel} ${styles.lineNamed}`}>
+                  소모품비<span className={`${styles.dot} ${styles.dotCons}`} />
                   <span className={styles.lineBasis}>
                     ({v.showVolume ? '예상 월 ' : '기본매수 '}
                     {pages(r.bwPages + r.colPages)} 기준)
@@ -630,7 +631,9 @@ export default function CostingCalculator() {
               </div>
               {v.showFixed ? (
                 <div className={styles.line}>
-                  <span className={`${styles.lineLabel} ${styles.cFix}`}>월 고정비</span>
+                  <span className={`${styles.lineLabel} ${styles.lineNamed}`}>
+                    월 고정비<span className={`${styles.dot} ${styles.dotFix}`} />
+                  </span>
                   <span className={styles.lineValues}>
                     <span className={styles.lineValue}>{won(r.fixed)}</span>
                     <span className={styles.linePct}>{pct(r.fixed, r.revenue)}</span>
@@ -638,8 +641,8 @@ export default function CostingCalculator() {
                 </div>
               ) : null}
               <div className={`${styles.line} ${styles.lineTotal}`}>
-                <span className={`${styles.lineLabel} ${r.profit < 0 ? styles.negText : styles.cProfit}`}>
-                  순이익
+                <span className={`${styles.lineLabel} ${styles.lineNamed}`}>
+                  순이익<span className={`${styles.dot} ${r.profit < 0 ? styles.dotLoss : styles.dotProfit}`} />
                 </span>
                 <span className={styles.lineValues}>
                   <span className={`${styles.lineValue} ${r.profit < 0 ? styles.negText : ''}`}>{won(r.profit)}</span>

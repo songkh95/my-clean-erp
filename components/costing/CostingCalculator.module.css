@@ -409,23 +409,37 @@
   color: var(--c-ink-3);
 }
 
-/* 막대 칸과 같은 색으로 줄 제목을 맞춘다 (.lineLabel 뒤에 와야 적용된다) */
-.cDep {
-  color: var(--c-part-dep-text);
+/* 막대 칸과 같은 색 점을 제목 오른쪽에 둔다 — 글자는 검정 그대로 */
+.lineNamed {
+  color: var(--c-ink);
   font-weight: var(--fw-medium);
 }
 
-.cCons {
-  color: var(--c-part-cons-text);
-  font-weight: var(--fw-medium);
+.dot {
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  margin-left: var(--sp-1);
+  vertical-align: 0.1em;
 }
 
-.cFix {
-  color: var(--c-part-fix-text);
-  font-weight: var(--fw-medium);
+.dotDep {
+  background: var(--c-part-dep);
 }
 
-.cProfit {
-  color: var(--c-part-profit-text);
-  font-weight: var(--fw-medium);
+.dotCons {
+  background: var(--c-part-cons);
+}
+
+.dotFix {
+  background: var(--c-part-fix);
+}
+
+.dotProfit {
+  background: var(--c-part-profit);
+}
+
+.dotLoss {
+  background: var(--c-danger);
 }
