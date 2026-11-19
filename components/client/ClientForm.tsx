@@ -513,6 +513,20 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
               </div>
             )}
 
+            {showNewMachineForm ? (
+              <div style={{
+                padding: '10px 12px', marginBottom: 10, borderRadius: 6,
+                border: '1px dashed #e5e5e5', background: '#fff',
+                fontSize: '0.8rem', color: '#666',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+              }}>
+                <span>신규 기기를 입력하는 동안에는 창고 검색을 쓸 수 없습니다.</span>
+                <Button type="button" variant="outline" size="sm" onClick={cancelMachineDraft}>
+                  입력 닫기
+                </Button>
+              </div>
+            ) : (
+              <>
             <InputField
               label="창고 기계 검색"
               value={machineSearch}
@@ -559,6 +573,8 @@ export default function ClientForm({ isOpen, onClose, onSuccess, editData }: Pro
                 })
               )}
             </div>
+              </>
+            )}
 
             {newMachines.length > 0 && (
               <div style={{ marginBottom: 10 }}>

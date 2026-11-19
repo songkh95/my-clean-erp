@@ -198,8 +198,15 @@ function getPeriodRange(
   return { from, to, includeUnvisited: true }
 }
 
+/**
+ * 한 줄로 묶는 기준.
+ * 기계가 창고를 거쳐 다른 거래처에 재설치되면 이전 거래처의 방문 이력과 섞이면 안 되므로
+ * 기계 + 거래처를 함께 키로 쓴다.
+ */
 function groupKeyOf(log: ServiceLog) {
-  return log.inventory_id ? `i:${log.inventory_id}` : `c:${log.client_id || log.id}`
+  return log.inventory_id
+    ? `i:${log.inventory_id}@c:${log.client_id || '-'}`
+    : `c:${log.client_id || log.id}`
 }
 
 function loadColWidths(): Record<ColKey, number> {

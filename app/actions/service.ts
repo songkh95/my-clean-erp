@@ -708,10 +708,15 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
     }
   }
 
+  // 같은 기계라도 거래처가 바뀌면(창고 회수 후 재설치) 직전 방문 이력은 이어지지 않는다.
+  // 새 거래처에 설치된 기계는 첫 방문부터 다시 시작한다.
+  const machineKeyOf = (inventoryId: string, clientId: string | null) =>
+    `i:${inventoryId}@c:${clientId || '-'}`
+
   const groups = new Map<string, any[]>()
   for (const log of realLogs) {
     const key = log.inventory_id
-      ? `i:${log.inventory_id}`
+      ? machineKeyOf(log.inventory_id, log.client_id || null)
       : log.client_id
         ? `c:${log.client_id}`
         : `n:${log.client_name || log.id}`
@@ -831,7 +836,7 @@ export async function getServiceLogsAction(logKind: ServiceLogKind = 'service') 
       manager: { name: '' },
       created_at: new Date().toISOString(),
       parts_usage: [],
-      prev_visit_date: lastVisitByKey.get(`i:${m.id}`) || null,
+      prev_visit_date: lastVisitByKey.get(machineKeyOf(m.id, m.client_id || null)) || null,
       latest_spare_stock: latestSpareByKey.get(`c:${m.client_id}`)?.value || null,
       latest_spare_stock_at: latestSpareByKey.get(`c:${m.client_id}`)?.at || null,
     }))
