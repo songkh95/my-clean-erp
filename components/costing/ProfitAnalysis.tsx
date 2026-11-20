@@ -368,13 +368,13 @@ export default function ProfitAnalysis() {
             <thead>
               <tr>
                 <th>거래처</th>
-                <th className={styles.num}>매출</th>
-                <th className={styles.num}>소모품 (실제)</th>
-                <th className={styles.num}>소모품 (환산)</th>
-                <th className={styles.num}>감가</th>
-                <th className={styles.num}>순이익 (실제)</th>
-                <th className={styles.num}>순이익 (환산)</th>
-                <th className={styles.num}>이익률</th>
+                <th className="num">매출</th>
+                <th className="num">소모품 (실제)</th>
+                <th className="num">소모품 (환산)</th>
+                <th className="num">감가</th>
+                <th className="num">순이익 (실제)</th>
+                <th className="num">순이익 (환산)</th>
+                <th className="num">이익률</th>
               </tr>
             </thead>
             <tbody>
@@ -401,26 +401,26 @@ export default function ProfitAnalysis() {
                           <span className={styles.muted}>{c.machines.length}대</span>
                         </span>
                       </td>
-                      <td className={styles.num}>{won(c.totals.revenue)}</td>
-                      <td className={styles.num}>{won(c.totals.consumableActual)}</td>
-                      <td className={`${styles.num} ${styles.muted}`}>
+                      <td className="num">{won(c.totals.revenue)}</td>
+                      <td className="num">{won(c.totals.consumableActual)}</td>
+                      <td className={`num ${styles.muted}`}>
                         {c.totals.consumableEstimated == null
                           ? '—'
                           : won(c.totals.consumableEstimated)}
                       </td>
-                      <td className={styles.num}>{won(c.totals.depreciation)}</td>
+                      <td className="num">{won(c.totals.depreciation)}</td>
                       <td
-                        className={`${styles.num} ${
+                        className={`num ${
                           c.totals.profitActual < 0 ? styles.neg : ''
                         }`}
                       >
                         {won(c.totals.profitActual)}
                       </td>
-                      <td className={`${styles.num} ${styles.muted}`}>
+                      <td className={`num ${styles.muted}`}>
                         {c.totals.profitEstimated == null ? '—' : won(c.totals.profitEstimated)}
                       </td>
                       <td
-                        className={`${styles.num} ${
+                        className={`num ${
                           c.totals.profitActual < 0 ? styles.neg : ''
                         }`}
                       >
@@ -439,21 +439,21 @@ export default function ProfitAnalysis() {
                                 {pages(m.usage.bw)} / 칼라 {pages(m.usage.col)} · {m.months}개월
                               </div>
                             </td>
-                            <td className={styles.num}>{won(m.revenue)}</td>
-                            <td className={styles.num}>{won(m.consumableActual)}</td>
-                            <td className={`${styles.num} ${styles.muted}`}>
+                            <td className="num">{won(m.revenue)}</td>
+                            <td className="num">{won(m.consumableActual)}</td>
+                            <td className={`num ${styles.muted}`}>
                               {m.consumableEstimated == null ? '—' : won(m.consumableEstimated)}
                             </td>
-                            <td className={styles.num}>{won(m.depreciation)}</td>
+                            <td className="num">{won(m.depreciation)}</td>
                             <td
-                              className={`${styles.num} ${m.profitActual < 0 ? styles.neg : ''}`}
+                              className={`num ${m.profitActual < 0 ? styles.neg : ''}`}
                             >
                               {won(m.profitActual)}
                             </td>
-                            <td className={`${styles.num} ${styles.muted}`}>
+                            <td className={`num ${styles.muted}`}>
                               {m.profitEstimated == null ? '—' : won(m.profitEstimated)}
                             </td>
-                            <td className={`${styles.num} ${styles.muted}`}>
+                            <td className={`num ${styles.muted}`}>
                               {m.revenue > 0 ? pct(m.profitActual / m.revenue) : '-'}
                             </td>
                           </tr>
