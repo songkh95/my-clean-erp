@@ -728,3 +728,30 @@ export async function normalizeInventoryModelNamesAction() {
 
   return { success: true, message: updated > 0 ? `모델명 ${updated}건을 대문자로 정리했습니다.` : '정리할 항목이 없습니다.', updated }
 }
+/** 기기 한 대 — 수익 분석에서 바로 계약·원가 정보를 고칠 때 쓴다 */
+export async function getInventoryByIdAction(id: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: '로그인이 필요합니다.', data: null }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single()
+  if (!profile?.organization_id) {
+    return { success: false, message: '조직 정보를 찾을 수 없습니다.', data: null }
+  }
+
+  const { data, error } = await supabase
+    .from('inventory')
+    .select('*')
+    .eq('id', id)
+    .eq('organization_id', profile.organization_id)
+    .single()
+
+  if (error || !data) {
+    return { success: false, message: error?.message || '기기를 찾을 수 없습니다.', data: null }
+  }
+  return { success: true, message: 'ok', data }
+}

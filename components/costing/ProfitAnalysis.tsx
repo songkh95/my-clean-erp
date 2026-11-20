@@ -13,6 +13,9 @@ import {
   type ProfitMode,
 } from '@/app/actions/costingProfit'
 import { listClientsForCostingAction } from '@/app/actions/costing'
+import { getInventoryByIdAction } from '@/app/actions/inventory'
+import InventoryForm from '@/components/inventory/InventoryForm'
+import { toast } from '@/components/ui/Toast'
 import { periodLabel } from '@/utils/profitAnalysis'
 import styles from './ProfitAnalysis.module.css'
 
@@ -40,6 +43,7 @@ export default function ProfitAnalysis() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [editMachine, setEditMachine] = useState<Record<string, unknown> | null>(null)
 
   useEffect(() => {
     listSettlementYearsAction().then((r) => setYears(r.data || []))
@@ -62,6 +66,16 @@ export default function ProfitAnalysis() {
   useEffect(() => {
     load()
   }, [load])
+
+  /** 계약·원가 정보가 비어 계산에서 빠진 기계를 바로 고친다 */
+  const openMachine = async (inventoryId: string) => {
+    const res = await getInventoryByIdAction(inventoryId)
+    if (!res.success || !res.data) {
+      toast.error(res.message || '기기를 불러오지 못했습니다.')
+      return
+    }
+    setEditMachine(res.data as Record<string, unknown>)
+  }
 
   const unitOptions = mode === 'quarter' ? QUARTERS : mode === 'month' ? MONTHS : []
   const label = periodLabel(mode, year, unit)
@@ -164,14 +178,22 @@ export default function ProfitAnalysis() {
                 원가 정보가 없어 계산에서 뺀 기계 {data.blocked.length}대
               </span>
               <ul className={styles.noticeList}>
-                {data.blocked.slice(0, 8).map((b) => (
+                {data.blocked.map((b) => (
                   <li key={b.inventoryId}>
-                    {b.clientName} · {b.model} ({b.serial}) — {b.missing.join(', ')} 없음
+                    <button
+                      type="button"
+                      className={styles.linkButton}
+                      onClick={() => openMachine(b.inventoryId)}
+                    >
+                      {b.clientName} · {b.model} ({b.serial})
+                    </button>
+                    <span className={styles.missing}> — {b.missing.join(', ')} 없음</span>
                   </li>
                 ))}
-                {data.blocked.length > 8 ? <li>그 외 {data.blocked.length - 8}대</li> : null}
               </ul>
-              <span className={styles.noticeList}>재고에서 해당 기계를 열어 채워 주세요.</span>
+              <span className={styles.noticeList}>
+                줄을 누르면 그 기계의 계약·원가 정보를 바로 고칠 수 있습니다.
+              </span>
             </span>
           </div>
         </div>
@@ -449,6 +471,16 @@ export default function ProfitAnalysis() {
       {!loading && (!data || data.clients.length === 0) ? (
         <p className={styles.empty}>{message || '보여줄 내용이 없습니다.'}</p>
       ) : null}
+
+      <InventoryForm
+        isOpen={editMachine !== null}
+        onClose={() => setEditMachine(null)}
+        onSuccess={() => {
+          setEditMachine(null)
+          load()
+        }}
+        editData={editMachine as never}
+      />
     </>
   )
 }

@@ -71,6 +71,10 @@
   padding: 0.1rem 0;
 }
 
+.noticeList .linkButton {
+  font-size: var(--fs-xs);
+}
+
 /* 합계 */
 .kpis {
   display: grid;
@@ -226,6 +230,10 @@
   border: 1px solid var(--c-line-strong);
   border-radius: var(--radius-1);
   font-size: var(--fs-xs);
+  color: var(--c-ink-3);
+}
+
+.missing {
   color: var(--c-ink-3);
 }
 
