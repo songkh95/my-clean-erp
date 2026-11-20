@@ -237,6 +237,12 @@
   color: var(--c-ink-3);
 }
 
+/* 관리코드 — 같은 품명·다른 색을 가릴 수 있게 같이 적는다 */
+.code {
+  font-variant-numeric: tabular-nums;
+  color: var(--c-ink-3);
+}
+
 .muted {
   color: var(--c-ink-3);
 }

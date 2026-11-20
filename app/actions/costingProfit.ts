@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import {
+  consumableDetailLabel,
   machineProfitOf,
   monthlyDepreciation,
   monthsOfPeriod,
@@ -24,11 +25,21 @@ export type BlockedMachine = {
   missing: string[]
 }
 
+/** 알림에 적는 소모품 한 품목 — 품명만으로는 색이 다른 품목을 구분할 수 없다 */
+export type WarnConsumable = {
+  id: string
+  label: string
+  code: string | null
+  category: string | null
+  color: string | null
+  regenerated: boolean
+}
+
 export type ProfitWarnings = {
   /** 단가가 0원이라 실제 원가가 적게 잡히는 소모품 */
-  zeroPrice: { id: string; name: string }[]
+  zeroPrice: WarnConsumable[]
   /** 라이프가 없어 환산을 못 내는 소모품 */
-  noLife: { id: string; name: string }[]
+  noLife: WarnConsumable[]
   /** 매수는 늘었는데 그 기간 서비스 일지가 없는 기계 */
   noServiceLog: { model: string; serial: string; clientName: string }[]
   /** 재설치 기계 — 감가가 이중으로 잡혔을 수 있음 */
@@ -231,6 +242,9 @@ export async function getProfitAnalysisAction(params: {
       unit_price: c.unit_price == null ? null : Number(c.unit_price),
       life_pages: c.life_pages == null ? null : Number(c.life_pages),
       color: c.color == null ? null : String(c.color),
+      category: c.category == null ? null : String(c.category),
+      is_regenerated: Boolean(c.is_regenerated),
+      code: c.code == null ? null : String(c.code),
     })
     specsByModel.set(key, list)
   }
@@ -246,7 +260,32 @@ export async function getProfitAnalysisAction(params: {
 
   // 실제 사용 금액 (기계별)
   const actualByMachine = new Map<string, number>()
-  const zeroPrice = new Map<string, string>()
+  const zeroPrice = new Map<string, WarnConsumable>()
+
+  const warnOf = (c: {
+    id: unknown
+    model_name?: unknown
+    category?: unknown
+    color?: unknown
+    is_regenerated?: unknown
+    code?: unknown
+  }): WarnConsumable => {
+    const shape = {
+      model_name: c.model_name == null ? null : String(c.model_name),
+      category: c.category == null ? null : String(c.category),
+      color: c.color == null ? null : String(c.color),
+      is_regenerated: Boolean(c.is_regenerated),
+      code: c.code == null ? null : String(c.code),
+    }
+    return {
+      id: String(c.id),
+      label: consumableDetailLabel(shape),
+      code: shape.code,
+      category: shape.category,
+      color: shape.color,
+      regenerated: shape.is_regenerated,
+    }
+  }
   for (const u of usages) {
     const invId = machineByLog.get(u.service_log_id)
     if (!invId) continue
@@ -254,7 +293,7 @@ export async function getProfitAnalysisAction(params: {
     if (!c) continue
     const price = num(c.unit_price)
     const qty = num(u.quantity) || 1
-    if (price <= 0) zeroPrice.set(String(c.id), String(c.model_name || ''))
+    if (price <= 0) zeroPrice.set(String(c.id), warnOf(c as { id: unknown }))
     actualByMachine.set(invId, (actualByMachine.get(invId) || 0) + price * qty)
   }
 
@@ -294,7 +333,7 @@ export async function getProfitAnalysisAction(params: {
   }
 
   const blocked: BlockedMachine[] = []
-  const noLife = new Map<string, string>()
+  const noLife = new Map<string, WarnConsumable>()
   const noServiceLog: ProfitWarnings['noServiceLog'] = []
   const reinstalled: ProfitWarnings['reinstalled'] = []
   const byClient = new Map<string, MachineProfit[]>()
@@ -340,8 +379,8 @@ export async function getProfitAnalysisAction(params: {
     const specs = specsByModel.get(toMachineModelName(String(m.model_name || '')).trim()) || []
     const perPage = specs.length > 0 ? perPageCostOf(specs) : null
     if (perPage) {
-      for (const c of perPage.missingLife) noLife.set(c.id, c.model_name)
-      for (const c of perPage.missingPrice) zeroPrice.set(c.id, c.model_name)
+      for (const c of perPage.missingLife) noLife.set(c.id, warnOf(c))
+      for (const c of perPage.missingPrice) zeroPrice.set(c.id, warnOf(c))
     }
 
     const profit = machineProfitOf({
@@ -393,8 +432,8 @@ export async function getProfitAnalysisAction(params: {
       totals: sumProfits(allMachines),
       blocked,
       warnings: {
-        zeroPrice: Array.from(zeroPrice, ([id, name]) => ({ id, name })),
-        noLife: Array.from(noLife, ([id, name]) => ({ id, name })),
+        zeroPrice: Array.from(zeroPrice.values()).sort((a, b) => a.label.localeCompare(b.label, 'ko')),
+        noLife: Array.from(noLife.values()).sort((a, b) => a.label.localeCompare(b.label, 'ko')),
         noServiceLog,
         reinstalled,
       },

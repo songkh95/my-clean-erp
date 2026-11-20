@@ -209,8 +209,11 @@ export default function ProfitAnalysis() {
               <span>
                 <span className={styles.noticeTitle}>단가가 0원인 소모품이 있어 원가가 적게 잡힙니다</span>
                 <ul className={styles.noticeList}>
-                  {warnings!.zeroPrice.slice(0, 10).map((c) => (
-                    <li key={c.id}>{c.name}</li>
+                  {warnings!.zeroPrice.map((c) => (
+                    <li key={c.id}>
+                      {c.label}
+                      {c.code ? <span className={styles.code}> {c.code}</span> : null}
+                    </li>
                   ))}
                 </ul>
                 <span className={styles.noticeList}>재고 → 소모품에서 매입 단가를 등록하세요.</span>
@@ -226,8 +229,11 @@ export default function ProfitAnalysis() {
               <span>
                 <span className={styles.noticeTitle}>라이프가 없어 환산 원가를 내지 못한 소모품</span>
                 <ul className={styles.noticeList}>
-                  {warnings!.noLife.slice(0, 10).map((c) => (
-                    <li key={c.id}>{c.name}</li>
+                  {warnings!.noLife.map((c) => (
+                    <li key={c.id}>
+                      {c.label}
+                      {c.code ? <span className={styles.code}> {c.code}</span> : null}
+                    </li>
                   ))}
                 </ul>
                 <span className={styles.noticeList}>

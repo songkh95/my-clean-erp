@@ -29,6 +29,32 @@ export type ConsumableSpec = {
   life_pages: number | null
   /** K / C / M / Y / KCMY, 빈 값이면 흑백·칼라 공통으로 본다 */
   color: string | null
+  category?: string | null
+  is_regenerated?: boolean | null
+  code?: string | null
+}
+
+/**
+ * 알림에 쓸 품목 이름.
+ * 같은 품명에 색만 다른 품목이 여러 개 있어서(토너 K·C·M·Y) 품명만으로는 구분이 안 된다.
+ * 품명 · 분류 색상 (관리코드) 로 적는다.
+ */
+export function consumableDetailLabel(c: {
+  model_name?: string | null
+  category?: string | null
+  color?: string | null
+  is_regenerated?: boolean | null
+  code?: string | null
+}): string {
+  const model = String(c.model_name || '').trim()
+  const category = String(c.category || '').trim()
+  const color = String(c.color || '').trim().toUpperCase()
+  const parts: string[] = []
+  if (category) parts.push(color ? `${category} ${color}` : category)
+  if (c.is_regenerated) parts.push('재생')
+  const tail = parts.join(' ')
+  const head = [model, tail].filter(Boolean).join(' · ')
+  return head || '(이름 없음)'
 }
 
 /** 계약 개월수 — 연수 우선, 없으면 계약 시작·종료일, 둘 다 없으면 null */
