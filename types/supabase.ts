@@ -163,6 +163,7 @@ export type Database = {
           organization_id: string
           product_group: string | null
           unit_price: number | null
+          life_pages: number | null
         }
         Insert: {
           category: string
@@ -177,6 +178,7 @@ export type Database = {
           organization_id: string
           product_group?: string | null
           unit_price?: number | null
+          life_pages?: number | null
         }
         Update: {
           category?: string
@@ -191,6 +193,7 @@ export type Database = {
           organization_id?: string
           product_group?: string | null
           unit_price?: number | null
+          life_pages?: number | null
         }
         Relationships: [
           {
@@ -341,6 +344,8 @@ export type Database = {
           product_condition: string | null
           purchase_date: string | null
           purchase_price: number | null
+          initial_toner_cost: number | null
+          setup_cost: number | null
           sale_price: number | null
           serial_number: string
           status: string
@@ -380,6 +385,8 @@ export type Database = {
           product_condition?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
+          initial_toner_cost?: number | null
+          setup_cost?: number | null
           sale_price?: number | null
           serial_number: string
           status?: string
@@ -419,6 +426,8 @@ export type Database = {
           product_condition?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
+          initial_toner_cost?: number | null
+          setup_cost?: number | null
           sale_price?: number | null
           serial_number?: string
           status?: string

@@ -35,6 +35,8 @@ interface InventoryFormState {
   department: string
   purchase_date: string
   purchase_price: number
+  setup_cost: number | ''
+  initial_toner_cost: number | ''
   initial_count_bw: number
   initial_count_col: number
   initial_count_bw_a3: number
@@ -70,6 +72,8 @@ function buildInitialInventoryForm(): InventoryFormState {
     department: '',
     purchase_date: new Date().toISOString().split('T')[0],
     purchase_price: 0,
+    setup_cost: '' as number | '',
+    initial_toner_cost: '' as number | '',
     initial_count_bw: 0,
     initial_count_col: 0,
     initial_count_bw_a3: 0,
@@ -169,6 +173,8 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
           purchase_date: editData.purchase_date || '',
           billing_date: editData.billing_date || initialData.billing_date,
           purchase_price: editData.purchase_price ?? 0,
+          setup_cost: editData.setup_cost ?? '',
+          initial_toner_cost: editData.initial_toner_cost ?? '',
           plan_basic_fee: editData.plan_basic_fee ?? 0,
           plan_basic_cnt_bw: editData.plan_basic_cnt_bw ?? 0,
           plan_basic_cnt_col: editData.plan_basic_cnt_col ?? 0,
@@ -281,6 +287,9 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
         // 빈 문자열일 경우 null로 처리하여 DB 에러 방지
         purchase_date: formData.purchase_date === '' ? null : formData.purchase_date,
         purchase_price: Number(formData.purchase_price) || 0,
+        setup_cost: formData.setup_cost === '' ? null : Number(formData.setup_cost) || 0,
+        initial_toner_cost:
+          formData.initial_toner_cost === '' ? null : Number(formData.initial_toner_cost) || 0,
         plan_basic_fee: Number(formData.plan_basic_fee),
         plan_basic_cnt_bw: Number(formData.plan_basic_cnt_bw),
         plan_basic_cnt_col: Number(formData.plan_basic_cnt_col),
@@ -492,6 +501,32 @@ export default function InventoryForm({ isOpen, onClose, onSuccess, editData, ov
                 placeholder="0"
                 value={formData.purchase_price} 
                 onChange={e => setFormData({ ...formData, purchase_price: Number(e.target.value) })} 
+              />
+            </div>
+            <div className={styles.grid2} style={{ marginTop: 10, marginBottom: 0 }}>
+              <InputField
+                label="설치비 (원, 선택)"
+                type="number"
+                placeholder="비워 두면 0"
+                value={formData.setup_cost}
+                onChange={e =>
+                  setFormData({
+                    ...formData,
+                    setup_cost: e.target.value === '' ? '' : Number(e.target.value),
+                  })
+                }
+              />
+              <InputField
+                label="초기 소모품 (원, 선택)"
+                type="number"
+                placeholder="비워 두면 0"
+                value={formData.initial_toner_cost}
+                onChange={e =>
+                  setFormData({
+                    ...formData,
+                    initial_toner_cost: e.target.value === '' ? '' : Number(e.target.value),
+                  })
+                }
               />
             </div>
           </div>

@@ -78,7 +78,12 @@ export async function createInventoryAction(data: Partial<Inventory>) {
       created_at: new Date().toISOString()
     }
 
-    const { error } = await supabase.from('inventory').insert(payload)
+    let { error } = await supabase.from('inventory').insert(payload)
+    // 설치비·초기 소모품 컬럼이 아직 없는 환경: 그 두 값만 빼고 다시 저장한다
+    if (error && /setup_cost|initial_toner_cost/i.test(error.message)) {
+      const { setup_cost: _s, initial_toner_cost: _i, ...slim } = payload as Record<string, unknown>
+      error = (await supabase.from('inventory').insert(slim as any)).error
+    }
     if (error) throw error
 
     revalidatePath('/inventory')
@@ -122,7 +127,13 @@ export async function updateInventoryAction(id: string, data: Partial<Inventory>
     }
 
     // H7: ID만으로 처리하던 것을 org ID까지 함께 검사
-    const { error } = await supabase.from('inventory').update(dbData).eq('id', id).eq('organization_id', orgId)
+    let { error } = await supabase.from('inventory').update(dbData).eq('id', id).eq('organization_id', orgId)
+    if (error && /setup_cost|initial_toner_cost/i.test(error.message)) {
+      const { setup_cost: _s, initial_toner_cost: _i, ...slim } = dbData as Record<string, unknown>
+      error = (
+        await supabase.from('inventory').update(slim as any).eq('id', id).eq('organization_id', orgId)
+      ).error
+    }
     if (error) throw error
 
     revalidatePath('/inventory')

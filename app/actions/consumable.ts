@@ -240,11 +240,20 @@ export async function upsertConsumableAction(formData: any) {
     formData.product_group != null && String(formData.product_group).trim()
       ? String(formData.product_group).trim()
       : null
+  // 라이프(장)는 선택 입력 — 비면 null 로 둔다
+  const lifeRaw = (formData as Record<string, unknown>).life_pages
+  const lifeIn = Number(lifeRaw)
+  const lifePages =
+    lifeRaw == null || lifeRaw === '' || !Number.isFinite(lifeIn) || lifeIn <= 0
+      ? null
+      : Math.round(lifeIn)
+
   const payload: Record<string, unknown> = {
     ...rest,
     organization_id: orgId,
     current_stock: Number.isFinite(stockIn) ? stockIn : 0,
     unit_price: Number.isFinite(priceIn) ? priceIn : 0,
+    life_pages: lifePages,
     product_group: productGroupName,
   }
 
@@ -360,6 +369,9 @@ export async function upsertConsumableAction(formData: any) {
       if (Number.isFinite(priceIn) && priceIn > 0 && !(Number(existing.unit_price) > 0)) {
         patch.unit_price = priceIn
       }
+      if (lifePages != null && !(Number((existing as any).life_pages) > 0)) {
+        patch.life_pages = lifePages
+      }
       if (productGroupName) patch.product_group = productGroupName
 
       await supabase.from('consumables').update(patch).eq('id', existing.id).eq('organization_id', orgId)
@@ -395,11 +407,23 @@ export async function upsertConsumableAction(formData: any) {
     payload.model_name = toConsumableModelName(String(payload.model_name)).trim()
   }
 
-  const { data: saved, error } = await supabase
+  let { data: saved, error } = await supabase
     .from('consumables')
     .upsert(payload as any)
     .select('*')
     .single()
+
+  // life_pages 컬럼이 아직 없는 환경: 라이프만 빼고 다시 저장한다
+  if (error && /life_pages/i.test(error.message)) {
+    delete payload.life_pages
+    const retry = await supabase
+      .from('consumables')
+      .upsert(payload as any)
+      .select('*')
+      .single()
+    saved = retry.data
+    error = retry.error
+  }
 
   if (error || !saved) {
     if (/consumables_org_code_uidx|consumables_org_code_regen_uidx|duplicate key/i.test(error?.message || '')) {

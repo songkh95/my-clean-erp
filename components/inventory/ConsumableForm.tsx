@@ -30,6 +30,7 @@ export type ConsumableFormPreset = {
   code?: string
   current_stock?: number
   unit_price?: number
+  life_pages?: number | ''
 }
 
 interface Props {
@@ -66,6 +67,7 @@ export default function ConsumableForm({
     code: '',
     current_stock: 0,
     unit_price: 0,
+    life_pages: '' as number | '',
     color: '' as TonerDrumColor | '',
     is_regenerated: false,
   })
@@ -118,6 +120,10 @@ export default function ConsumableForm({
         code: editData.code || '',
         current_stock: Number(editData.current_stock) || 0,
         unit_price: Number(editData.unit_price) || 0,
+        life_pages:
+          editData.life_pages == null || editData.life_pages === ''
+            ? ''
+            : Number(editData.life_pages),
         color: (editData.color as TonerDrumColor) || '',
         is_regenerated: Boolean(editData.is_regenerated),
       })
@@ -151,6 +157,7 @@ export default function ConsumableForm({
         code: defaultCode,
         current_stock: preset?.current_stock ?? 0,
         unit_price: preset?.unit_price ?? 0,
+        life_pages: preset?.life_pages ?? '',
         color,
         is_regenerated: regen,
       })
@@ -370,12 +377,30 @@ export default function ConsumableForm({
             />
           </div>
 
-          <InputField
-            label="매입 단가 (원)"
-            type="number"
-            value={formData.unit_price}
-            onChange={(e) => setFormData({ ...formData, unit_price: Number(e.target.value) })}
-          />
+          <div className={styles.grid2}>
+            <InputField
+              label="매입 단가 (원)"
+              type="number"
+              value={formData.unit_price}
+              onChange={(e) => setFormData({ ...formData, unit_price: Number(e.target.value) })}
+            />
+            <InputField
+              label="라이프 (장)"
+              type="number"
+              value={formData.life_pages}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  life_pages: e.target.value === '' ? '' : Number(e.target.value),
+                })
+              }
+              placeholder="예: 20000 (선택)"
+            />
+          </div>
+          <p style={{ margin: '-10px 0 16px', fontSize: '0.72rem', color: '#6b7280', lineHeight: 1.45 }}>
+            이 소모품 1개로 찍을 수 있는 장수입니다. 비워 두어도 됩니다 — 넣으면 원가계산에서
+            장당 원가를 자동으로 잡고, 수익 분석에서 실제 사용분과 비교할 수 있습니다.
+          </p>
 
           <div
             style={{

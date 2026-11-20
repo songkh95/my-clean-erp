@@ -56,7 +56,15 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { name: '견적서', path: '/quotes', icon: FileText },
-  { name: '원가계산', path: '/costing', icon: Calculator },
+  {
+    name: '원가계산',
+    path: '/costing',
+    icon: Calculator,
+    children: [
+      { name: '계산기', path: '/costing' },
+      { name: '수익 분석', path: '/costing/profit' },
+    ],
+  },
   { name: '월 정산 등록', path: '/accounting/registration', icon: SquarePen },
   { name: '청구 이력', path: '/accounting/history', icon: History },
   { name: '수금 현황', path: '/accounting/dashboard', icon: Wallet },
@@ -74,7 +82,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname()
   const [appName, setAppName] = useState('My Clean ERP')
-  const [serviceOpen, setServiceOpen] = useState(true)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const sync = () => setAppName(loadAppSettings().general.appDisplayName || 'My Clean ERP')
@@ -85,21 +93,23 @@ export default function Sidebar({
 
   useEffect(() => {
     try {
-      const v = sessionStorage.getItem('sidebar-service-open')
-      if (v !== null) setServiceOpen(v === '1')
+      const raw = sessionStorage.getItem('sidebar-open-groups')
+      if (raw) setOpenGroups(JSON.parse(raw) as Record<string, boolean>)
     } catch { /* ignore */ }
   }, [])
 
-  const toggleServiceOpen = () => {
-    setServiceOpen((prev) => {
-      const next = !prev
-      try { sessionStorage.setItem('sidebar-service-open', next ? '1' : '0') } catch { /* ignore */ }
+  /** 하위 메뉴는 기본으로 펼쳐 둔다 */
+  const isGroupOpen = (path: string) => openGroups[path] !== false
+
+  const toggleGroup = (path: string) => {
+    setOpenGroups((prev) => {
+      const next = { ...prev, [path]: prev[path] === false }
+      try { sessionStorage.setItem('sidebar-open-groups', JSON.stringify(next)) } catch { /* ignore */ }
       return next
     })
   }
 
   const collapsed = isCollapsed && !isMobile
-  const serviceSectionOpen = pathname === '/service' || pathname.startsWith('/service/')
 
   const asideClass = cx(
     styles.sidebar,
@@ -131,9 +141,12 @@ export default function Sidebar({
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon
           const children = item.children
+          const inSection =
+            pathname === item.path || (pathname.startsWith(`${item.path}/`) && item.path !== '/')
           const parentActive = children
-            ? serviceSectionOpen
+            ? inSection
             : pathname === item.path || (pathname.startsWith(item.path) && item.path !== '/')
+          const groupOpen = isGroupOpen(item.path)
 
           if (children && !collapsed) {
             return (
@@ -152,21 +165,21 @@ export default function Sidebar({
                   <button
                     type="button"
                     className={styles.iconBtn}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleServiceOpen() }}
-                    aria-label={serviceOpen ? '서비스 메뉴 접기' : '서비스 메뉴 펼치기'}
-                    aria-expanded={serviceOpen}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleGroup(item.path) }}
+                    aria-label={`${item.name} 메뉴 ${groupOpen ? '접기' : '펼치기'}`}
+                    aria-expanded={groupOpen}
                   >
-                    {serviceOpen
+                    {groupOpen
                       ? <ChevronDown size="1em" strokeWidth={ICON_STROKE} aria-hidden />
                       : <ChevronRight size="1em" strokeWidth={ICON_STROKE} aria-hidden />}
                   </button>
                 </div>
-                {serviceOpen && (
+                {groupOpen && (
                   <div className={styles.navChildren}>
                     {children.map((child) => {
                       const childActive =
-                        child.path === '/service'
-                          ? pathname === '/service'
+                        child.path === item.path
+                          ? pathname === item.path
                           : pathname === child.path || pathname.startsWith(`${child.path}/`)
                       return (
                         <Link
